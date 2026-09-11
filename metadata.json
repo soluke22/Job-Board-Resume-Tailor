@@ -1,0 +1,6 @@
+{
+  "name": "Resume Tailoring Studio",
+  "description": "Unified Job Search + Resume Tailoring application with canonical ATS verification and evidence-grounded tailoring.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

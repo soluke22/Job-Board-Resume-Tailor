@@ -1,0 +1,990 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import {
+  CandidateProfile,
+  EvidenceItem,
+  ProjectItem,
+  SkillItem,
+  JobRecord,
+  TailoredResume,
+  TailoredCoverLetter,
+  ResumeEvaluation,
+  ResumeBullet,
+  SearchProfile,
+  OutcomeAnalytics,
+  WorkspaceMode,
+  AuthSession,
+  ApplicationStatus,
+  InterviewProofPack,
+  RecruiterOutreach
+} from '../types';
+import { storageService } from '../services/storage';
+import { apiService } from '../services/api';
+
+export type AppView =
+  | 'dashboard'
+  | 'discover'
+  | 'pipeline'
+  | 'jobs'
+  | 'job-detail'
+  | 'resume-editor'
+  | 'proof-packs'
+  | 'outreach'
+  | 'master-resume'
+  | 'evidence-bank'
+  | 'projects'
+  | 'skills'
+  | 'analytics'
+  | 'candidate-setup'
+  | 'settings';
+
+interface AppContextType {
+  // Views & Mode
+  currentView: AppView;
+  setCurrentView: (view: AppView) => void;
+  workspaceMode: WorkspaceMode;
+  setWorkspaceMode: (mode: WorkspaceMode) => void;
+  authSession: AuthSession;
+  login: (email: string, passwordOrToken?: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+
+  // Data Models
+  profile: CandidateProfile;
+  setProfile: (profile: CandidateProfile) => void;
+  searchProfile: SearchProfile;
+  updateSearchProfile: (profile: SearchProfile) => void;
+  evidence: EvidenceItem[];
+  projects: ProjectItem[];
+  skills: SkillItem[];
+  jobs: JobRecord[];
+  activeJobId: string | null;
+  activeJob: JobRecord | null;
+  masterResume: TailoredResume;
+  analytics: OutcomeAnalytics;
+
+  // Status & Progress
+  isAnalyzing: boolean;
+  isGenerating: boolean;
+  isDiscovering: boolean;
+  error: string | null;
+  clearError: () => void;
+
+  // Navigation / Selection
+  setActiveJobId: (id: string | null) => void;
+  openJobDetail: (id: string) => void;
+  openResumeEditor: (id: string) => void;
+
+  // Discovery & Job Pipeline
+  discoverJobs: (queryBudget?: number) => Promise<void>;
+  verifyAtsStatus: (jobId: string) => Promise<void>;
+  addJob: (
+    rawDescription: string,
+    sourceUrl?: string,
+    company?: string,
+    title?: string
+  ) => Promise<JobRecord>;
+  deleteJob: (id: string) => void;
+  updateJob: (job: JobRecord) => void;
+  logOutcome: (
+    jobId: string,
+    status: ApplicationStatus,
+    notes?: string,
+    rejectionReason?: string
+  ) => void;
+
+  // Tailoring Workflow
+  analyzeJob: (jobId: string) => Promise<void>;
+  matchEvidence: (jobId: string) => Promise<void>;
+  submitGapAnswers: (
+    jobId: string,
+    answers: Record<string, string>,
+    saveToEvidenceBank: Record<string, boolean>
+  ) => Promise<void>;
+  generatePlan: (jobId: string) => Promise<void>;
+  generateResume: (jobId: string) => Promise<void>;
+  generateCoverLetter: (jobId: string) => Promise<void>;
+  evaluateResume: (jobId: string) => Promise<void>;
+  updateResume: (jobId: string, resume: TailoredResume) => void;
+  updateCoverLetter: (jobId: string, coverLetter: TailoredCoverLetter) => void;
+  regenerateBullet: (
+    jobId: string,
+    bulletId: string,
+    employerOrProject: string,
+    currentText: string,
+    targetReq: string,
+    underlyingEvidence: string
+  ) => Promise<void>;
+
+  // Preparation & Outreach
+  generateProofPack: (jobId: string) => Promise<void>;
+  generateOutreach: (jobId: string) => Promise<void>;
+  generateAnswers: (jobId: string, questions: string[]) => Promise<void>;
+  generateReferral: (
+    jobId: string,
+    contactName: string,
+    relationship: string,
+    jobUrl?: string
+  ) => Promise<string>;
+
+  // Dialogs & Modals
+  isQuickGrabOpen: boolean;
+  setIsQuickGrabOpen: (open: boolean) => void;
+  isAtsGuardsOpen: boolean;
+  setIsAtsGuardsOpen: (open: boolean) => void;
+  isAuthModalOpen: boolean;
+  setIsAuthModalOpen: (open: boolean) => void;
+
+  // Candidate Data Management
+  saveMasterResume: (resume: TailoredResume) => void;
+  addEvidenceItem: (item: EvidenceItem) => void;
+  updateEvidenceItem: (item: EvidenceItem) => void;
+  toggleEvidenceItem: (id: string) => void;
+  deleteEvidenceItem: (id: string) => void;
+  addProjectItem: (project: ProjectItem) => void;
+  updateProjectItem: (project: ProjectItem) => void;
+  addSkillItem: (skill: SkillItem) => void;
+  updateSkillItem: (skill: SkillItem) => void;
+
+  // Workspace Sync & Migration
+  importWorkspaceJson: (jsonString: string) => { success: boolean; message: string };
+  exportWorkspaceJson: () => string;
+  clearWorkspace: () => void;
+  resetAllData: () => void;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentView, setCurrentView] = useState<AppView>('dashboard');
+  const [workspaceMode, setWorkspaceModeState] = useState<WorkspaceMode>(storageService.getWorkspaceMode());
+  const [authSession, setAuthSession] = useState<AuthSession>(storageService.getAuthSession());
+
+  // Entity states initialized from storage by mode
+  const [profile, setProfileState] = useState<CandidateProfile>(() => storageService.getProfile(workspaceMode));
+  const [searchProfile, setSearchProfileState] = useState<SearchProfile>(() => storageService.getSearchProfile(workspaceMode));
+  const [evidence, setEvidenceState] = useState<EvidenceItem[]>(() => storageService.getEvidence(workspaceMode));
+  const [projects, setProjectsState] = useState<ProjectItem[]>(() => storageService.getProjects(workspaceMode));
+  const [skills, setSkillsState] = useState<SkillItem[]>(() => storageService.getSkills(workspaceMode));
+  const [jobs, setJobsState] = useState<JobRecord[]>(() => storageService.getJobs(workspaceMode));
+  const [masterResume, setMasterResumeState] = useState<TailoredResume>(() => storageService.getMasterResume(workspaceMode));
+  const [analytics, setAnalyticsState] = useState<OutcomeAnalytics>(() => storageService.getAnalytics(workspaceMode));
+
+  const [activeJobId, setActiveJobId] = useState<string | null>(jobs[0]?.id || null);
+
+  // Modals & UI states
+  const [isQuickGrabOpen, setIsQuickGrabOpen] = useState(false);
+  const [isAtsGuardsOpen, setIsAtsGuardsOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Async task spinners
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const clearError = () => setError(null);
+
+  const activeJob = jobs.find((j) => j.id === activeJobId) || null;
+
+  // Synchronize state when workspaceMode changes
+  const reloadDataForMode = (mode: WorkspaceMode) => {
+    setProfileState(storageService.getProfile(mode));
+    setSearchProfileState(storageService.getSearchProfile(mode));
+    setEvidenceState(storageService.getEvidence(mode));
+    setProjectsState(storageService.getProjects(mode));
+    setSkillsState(storageService.getSkills(mode));
+    const loadedJobs = storageService.getJobs(mode);
+    setJobsState(loadedJobs);
+    setMasterResumeState(storageService.getMasterResume(mode));
+    setAnalyticsState(storageService.getAnalytics(mode));
+    setActiveJobId(loadedJobs[0]?.id || null);
+  };
+
+  const setWorkspaceMode = (newMode: WorkspaceMode) => {
+    if (newMode === 'PRIVATE_WORKSPACE' && !authSession.isAuthenticated) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setWorkspaceModeState(newMode);
+    storageService.setWorkspaceMode(newMode);
+    reloadDataForMode(newMode);
+  };
+
+  // Auth actions
+  const login = async (email: string, passwordOrToken?: string): Promise<boolean> => {
+    setError(null);
+    try {
+      const res = await apiService.login(email, passwordOrToken);
+      const session: AuthSession = {
+        isAuthenticated: true,
+        userEmail: res.userEmail,
+        userName: res.userName,
+        token: res.token,
+        isOwner: true,
+        mode: 'PRIVATE_WORKSPACE'
+      };
+      setAuthSession(session);
+      storageService.saveAuthSession(session);
+      setWorkspaceModeState('PRIVATE_WORKSPACE');
+      reloadDataForMode('PRIVATE_WORKSPACE');
+      setIsAuthModalOpen(false);
+      return true;
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed');
+      return false;
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    try {
+      if (authSession.token) {
+        await apiService.logout(authSession.token);
+      }
+    } catch {
+      // Non-blocking
+    }
+    storageService.clearAuthSession();
+    const publicSession: AuthSession = {
+      isAuthenticated: false,
+      userEmail: null,
+      userName: null,
+      isOwner: false,
+      mode: 'PUBLIC_DEMO'
+    };
+    setAuthSession(publicSession);
+    setWorkspaceModeState('PUBLIC_DEMO');
+    reloadDataForMode('PUBLIC_DEMO');
+  };
+
+  // Profile and data setters with storage persistence
+  const setProfile = (newProfile: CandidateProfile) => {
+    setProfileState(newProfile);
+    storageService.saveProfile(newProfile, workspaceMode);
+  };
+
+  const updateSearchProfile = (newSearchProfile: SearchProfile) => {
+    setSearchProfileState(newSearchProfile);
+    storageService.saveSearchProfile(newSearchProfile, workspaceMode);
+  };
+
+  const setEvidence = (newEvidence: EvidenceItem[]) => {
+    setEvidenceState(newEvidence);
+    storageService.saveEvidence(newEvidence, workspaceMode);
+  };
+
+  const setProjects = (newProjects: ProjectItem[]) => {
+    setProjectsState(newProjects);
+    storageService.saveProjects(newProjects, workspaceMode);
+  };
+
+  const setSkills = (newSkills: SkillItem[]) => {
+    setSkillsState(newSkills);
+    storageService.saveSkills(newSkills, workspaceMode);
+  };
+
+  const setJobs = (newJobs: JobRecord[]) => {
+    setJobsState(newJobs);
+    storageService.saveJobs(newJobs, workspaceMode);
+    setAnalyticsState(storageService.getAnalytics(workspaceMode));
+  };
+
+  const saveMasterResume = (resume: TailoredResume) => {
+    setMasterResumeState(resume);
+    storageService.saveMasterResume(resume, workspaceMode);
+  };
+
+  const openJobDetail = (id: string) => {
+    setActiveJobId(id);
+    setCurrentView('job-detail');
+  };
+
+  const openResumeEditor = (id: string) => {
+    setActiveJobId(id);
+    setCurrentView('resume-editor');
+  };
+
+  // Job Search & Discovery
+  const discoverJobs = async (queryBudget = 3): Promise<void> => {
+    setIsDiscovering(true);
+    setError(null);
+    try {
+      const res = await apiService.discoverJobs(searchProfile, undefined, queryBudget, jobs);
+      const newDiscovered = res.discoveredJobs || [];
+
+      if (newDiscovered.length > 0) {
+        // Merge with deduplication
+        const existingUrls = new Set(jobs.map((j) => (j.canonicalUrl || j.sourceUrl || '').toLowerCase()));
+        const filteredNew = newDiscovered.filter(
+          (j) => !existingUrls.has((j.canonicalUrl || j.sourceUrl || '').toLowerCase())
+        );
+
+        const updated = [...filteredNew, ...jobs];
+        setJobs(updated);
+        if (filteredNew[0]) {
+          setActiveJobId(filteredNew[0].id);
+        }
+      }
+    } catch (err: any) {
+      console.error('Job discovery failed:', err);
+      setError(err.message || 'Job discovery encountered an error');
+    } finally {
+      setIsDiscovering(false);
+    }
+  };
+
+  const verifyAtsStatus = async (jobId: string): Promise<void> => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target) return;
+
+    try {
+      const url = target.canonicalUrl || target.applyUrl || target.sourceUrl;
+      if (!url) return;
+
+      const res = await apiService.verifyAts(url, target.atsProvider, target.atsBoard, target.atsJobId);
+      const updated: JobRecord = {
+        ...target,
+        verificationStatus: res.status || target.verificationStatus,
+        isCurrentlyListed: res.isListed !== false,
+        lastVerifiedAt: res.lastVerifiedAt || new Date().toISOString(),
+        canonicalUrl: res.canonicalUrl || target.canonicalUrl,
+        applyUrl: res.applyUrl || target.applyUrl
+      };
+      updateJob(updated);
+    } catch (err: any) {
+      console.error('ATS verification error:', err);
+    }
+  };
+
+  const addJob = async (
+    rawDescription: string,
+    sourceUrl?: string,
+    company?: string,
+    title?: string
+  ): Promise<JobRecord> => {
+    const effectiveUrl = sourceUrl || 'https://jobs.example.com';
+    const newJob: JobRecord = {
+      id: `job-${Date.now()}`,
+      atsProvider: 'company-careers',
+      company: company || 'Pending Analysis',
+      title: title || 'Target Role',
+      canonicalUrl: effectiveUrl,
+      applyUrl: effectiveUrl,
+      sourceUrl,
+      rawDescription,
+      description: rawDescription,
+      location: 'Remote (US)',
+      remoteStatus: 'remote',
+      employmentType: 'full-time',
+      dateAdded: new Date().toISOString().split('T')[0],
+      firstSeenAt: new Date().toISOString(),
+      lastVerifiedAt: new Date().toISOString(),
+      verificationStatus: 'LISTED',
+      isCurrentlyListed: true,
+      freshnessBand: 'NEW',
+      sourceChannel: 'Direct User Input',
+      applicationPriority: 'STRONG',
+      priorityReason: 'User imported target role',
+      qualificationFit: 8.5,
+      evidenceCoverage: 8.0,
+      applicationStatus: 'SHORTLISTED',
+      status: 'Imported',
+      primaryRoleFamily: 'frontend-product',
+      roleModifiers: ['B2B_SAAS'],
+      seniority: 'Mid',
+      hardRequirements: [],
+      preferredRequirements: [],
+      technologies: [],
+      responsibilities: [],
+      hiringSignals: [],
+      hardBlockers: [],
+      softGaps: []
+    };
+
+    const updated = [newJob, ...jobs];
+    setJobs(updated);
+    setActiveJobId(newJob.id);
+    setCurrentView('job-detail');
+    return newJob;
+  };
+
+  const deleteJob = (id: string) => {
+    const updated = jobs.filter((j) => j.id !== id);
+    setJobs(updated);
+    if (activeJobId === id) {
+      setActiveJobId(updated[0]?.id || null);
+      setCurrentView('pipeline');
+    }
+  };
+
+  const updateJob = (updatedJob: JobRecord) => {
+    const updated = jobs.map((j) => (j.id === updatedJob.id ? updatedJob : j));
+    setJobs(updated);
+  };
+
+  const logOutcome = (
+    jobId: string,
+    status: ApplicationStatus,
+    notes?: string,
+    rejectionReason?: string
+  ) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target) return;
+
+    const historyEntry = {
+      status,
+      timestamp: new Date().toISOString(),
+      notes
+    };
+
+    const updated: JobRecord = {
+      ...target,
+      applicationStatus: status,
+      appliedDate: status === 'APPLIED' ? new Date().toISOString().split('T')[0] : target.appliedDate,
+      rejectionReason: rejectionReason || target.rejectionReason,
+      statusHistory: [...(target.statusHistory || []), historyEntry]
+    };
+
+    updateJob(updated);
+    storageService.addAuditLog('OUTCOME_LOGGED', jobId, `Updated status to ${status}${notes ? `: ${notes}` : ''}`);
+  };
+
+  // Tailoring Workflow
+  const analyzeJob = async (jobId: string) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target) return;
+
+    setIsAnalyzing(true);
+    setError(null);
+    try {
+      const textToAnalyze = target.description || target.rawDescription;
+      const { parsed, fit } = await apiService.analyzeJob(textToAnalyze, profile, evidence);
+      const updated: JobRecord = {
+        ...target,
+        company: parsed.company || target.company,
+        title: parsed.roleTitle || target.title,
+        parsed,
+        fit,
+        status: 'Fit Checked',
+        qualificationFit: fit.qualificationFit,
+        evidenceCoverage: fit.evidenceCoverage,
+        primaryRoleFamily: parsed.roleFamily || target.primaryRoleFamily,
+        hardRequirements: parsed.hardRequirements || target.hardRequirements,
+        preferredRequirements: parsed.preferredRequirements || target.preferredRequirements,
+        technologies: parsed.technologies || target.technologies
+      };
+      updateJob(updated);
+
+      // Automatically initiate evidence match
+      await matchEvidence(jobId);
+    } catch (err: any) {
+      console.error('Job analysis failed:', err);
+      setError(err.message || 'Job analysis failed');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const matchEvidence = async (jobId: string) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target || !target.parsed) return;
+
+    setIsAnalyzing(true);
+    try {
+      const { matches } = await apiService.matchEvidence(target.parsed, evidence, projects, skills);
+      const updated: JobRecord = {
+        ...target,
+        evidenceMatches: matches
+      };
+      updateJob(updated);
+
+      // Check if gap interview is recommended
+      if (target.fit && (target.fit.verdict === 'Borderline' || (target.fit.blockers && target.fit.blockers.length > 0))) {
+        const { questions } = await apiService.getGapInterviewQuestions(target.fit, matches, target.parsed);
+        updateJob({
+          ...updated,
+          gapQuestions: questions,
+          status: 'Gap Interview Recommended'
+        });
+      }
+    } catch (err: any) {
+      console.error('Evidence matching failed:', err);
+      setError(err.message || 'Evidence matching failed');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const submitGapAnswers = async (
+    jobId: string,
+    answers: Record<string, string>,
+    saveToEvidenceBank: Record<string, boolean>
+  ) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target) return;
+
+    // Save selected answers to evidence bank
+    const newItems: EvidenceItem[] = [];
+    Object.entries(answers).forEach(([qId, ans]) => {
+      if (saveToEvidenceBank[qId] && ans.trim()) {
+        const q = target.gapQuestions?.find((item) => item.id === qId);
+        newItems.push({
+          id: `ev-gap-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          sourceType: 'manual-entry',
+          sourceLocation: 'Gap Interview session',
+          context: 'Full-time',
+          verificationStatus: 'session-unreviewed',
+          rawEvidence: ans,
+          technologies: target.parsed?.technologies || [],
+          responsibilities: [ans],
+          outcomes: [],
+          supportedVerbs: ['implemented', 'contributed', 'supported'],
+          supportedMetrics: [],
+          strength: 'Moderate',
+          roleFamilyRelevance: [target.primaryRoleFamily || 'frontend-product'],
+          source: `Gap Interview response for ${target.company} (${q?.relatedRequirement || 'General'})`,
+          enabled: true,
+          lastVerifiedAt: new Date().toISOString()
+        });
+      }
+    });
+
+    if (newItems.length > 0) {
+      const updatedEvidence = [...evidence, ...newItems];
+      setEvidence(updatedEvidence);
+    }
+
+    const updatedJob: JobRecord = {
+      ...target,
+      sessionAnswers: {
+        ...(target.sessionAnswers || {}),
+        ...answers
+      },
+      status: 'Ready to Plan'
+    };
+    updateJob(updatedJob);
+  };
+
+  const generatePlan = async (jobId: string) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target || !target.parsed || !target.fit || !target.evidenceMatches) return;
+
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const { plan } = await apiService.generatePlan(
+        target.parsed,
+        target.fit,
+        target.evidenceMatches,
+        target.sessionAnswers
+      );
+      const updated: JobRecord = {
+        ...target,
+        tailoringPlan: plan,
+        status: 'Plan Ready'
+      };
+      updateJob(updated);
+    } catch (err: any) {
+      console.error('Tailoring plan generation failed:', err);
+      setError(err.message || 'Plan generation failed');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const generateResume = async (jobId: string) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target || !target.parsed || !target.tailoringPlan) return;
+
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const { resume } = await apiService.generateResume(
+        target.parsed,
+        target.tailoringPlan,
+        profile,
+        masterResume
+      );
+      const updated: JobRecord = {
+        ...target,
+        tailoredResume: resume,
+        status: 'Resume Generated',
+        applicationStatus: 'TAILORED'
+      };
+      updateJob(updated);
+      setCurrentView('resume-editor');
+
+      // Also evaluate resume automatically
+      await evaluateResume(jobId);
+    } catch (err: any) {
+      console.error('Resume generation failed:', err);
+      setError(err.message || 'Resume generation failed');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const generateCoverLetter = async (jobId: string) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target || !target.parsed || !target.tailoredResume) return;
+
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const { coverLetter } = await apiService.generateCoverLetter(
+        target.parsed,
+        profile,
+        target.tailoredResume
+      );
+      const updated: JobRecord = {
+        ...target,
+        coverLetter
+      };
+      updateJob(updated);
+    } catch (err: any) {
+      console.error('Cover letter generation failed:', err);
+      setError(err.message || 'Cover letter generation failed');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const evaluateResume = async (jobId: string) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target || !target.parsed || !target.tailoredResume) return;
+
+    try {
+      const { evaluation } = await apiService.evaluateResume(target.tailoredResume, target.parsed);
+      const updated: JobRecord = {
+        ...target,
+        evaluation
+      };
+      updateJob(updated);
+    } catch (err: any) {
+      console.error('Resume evaluation failed:', err);
+    }
+  };
+
+  const updateResume = (jobId: string, resume: TailoredResume) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target) return;
+    updateJob({ ...target, tailoredResume: resume });
+    storageService.addAuditLog('RESUME_MANUALLY_EDITED', jobId, 'Edited resume in Studio');
+  };
+
+  const updateCoverLetter = (jobId: string, coverLetter: TailoredCoverLetter) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target) return;
+    updateJob({ ...target, coverLetter });
+  };
+
+  const regenerateBullet = async (
+    jobId: string,
+    bulletId: string,
+    employerOrProject: string,
+    currentText: string,
+    targetReq: string,
+    underlyingEvidence: string
+  ) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target || !target.tailoredResume) return;
+
+    setIsGenerating(true);
+    try {
+      const { bulletText, whyThisBullet } = await apiService.regenerateBullet(
+        targetReq,
+        underlyingEvidence,
+        currentText,
+        employerOrProject
+      );
+
+      // Deep clone and replace bullet
+      const resume = JSON.parse(JSON.stringify(target.tailoredResume)) as TailoredResume;
+      let replaced = false;
+
+      resume.experience?.forEach((exp) => {
+        exp.bullets?.forEach((b) => {
+          if (b.id === bulletId) {
+            b.text = bulletText;
+            if (whyThisBullet) b.whyThisBullet = whyThisBullet;
+            replaced = true;
+          }
+        });
+      });
+
+      if (!replaced) {
+        resume.projects?.forEach((proj) => {
+          proj.bullets?.forEach((b) => {
+            if (b.id === bulletId) {
+              b.text = bulletText;
+              if (whyThisBullet) b.whyThisBullet = whyThisBullet;
+              replaced = true;
+            }
+          });
+        });
+      }
+
+      updateResume(jobId, resume);
+    } catch (err: any) {
+      console.error('Failed to regenerate bullet:', err);
+      setError(err.message || 'Failed to regenerate bullet');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Preparation & Outreach
+  const generateProofPack = async (jobId: string) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target) return;
+
+    const resumeToUse = target.tailoredResume || masterResume;
+    const parsedJob = target.parsed || {
+      roleTitle: target.title,
+      company: target.company
+    };
+
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const res = await apiService.generateProofPack(resumeToUse, evidence, parsedJob);
+      const updated: JobRecord = {
+        ...target,
+        proofPack: res.proofPack
+      };
+      updateJob(updated);
+      setCurrentView('proof-packs');
+    } catch (err: any) {
+      console.error('Failed to generate proof pack:', err);
+      setError(err.message || 'Failed to generate proof pack');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const generateOutreach = async (jobId: string) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target) return;
+
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const parsedJob = target.parsed || {
+        id: target.id,
+        roleTitle: target.title,
+        company: target.company
+      };
+      const res = await apiService.generateOutreach(parsedJob, profile, target.tailoredResume);
+      const updated: JobRecord = {
+        ...target,
+        recruiterOutreach: res.outreach
+      };
+      updateJob(updated);
+      setCurrentView('outreach');
+    } catch (err: any) {
+      console.error('Failed to generate outreach:', err);
+      setError(err.message || 'Failed to generate outreach');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const generateAnswers = async (jobId: string, questions: string[]) => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target) return;
+
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const parsedJob = target.parsed || {
+        roleTitle: target.title,
+        company: target.company
+      };
+      const res = await apiService.generateAnswers(questions, parsedJob, evidence);
+      const updated: JobRecord = {
+        ...target,
+        applicationAnswers: res.answers
+      };
+      updateJob(updated);
+    } catch (err: any) {
+      console.error('Failed to generate answers:', err);
+      setError(err.message || 'Failed to generate application answers');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const generateReferral = async (
+    jobId: string,
+    contactName: string,
+    relationship: string,
+    jobUrl?: string
+  ): Promise<string> => {
+    const target = jobs.find((j) => j.id === jobId);
+    if (!target) return '';
+
+    const effectiveUrl = jobUrl || target.canonicalUrl || target.applyUrl || target.sourceUrl || '';
+    const res = await apiService.generateReferral(
+      contactName,
+      relationship,
+      target.company,
+      target.title,
+      effectiveUrl
+    );
+    return res.referralMessage;
+  };
+
+  // Evidence & Entities
+  const addEvidenceItem = (item: EvidenceItem) => {
+    const updated = [item, ...evidence];
+    setEvidence(updated);
+  };
+
+  const updateEvidenceItem = (item: EvidenceItem) => {
+    const updated = evidence.map((e) => (e.id === item.id ? item : e));
+    setEvidence(updated);
+  };
+
+  const toggleEvidenceItem = (id: string) => {
+    const updated = evidence.map((e) => (e.id === id ? { ...e, enabled: !e.enabled } : e));
+    setEvidence(updated);
+  };
+
+  const deleteEvidenceItem = (id: string) => {
+    const updated = evidence.filter((e) => e.id !== id);
+    setEvidence(updated);
+  };
+
+  const addProjectItem = (project: ProjectItem) => {
+    const updated = [project, ...projects];
+    setProjects(updated);
+  };
+
+  const updateProjectItem = (project: ProjectItem) => {
+    const updated = projects.map((p) => (p.id === project.id ? project : p));
+    setProjects(updated);
+  };
+
+  const addSkillItem = (skill: SkillItem) => {
+    const updated = [skill, ...skills];
+    setSkills(updated);
+  };
+
+  const updateSkillItem = (skill: SkillItem) => {
+    const updated = skills.map((s) => (s.id === skill.id ? skill : s));
+    setSkills(updated);
+  };
+
+  // Workspace Import / Export / Reset
+  const importWorkspaceJson = (jsonString: string) => {
+    const result = storageService.importWorkspaceData(jsonString);
+    if (result.success) {
+      reloadDataForMode(workspaceMode);
+    }
+    return result;
+  };
+
+  const exportWorkspaceJson = () => {
+    return storageService.exportPrivateWorkspace();
+  };
+
+  const clearWorkspace = () => {
+    storageService.clearPrivateWorkspace();
+    reloadDataForMode('PRIVATE_WORKSPACE');
+  };
+
+  const resetAllData = () => {
+    if (workspaceMode === 'PUBLIC_DEMO') {
+      localStorage.removeItem('caos_demo_profile');
+      localStorage.removeItem('caos_demo_evidence');
+      localStorage.removeItem('caos_demo_projects');
+      localStorage.removeItem('caos_demo_skills');
+      localStorage.removeItem('caos_demo_jobs');
+      localStorage.removeItem('caos_demo_master_resume');
+      reloadDataForMode('PUBLIC_DEMO');
+    } else {
+      clearWorkspace();
+    }
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        currentView,
+        setCurrentView,
+        workspaceMode,
+        setWorkspaceMode,
+        authSession,
+        login,
+        logout,
+        profile,
+        setProfile,
+        searchProfile,
+        updateSearchProfile,
+        evidence,
+        projects,
+        skills,
+        jobs,
+        activeJobId,
+        activeJob,
+        masterResume,
+        analytics,
+        isAnalyzing,
+        isGenerating,
+        isDiscovering,
+        error,
+        clearError,
+        setActiveJobId,
+        openJobDetail,
+        openResumeEditor,
+        discoverJobs,
+        verifyAtsStatus,
+        addJob,
+        deleteJob,
+        updateJob,
+        logOutcome,
+        analyzeJob,
+        matchEvidence,
+        submitGapAnswers,
+        generatePlan,
+        generateResume,
+        generateCoverLetter,
+        evaluateResume,
+        updateResume,
+        updateCoverLetter,
+        regenerateBullet,
+        generateProofPack,
+        generateOutreach,
+        generateAnswers,
+        generateReferral,
+        isQuickGrabOpen,
+        setIsQuickGrabOpen,
+        isAtsGuardsOpen,
+        setIsAtsGuardsOpen,
+        isAuthModalOpen,
+        setIsAuthModalOpen,
+        saveMasterResume,
+        addEvidenceItem,
+        updateEvidenceItem,
+        toggleEvidenceItem,
+        deleteEvidenceItem,
+        addProjectItem,
+        updateProjectItem,
+        addSkillItem,
+        updateSkillItem,
+        importWorkspaceJson,
+        exportWorkspaceJson,
+        clearWorkspace,
+        resetAllData
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};
