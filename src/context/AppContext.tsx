@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { mergeDiscoveredJobs } from '../utils/jobIdentity';
 import {
   CandidateProfile,
   EvidenceItem,
@@ -394,19 +395,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const res = await apiService.discoverJobs(searchProfile, undefined, queryBudget, jobs);
       const newDiscovered = res.discoveredJobs || [];
 
-      if (newDiscovered.length > 0) {
-        // Merge with deduplication
-        const existingUrls = new Set(jobs.map((j) => (j.canonicalUrl || j.sourceUrl || '').toLowerCase()));
-        const filteredNew = newDiscovered.filter(
-          (j) => !existingUrls.has((j.canonicalUrl || j.sourceUrl || '').toLowerCase())
-        );
-
-        const updated = [...filteredNew, ...jobs];
-        setJobs(updated);
-        if (filteredNew[0]) {
-          setActiveJobId(filteredNew[0].id);
-        }
-      }
+      // Read the latest cache after the await: an in-flight search must not undo
+      // application edits or resurrect a history record deleted meanwhile.
+      const currentJobs = storageService.getJobs(workspaceMode);
+      const retainedRefreshes = (res.refreshedJobs || []).filter(j => currentJobs.some(current => current.id === j.id));
+      const merged = mergeDiscoveredJobs(currentJobs, [...retainedRefreshes, ...newDiscovered]);
+      setJobs(merged.jobs);
+      if (merged.newJobs[0]) setActiveJobId(merged.newJobs[0].id);
     } catch (err: any) {
       console.error('Job discovery failed:', err);
       setError(err.message || 'Job discovery encountered an error');
@@ -424,15 +419,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!url) return;
 
       const res = await apiService.verifyAts(url, target.atsProvider, target.atsBoard, target.atsJobId);
+      const currentJobs = storageService.getJobs(workspaceMode);
+      const current = currentJobs.find(j => j.id === jobId);
+      if (!current) return;
       const updated: JobRecord = {
-        ...target,
-        verificationStatus: res.status || target.verificationStatus,
-        isCurrentlyListed: res.isListed !== false,
+        ...current,
+        verificationStatus: res.status || 'UNKNOWN',
+        isCurrentlyListed: res.status === 'LISTED',
         lastVerifiedAt: res.lastVerifiedAt || new Date().toISOString(),
-        canonicalUrl: res.canonicalUrl || target.canonicalUrl,
-        applyUrl: res.applyUrl || target.applyUrl
+        canonicalUrl: res.canonicalUrl || current.canonicalUrl,
+        applyUrl: res.applyUrl || current.applyUrl
       };
-      updateJob(updated);
+      setJobs(currentJobs.map(j => j.id === jobId ? updated : j));
     } catch (err: any) {
       console.error('ATS verification error:', err);
     }
@@ -444,7 +442,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     company?: string,
     title?: string
   ): Promise<JobRecord> => {
-    const effectiveUrl = sourceUrl || 'https://jobs.example.com';
+    const effectiveUrl = sourceUrl || '';
     const newJob: JobRecord = {
       id: `job-${Date.now()}`,
       atsProvider: 'company-careers',
@@ -455,25 +453,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       sourceUrl,
       rawDescription,
       description: rawDescription,
-      location: 'Remote (US)',
-      remoteStatus: 'remote',
-      employmentType: 'full-time',
+      location: '',
+      remoteStatus: 'unknown',
+      employmentType: '',
       dateAdded: new Date().toISOString().split('T')[0],
       firstSeenAt: new Date().toISOString(),
-      lastVerifiedAt: new Date().toISOString(),
-      verificationStatus: 'LISTED',
-      isCurrentlyListed: true,
-      freshnessBand: 'NEW',
+      verificationStatus: 'UNKNOWN',
+      isCurrentlyListed: false,
+      freshnessBand: 'UNKNOWN',
       sourceChannel: 'Direct User Input',
-      applicationPriority: 'STRONG',
-      priorityReason: 'User imported target role',
-      qualificationFit: 8.5,
-      evidenceCoverage: 8.0,
+      applicationPriority: 'UNASSESSED',
+      assessmentStatus: 'UNASSESSED',
+      priorityReason: 'User imported target role; not assessed',
       applicationStatus: 'SHORTLISTED',
       status: 'Imported',
-      primaryRoleFamily: 'frontend-product',
-      roleModifiers: ['B2B_SAAS'],
-      seniority: 'Mid',
+      primaryRoleFamily: undefined,
+      roleModifiers: [],
+      seniority: 'Unspecified',
       hardRequirements: [],
       preferredRequirements: [],
       technologies: [],
@@ -550,6 +546,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: 'Fit Checked',
         qualificationFit: fit.qualificationFit,
         evidenceCoverage: fit.evidenceCoverage,
+        assessmentStatus: 'ASSESSED',
+        applicationPriority: fit.applicationPriority,
         primaryRoleFamily: parsed.roleFamily || target.primaryRoleFamily,
         hardRequirements: parsed.hardRequirements || target.hardRequirements,
         preferredRequirements: parsed.preferredRequirements || target.preferredRequirements,

@@ -43,11 +43,12 @@ export type AtsVerificationStatus =
   | 'UNKNOWN'
   | 'UNSUPPORTED';
 
-export type FreshnessBand = 'NEW' | 'RECENT' | 'ESTABLISHED' | 'OLD';
+export type FreshnessBand = 'NEW' | 'RECENT' | 'ESTABLISHED' | 'OLD' | 'UNKNOWN';
 
 export type Verdict = 'Apply' | 'Borderline' | 'Skip';
 
 export type ApplicationPriority =
+  | 'UNASSESSED'
   | 'APPLY FIRST'
   | 'STRONG'
   | 'CALIBRATED STRETCH'
@@ -524,6 +525,16 @@ export interface JobRecord {
   applyUrl: string;
   sourceUrl?: string;
   discoveryUrl?: string;
+  discoveryTitle?: string;
+  discoveryCompany?: string;
+  publicationDateSource?: string;
+  discoverySummary?: string;
+  discoverySourceUrls?: string[];
+  discoveryAliases?: string[];
+  canonicalContentStatus?: 'AVAILABLE' | 'UNAVAILABLE' | 'UNSUPPORTED';
+  canonicalContentSource?: string;
+  canonicalMetadata?: unknown;
+  assessmentStatus?: 'UNASSESSED' | 'ASSESSED';
   description: string;
   location: string;
   secondaryLocations?: string[];
@@ -550,7 +561,7 @@ export interface JobRecord {
   searchQuery?: string;
 
   // Categorization & Fit
-  primaryRoleFamily: PrimaryRoleFamily;
+  primaryRoleFamily?: PrimaryRoleFamily;
   roleModifiers: RoleModifier[];
   seniority: 'Junior' | 'Mid' | 'Senior' | 'Staff' | 'Lead' | 'Unspecified' | string;
   hardRequirements: string[];
@@ -562,8 +573,8 @@ export interface JobRecord {
   softGaps: string[];
 
   // Scores & Priority
-  qualificationFit: number; // 0 - 10
-  evidenceCoverage: number; // 0 - 10
+  qualificationFit?: number; // absent until assessed
+  evidenceCoverage?: number; // absent until assessed
   applicationPriority: ApplicationPriority;
   priorityReason: string;
   applicationStatus: ApplicationStatus;

@@ -70,13 +70,17 @@ const evaluation = object({ isReady: flag, overallStatus: z.enum(['PASS', 'WARN'
     targetId: text.optional(), message: text, suggestedFix: text.optional(), isSafeToAutoFix: flag })) });
 export const jobSchema = object({ id, atsProvider: text, atsBoard: text.optional(), atsJobId: text.optional(), company: text, title: text,
   canonicalUrl: text, applyUrl: text, sourceUrl: text.optional(), discoveryUrl: text.optional(), description: text, location: text,
+  discoveryTitle: text.optional(), discoveryCompany: text.optional(), discoverySummary: text.optional(),
+  discoverySourceUrls: strings.optional(), discoveryAliases: strings.optional(),
+  canonicalContentStatus: z.enum(['AVAILABLE', 'UNAVAILABLE', 'UNSUPPORTED']).optional(), canonicalContentSource: text.optional(),
+  canonicalMetadata: z.unknown().optional(), publicationDateSource: text.optional(), assessmentStatus: z.enum(['UNASSESSED', 'ASSESSED']).optional(),
   secondaryLocations: strings.optional(), remoteStatus: z.enum(['remote', 'hybrid', 'onsite', 'unknown']), workplaceType: text.optional(), employmentType: text,
   compensation: object({ min: number.optional(), max: number.optional(), currency: text.optional(), interval: z.enum(['year', 'hour', 'month']).optional(), raw: text.optional() }).optional(),
   department: text.optional(), team: text.optional(), publishedAt: text.optional(), updatedAt: text.optional(), firstSeenAt: text, lastVerifiedAt: text.optional(),
   verificationStatus: text, isCurrentlyListed: flag, freshnessBand: text.optional(), sourceChannel: text, searchQuery: text.optional(),
-  primaryRoleFamily: text, roleModifiers: strings, seniority: text, hardRequirements: strings, preferredRequirements: strings,
+  primaryRoleFamily: text.optional(), roleModifiers: strings, seniority: text, hardRequirements: strings, preferredRequirements: strings,
   technologies: strings, responsibilities: strings, hiringSignals: strings, hardBlockers: strings, softGaps: strings,
-  qualificationFit: number, evidenceCoverage: number, applicationPriority: text, priorityReason: text, applicationStatus: text,
+  qualificationFit: number.optional(), evidenceCoverage: number.optional(), applicationPriority: text, priorityReason: text, applicationStatus: text,
   duplicateOf: text.optional(), notes: text.optional(), rawDescription: text.optional(), dateAdded: text.optional(), status: text.optional(), stage: text.optional(),
   channel: text.optional(), appliedDate: text.optional(), rejectionReason: text.optional(), parsed: parsed.optional(), fit: fit.optional(),
   evidenceMatches: list(match).optional(), sessionQuestions: list(question).optional(), gapQuestions: list(question).optional(), sessionAnswers: z.record(z.string(), text).optional(),
@@ -84,7 +88,14 @@ export const jobSchema = object({ id, atsProvider: text, atsBoard: text.optional
   versionHistory: list(object({ versionId: id, timestamp: text, note: text, resume: resumeSchema })).refine(records => new Set(records.map(r => r.versionId)).size === records.length, 'Duplicate version ids').optional(),
   proofPack: proof.optional(), outreachDrafts: outreach.optional(), recruiterOutreach: outreach.optional(), referralContact: contact.optional(),
   applicationAnswers: list(object({ id, question: text, answer: text, evidenceIds: strings, rationale: text.optional() })).optional(),
-  statusHistory: list(object({ from: text, to: text, timestamp: text, note: text.optional() })).optional(), ...review });
+  statusHistory: list(object({ from: text, to: text, timestamp: text, note: text.optional() })).optional(), ...review }).superRefine((job, context) => {
+    if (job.assessmentStatus === 'UNASSESSED') {
+      if (job.qualificationFit !== undefined || job.evidenceCoverage !== undefined || job.fit !== undefined || job.applicationPriority !== 'UNASSESSED')
+        context.addIssue({code: 'custom', message: 'Unassessed jobs cannot contain fit scores or assessed priority.'});
+    } else if (job.qualificationFit === undefined || job.evidenceCoverage === undefined || job.assessmentStatus === undefined && job.primaryRoleFamily === undefined) {
+      context.addIssue({code: 'custom', message: 'Missing assessment fields require explicit UNASSESSED state.'});
+    }
+  });
 const unique = <T extends z.ZodType<{ id: string }>>(schema: T) => list(schema).refine(records => new Set(records.map(r => r.id)).size === records.length, 'Duplicate record ids');
 export const workspaceInput = z.object({ profile: profileSchema.nullable().optional(), searchProfile: searchProfileSchema.nullable().optional(), masterResume: resumeSchema.nullable().optional(),
   evidence: unique(evidenceSchema).optional(), projects: unique(projectSchema).optional(), skills: unique(skillSchema).optional(), jobs: unique(jobSchema).optional(),
