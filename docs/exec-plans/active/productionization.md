@@ -5,19 +5,30 @@ Truthful discovery and evidence-grounded career workflows with durable owner-onl
 private storage and a separate synthetic demo. GitHub is canonical.
 
 ## Current Branch
-dev; Phase 5 started clean at freshly fetched dev == origin/dev ==
-8882f7207060ec5182ede4e424963c8102863c94 (published Phase 4).
-User requests coherent Phase 5 checkpoints and normal fast-forward origin/dev push.
+dev; Phase 4.1 began clean at freshly fetched dev == origin/dev ==
+610a00f369d589ba8c76ca7b9cc67f354770555b (published Phase 5).
+User requests coherent calibration checkpoint and normal fast-forward origin/dev push.
 No main, release PR, Studio or production deployment.
 
 ## Current Phase / Scope and Acceptance
-Phase 5 — Resume provenance + tailoring + manual validation.
+Phase 4.1 calibration hardening, before Phase 6. Bounded scope/centrality/depth
+and relationship arithmetic, caps, priority and synthetic regressions. Acceptance:
+[calibration matrix](phase-4-1-calibration.md). Phase 5 remains complete.
+Parent owns writes; one narrow read-only calibration security review.
+Previous completed scope: Phase 5 — Resume provenance + tailoring + manual validation.
 Acceptance: [Phase 5 matrix](phase-5-acceptance.md). Current certified assessment,
 owner-resolved eligible evidence, exact-text claim ledger, deterministic identity,
 manual invalidation/revalidation, safe regeneration, version history and final export.
 No Phase 6. Parent owns writes; one narrow read-only security-reviewer.
 
 ## Current Status
+Phase 4.1 calibration hardening complete locally. Focused Phase 4/4.1/5 29/29,
+full suite 69/69, final release composition, startup smoke 1/1, standalone evidence
+validator, privacy triage (zero findings) and git diff --check pass. Reviewer
+directly rechecked both demonstrated calibration defects and confirmed resolved.
+Coherent dev checkpoint/publication is the remaining step for this task.
+Algorithm phase4.1-v2; old assessments/artifacts become stale via existing basis.
+
 Phase 5 conservative deterministic contract complete and published. Focused 11/11 and full
 63/63 tests pass; initial release composition passes typecheck/build/harness/tests
 and strict required-build privacy scan, zero findings. Final validation complete; implementation c00c5e2 published to origin/dev by normal
@@ -93,6 +104,14 @@ blocks final export. Complete local gates pass; live semantic/rendering proofs
 remain explicit external gates. Truth precedes relevance/readability/page fit.
 
 ## Tests Passed
+Phase 4.1: calibration 5/5, Phase 4 12/12, Phase 5 12/12; complete 69/69.
+Final release:check passes typecheck/build/harness/full tests/strict required-build
+privacy zero findings. Standalone privacy scan/evidence validator, startup smoke
+1/1 and git diff --check pass. Existing 541.45 kB chunk warning remains.
+Reviewer directly reran unrelated/negative/range tenure and critical-gap dilution
+reproductions: fixed; direct targets retain APPLY FIRST. Live semantic gates unchanged.
+
+Previous Phase 5 checkpoint validation:
 Focused Phase 5 11/11; full npm test 63/63. Typecheck/build/harness and initial
 release composition pass, strict required-build privacy zero findings.
 Final npm run release:check passes typecheck/build/harness, 63/63 tests and strict
@@ -101,6 +120,11 @@ synthetic evidence validator, startup smoke 1/1 and git diff --check pass.
 Existing client >500 kB warning remains (541.45 kB).
 
 ## Tests Failing / Security Review
+Phase 4.1 has no remaining demonstrated defect in this bounded review. Initial
+calibration fixture exposed CMS adjacency outscoring senior stretch; core-adjacency
+cap now separates them. Reviewer exposed duration-domain/negative/range and
+critical-partial dilution; new regressions and fixes verified. See calibration matrix.
+
 No failures in latest focused suite. Full initial suite found protected route count
 and legacy artifact metadata expectations; updated assertions retain denied HTTP
 coverage and exact legacy text/identity preservation. Reviewer demonstrated negative
@@ -137,6 +161,10 @@ Only synthetic candidate evidence authorized for a live Gemini smoke.
 No secrets/private data logged or remote resources created.
 
 ## Files / Modules Currently Involved
+Phase 4.1: server/assessment.ts, src/types/assessment.ts, focused Phase 4/4.1/5
+tests and synthetic evidence fixture; calibration/acceptance/pipeline/evidence/testing
+docs and this plan. No Phase 5 generation/readiness implementation changes.
+
 server/resumeProvenance.ts, resumeRoutes.ts, server.ts structured adapter;
 workspaceRepository certification/history/import and workspaceValidation;
 shared provenance/index types; API/AppContext, editor/evidence/history/export/print
@@ -149,7 +177,7 @@ freshly fetched refs without a self-hash loop.
 
 ## Next Exact Step
 Phase 6 — Proof packs + outreach + application answers.
-Begin only on a new explicit continuation; this task stops after Phase 5 publication
+Begin only on a new explicit continuation; this task stops after Phase 4.1 publication
 and report. Live Phase 5 synthetic Gemini acceptance awaits external configuration.
 Release audit precedes dev/main PR, merged-main AI Studio verification and final
 Vercel production. Do not begin Phase 6 in this task.

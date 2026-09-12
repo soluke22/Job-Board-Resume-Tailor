@@ -52,6 +52,14 @@ Target requirement IDs must exist and have a Phase 4 match to supporting evidenc
 Duplicate supporting IDs normalize; unknown/ineligible IDs reject.
 
 ## Assessment and artifact basis
+Phase 4.1 uses context, employer, role, period and source location/type for
+professional-depth safeguards and assessment fingerprints. Personal/project
+support cannot equal professional production support. Duration requires an explicit
+approved statement meeting the minimum; periods are not summed into tenure.
+Semantic domain/seniority support remains subject to source-grounded matching.
+The phase4.1-v2 bump invalidates phase4-v1 assessments and linked READY resumes;
+historical text/claim ledger remains intact and migration does not regenerate.
+
 A new resume requires current ASSESSED Phase 4 JD/evidence/SearchProfile/algorithm
 fingerprints; UNASSESSED, STALE, failed and legacy assessments cannot certify it.
 SKIP/hard-blocked roles are excluded, while calibrated stretches remain eligible.

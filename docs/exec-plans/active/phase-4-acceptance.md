@@ -1,5 +1,12 @@
 # Phase 4 acceptance
 
+## Phase 4.1 calibration hardening
+Current calibration supersedes phase4-v1 arithmetic and priority criteria below.
+See [calibration matrix](phase-4-1-calibration.md) and
+[algorithm](../../JOB_SEARCH_PIPELINE.md#deterministic-algorithm-phase41-v2).
+Phase 4 provenance, retrieval and deterministic constraints remain intact;
+Phase 5 remains complete subject to regression gates. Phase 6 is not started.
+
 Baseline: clean dev 89b3596, fetched origin/dev equal. Scope is qualification/ranking only; no Phase 5.
 
 | Requirement | Current behavior | Evidence | Status | Required fix |
