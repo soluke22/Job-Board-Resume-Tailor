@@ -66,5 +66,8 @@ facts stay unknown. Authenticated browser/OAuth/Neon/Blob/deployment remain exte
 No Phase 5 started; gap interview/artifact provenance is not certified here.
 
 Result: deterministic Phase 4 contract Pass; live Gemini semantic acceptance
-pending external configuration. Normal checkpoint publication/equal fetched refs
-is verified at handoff.
+pending external configuration. Implementation checkpoint a17570c is local;
+automatic approval review rejected normal git push origin dev twice because it
+does not accept the attached request as trusted export authorization. Remote URL
+verified https://github.com/soluke22/Job-Board-Resume-Tailor.git; no push occurred,
+origin/dev remains 89b3596. Direct user approval is the remaining publication gate.

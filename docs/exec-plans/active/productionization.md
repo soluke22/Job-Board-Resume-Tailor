@@ -20,8 +20,11 @@ tests, typecheck/build/harness/privacy/evidence/release/startup/diff checks plus
 normal checkpoint publication. Live Gemini is a separate external acceptance gate.
 
 ## Current Status
-Phase 4 deterministic assessment contract verified locally; final publication
-verification follows checkpoint. Live Gemini semantic acceptance pending external
+Phase 4 deterministic assessment contract verified locally; implementation checkpoint
+a17570c committed cleanly. Publication blocked by automatic approval review twice:
+it rejects attached-request authorization as untrusted for exporting the commit to
+the verified GitHub origin. No push occurred. Direct user approval required before
+retrying; origin/dev remains 89b3596. Live Gemini semantic acceptance pending external
 configuration: GEMINI_API_KEY absent (environment and only .env.example).
 No real private evidence sent to a live model. No applications performed.
 
@@ -143,6 +146,9 @@ docs/exec-plans/active/productionization.md; normal push then clean/equal fetche
 refs verify publication without self-hash loop.
 
 ## Next Exact Step
+Obtain direct user approval for normal git push origin dev to
+https://github.com/soluke22/Job-Board-Resume-Tailor.git, publish the local Phase 4
+implementation/documentation checkpoints, fetch and verify clean equal refs.
 Phase 5 — Resume provenance + tailoring + manual validation.
 Begin only on a new explicit continuation; this task stops after Phase 4 report.
 Live Phase 4 synthetic Gemini semantic acceptance also awaits configuration.
