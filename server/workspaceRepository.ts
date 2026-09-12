@@ -34,8 +34,9 @@ function decode(table: EntityTable, row: any) {
 export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
   async function upsert(tx: any, table: EntityTable, ownerId: string, id: string, data: Record<string, unknown>, parentId: string | null = null) {
     const rest = { ...data };
-    const scalars: Record<string, string> = {};
+    const scalars: Record<string, string | null> = {};
     for (const field of scalarFields.get(table) ?? []) {
+      scalars[field] = null;
       if (rest[field] !== undefined) {
         if (typeof rest[field] !== 'string') throw new WorkspaceValidationError(`Invalid ${field}`);
         scalars[field] = rest[field];
@@ -122,6 +123,10 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
               for (const [index, item] of (job[key] as Record<string, unknown>[]).entries()) {
                 if (!item || typeof item !== 'object') throw new WorkspaceValidationError('Invalid history entry');
                 await upsert(tx, table, ownerId, `${id}:${key}:${String(item.versionId ?? index)}`, normalize(item), id);
+              }
+              if (!importing) {
+                const historyIds = (job[key] as Record<string, unknown>[]).map((item, index) => `${id}:${key}:${String(item.versionId ?? index)}`);
+                await tx.delete(table).where(and(eq(table.ownerId, ownerId), eq(table.parentId, id), historyIds.length ? notInArray(table.id, historyIds) : undefined));
               }
             }
             delete job[key];

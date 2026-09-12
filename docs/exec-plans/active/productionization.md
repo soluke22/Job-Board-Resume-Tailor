@@ -9,9 +9,19 @@ fetch confirmed dev == origin/dev. Publish Phase 1 by normal fast-forward only;
 verify fetched origin/dev == dev and a clean working tree. No main mutation/PR.
 
 ## Current Phase
+Phase 2 started: audit inherited durable database/private files against the
+[before-edit matrix](phase-2-acceptance.md). Scope is persistence acceptance and
+demonstrated fixes only, with local synthetic PGlite and file fault tests; no
+remote migrations/deployment or Phase 3. Acceptance requires restart-safe owner
+state, transactional revisions, deterministic replace/import and file consistency.
+First local checkpoint passed release:check (21 tests), typecheck/build/harness and
+strict public-build privacy scan. db:generate reports no drift. Scalar/history
+replacement fixes and real SQL-trigger rollback pass. File fault tests demonstrate
+failed compensation can orphan a private Blob. Phase 2 NOT complete.
+
 Phase 1 code-complete: authentication + public/private boundary acceptance and
 demonstrated fixes. Deterministic gates pass; live Google acceptance is pending
-external configuration. Phase 2 has not begun.
+external configuration. Phase 2 is in progress; Phase 1 results below are historical.
 
 ## Current Status
 Retained Better Auth/Google OAuth, Drizzle database sessions, server owner guards,
@@ -105,6 +115,11 @@ Use git rev-parse dev origin/dev after fetch for publication receipt; avoid a
 self-referential commit hash. Final deterministic results are recorded above.
 
 ## Next Exact Step
+Continue Phase 2: resolve failed-upload Blob orphan reconciliation with a minimal
+durable race-safe strategy and tests, then finish remaining acceptance in
+phase-2-acceptance.md. Obtain request continuation after truncated section 13.
+No Phase 3, remote migration or deployment. The prior start step below is completed.
+
 On clean dev, fetch origin and confirm dev == origin/dev. Read
 .agents/skills/vercel-deployment/SKILL.md and docs/DEPLOYMENT.md; audit inherited
 Neon/Drizzle workspace and Private Blob persistence against durable restart,
