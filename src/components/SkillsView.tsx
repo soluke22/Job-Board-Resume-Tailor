@@ -37,7 +37,7 @@ export const SkillsView: React.FC = () => {
           </span>
         </div>
         <p className="text-xs text-slate-500 mt-0.5">
-          Every skill listed here is tied to production code at Disney or validated project implementations. Unsupported skills are never added.
+          Review the evidence supporting each skill before including it in an application.
         </p>
       </div>
 

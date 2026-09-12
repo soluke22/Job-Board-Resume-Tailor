@@ -60,7 +60,7 @@ export const DashboardView: React.FC = () => {
   const borderlineCount = jobs.filter((j) => j.fit?.verdict === 'Borderline').length;
   const skipCount = jobs.filter((j) => j.fit?.verdict === 'Skip').length;
 
-  const displayName = profile.name || 'Solomon Lucas-Thornton';
+  const displayName = profile.name || 'Candidate';
 
   // Quick plain text ATS generator for master resume
   const getMasterPlainText = () => {
@@ -125,15 +125,15 @@ export const DashboardView: React.FC = () => {
                 {displayName}
               </h1>
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 text-xs font-semibold">
-                {profile.title || 'Software Engineer'}
+                {profile.title || 'Add your professional title'}
               </span>
               <span className="text-xs text-slate-500">
-                {profile.location || 'Los Angeles, CA / Remote'}
+                {profile.location || 'Add your location'}
               </span>
             </div>
 
             <p className="text-xs text-slate-600 dark:text-slate-400 max-w-3xl leading-relaxed">
-              Production React, TypeScript, and GraphQL engineer with high-traffic web experience at The Walt Disney Company.
+              {masterResume.professionalSummary || 'Add your profile and evidence to get started.'}
               Tailoring resumes and cover letters strictly when jobs genuinely fit defensible candidate evidence.
             </p>
 
@@ -200,17 +200,17 @@ export const DashboardView: React.FC = () => {
                 </span>
               </div>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
-                Active & Grounded
+                Master Resume
               </span>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Canonical single source of truth grounded in Disney ESPN live-event features, tournament state logic, and defensible projects.
+              Your saved master resume and source claims for tailoring.
             </p>
             <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300 space-y-1">
               <div className="flex justify-between">
-                <span className="text-slate-400">Disney Bullets:</span>
+                <span className="text-slate-400">Experience Bullets:</span>
                 <span className="font-medium text-slate-800 dark:text-slate-200">
-                  {masterResume.experience[0]?.bullets?.length || 8} verified claims
+                  {masterResume.experience[0]?.bullets?.length || 0} saved claims
                 </span>
               </div>
               <div className="flex justify-between">
@@ -282,12 +282,12 @@ export const DashboardView: React.FC = () => {
 
               <button
                 onClick={() => {
-                  const disneyBullets = masterResume.experience[0]?.bullets?.map((b) => `* ${b.text}`).join('\n') || '';
-                  copyToClipboard(disneyBullets, 'dash-bullets');
+                  const experienceBullets = masterResume.experience[0]?.bullets?.map((b) => `* ${b.text}`).join('\n') || '';
+                  copyToClipboard(experienceBullets, 'dash-bullets');
                 }}
                 className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200 cursor-pointer"
               >
-                <span>Disney Bullets</span>
+                <span>Experience Bullets</span>
                 {copiedKey === 'dash-bullets' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-slate-400" />}
               </button>
 
@@ -385,7 +385,7 @@ export const DashboardView: React.FC = () => {
             <span className="text-xs text-slate-400">records</span>
           </div>
           <p className="mt-1 text-[11px] text-slate-400 truncate">
-            Disney, ESPN, SignalSafe, UI Lib
+            Candidate evidence sources
           </p>
         </div>
 
@@ -399,7 +399,7 @@ export const DashboardView: React.FC = () => {
             <span className="text-xs text-slate-400">verified</span>
           </div>
           <p className="mt-1 text-[11px] text-slate-400 truncate">
-            React, TypeScript, GraphQL, Jest
+            {skills.map((skill) => skill.name).slice(0, 4).join(', ') || 'No skills entered'}
           </p>
         </div>
 
@@ -413,7 +413,7 @@ export const DashboardView: React.FC = () => {
             <span className="text-xs text-slate-400">projects</span>
           </div>
           <p className="mt-1 text-[11px] text-slate-400 truncate">
-            SignalSafe, A11y UI Primitives
+            {projects.map((project) => project.name).slice(0, 3).join(', ') || 'No projects entered'}
           </p>
         </div>
 

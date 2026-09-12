@@ -1,10 +1,11 @@
 import express, { Request, Response, NextFunction } from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
-import { createServer as createViteServer } from 'vite';
+import { installAuth, requireWorkspaceOwner } from './server/auth';
+import { installPrivateFiles } from './server/privateFiles';
+import { createWorkspaceRouter } from './server/workspaceRoutes';
+import { redactAiPayload } from './server/privacy';
 import { detectAtsProvider, verifyPostingAts } from './server/atsAdapters';
 import {
   evaluateDeterministicBlockers,
@@ -16,62 +17,24 @@ import { JobRecord, SearchProfile } from './src/types';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-const PORT = 3000;
-
-app.use(express.json({ limit: '10mb' }));
-
-// Owner allowlist configuration
-const OWNER_EMAIL = (process.env.OWNER_EMAIL || 'solomonlucasthornton@gmail.com').toLowerCase().trim();
-const ACTIVE_SESSIONS = new Map<string, { email: string; createdAt: number }>();
-
-function generateSessionToken(email: string): string {
-  const token = `caos_sess_${Date.now()}_${crypto.randomBytes(16).toString('hex')}`;
-  ACTIVE_SESSIONS.set(token, { email, createdAt: Date.now() });
-  return token;
-}
-
-function validateOwnerSession(req: Request): boolean {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.replace(/^Bearer\s+/i, '') || (req.query.token as string);
-  if (!token) return false;
-
-  const session = ACTIVE_SESSIONS.get(token);
-  if (!session) return false;
-
-  // Session valid for 7 days
-  if (Date.now() - session.createdAt > 7 * 24 * 60 * 60 * 1000) {
-    ACTIVE_SESSIONS.delete(token);
-    return false;
-  }
-
-  return session.email.toLowerCase() === OWNER_EMAIL;
-}
-
-function requireWorkspaceOwner(req: Request, res: Response, next: NextFunction): void {
-  if (!validateOwnerSession(req)) {
-    res.status(403).json({
-      error: 'Unauthorized: Access to private workspace data requires authenticated workspace owner session.'
-    });
-    return;
-  }
-  next();
-}
-
-// In-memory private storage store (can sync with Neon Postgres when DATABASE_URL is configured)
-let privateWorkspaceStore: any = null;
-const privateAuditLogs: any[] = [];
+export const app = express();
+app.disable('x-powered-by');
+app.use((_req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('X-Frame-Options', 'DENY'); next(); });
+installAuth(app);
+installPrivateFiles(app);
+app.use(express.json({ limit: '3mb' }));
+app.use('/api/workspace', createWorkspaceRouter());
+app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+// All remaining application APIs handle private data or invoke private services.
+app.use('/api', requireWorkspaceOwner);
 
 // Lazy initialization of GoogleGenAI
-function getGeminiClient(): GoogleGenAI | null {
+function getGeminiClient(req: Request): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return null;
   }
-  return new GoogleGenAI({
+  const client = new GoogleGenAI({
     apiKey,
     httpOptions: {
       headers: {
@@ -79,6 +42,9 @@ function getGeminiClient(): GoogleGenAI | null {
       }
     }
   });
+  const generate = client.models.generateContent.bind(client.models);
+  client.models.generateContent = (params: any) => generate(redactAiPayload(params, req.body?.candidateProfile));
+  return client;
 }
 
 const MODEL_NAME = 'gemini-3.8-flash';
@@ -150,8 +116,8 @@ app.post('/api/fetch-job-url', async (req: Request, res: Response): Promise<void
 
     res.json({ text: stripped.slice(0, 15000), title, url });
   } catch (error: any) {
-    console.error('Error fetching job URL:', error);
-    res.status(500).json({ error: error.message || 'Failed to fetch job posting from URL' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to fetch job posting from URL' });
   }
 });
 
@@ -167,7 +133,7 @@ app.post('/api/analyze-job', async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
     if (!ai) {
       res.status(503).json({
         error:
@@ -179,7 +145,7 @@ app.post('/api/analyze-job', async (req: Request, res: Response): Promise<void> 
     // Anonymized candidate profile and evidence context to protect PII
     const anonymizedEvidence = (evidenceItems || []).map((e: any) => ({
       id: e.id,
-      experienceOrProject: e.context?.company || e.context?.role || 'Disney / Projects',
+      experienceOrProject: e.employer || e.role || 'Candidate evidence',
       skills: e.technologies || [],
       domain: e.domain || 'Frontend Web',
       claim: e.rawEvidence,
@@ -188,9 +154,9 @@ app.post('/api/analyze-job', async (req: Request, res: Response): Promise<void> 
 
     const systemPrompt = `You are a skeptical tech recruiter and engineering hiring manager evaluating a job description against verified candidate evidence.
 Candidate Background:
-- Software Engineer specializing in React, TypeScript, JavaScript, GraphQL, and frontend product engineering.
-- Production experience at The Walt Disney Company (ESPN consumer web properties, live event components, WNBA Commissioner's Cup).
-- The candidate is NOT a generic full-stack engineer, low-level backend architect (e.g. Go/C++ distributed systems, kernel tuning), or ML engineer.
+- Use only the supplied candidate evidence to determine specialization.
+- Do not assume any employer, project, degree or professional history.
+- Do not infer candidate qualifications without evidence.
 
 Your task:
 1. Parse the job description into structured details.
@@ -255,7 +221,7 @@ CRITICAL RULES:
       contents: [
         { text: systemPrompt },
         {
-          text: `Candidate Summary:\nSoftware Engineer with production React, TypeScript, GraphQL at The Walt Disney Company.\n\nVerified Evidence Context:\n${JSON.stringify(
+          text: `Candidate Summary:\nUse only the verified evidence below.\n\nVerified Evidence Context:\n${JSON.stringify(
             anonymizedEvidence
           )}\n\nJob Description:\n${rawDescription}`
         }
@@ -268,8 +234,8 @@ CRITICAL RULES:
     const json = extractCleanJson(response.text || '{}');
     res.json(json);
   } catch (error: any) {
-    console.error('Error in /api/analyze-job:', error);
-    res.status(500).json({ error: error.message || 'Failed to analyze job description' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to analyze job description' });
   }
 });
 
@@ -279,7 +245,7 @@ CRITICAL RULES:
 app.post('/api/match-evidence', async (req: Request, res: Response): Promise<void> => {
   try {
     const { parsedJob, evidenceItems, projects, skills } = req.body;
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
 
     if (!ai) {
       res.status(503).json({
@@ -348,8 +314,8 @@ Return JSON matching this schema:
     const json = extractCleanJson(response.text || '{}');
     res.json(json);
   } catch (error: any) {
-    console.error('Error in /api/match-evidence:', error);
-    res.status(500).json({ error: error.message || 'Failed to match evidence' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to match evidence' });
   }
 });
 
@@ -376,7 +342,7 @@ app.post('/api/gap-interview', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
     if (!ai) {
       res.status(503).json({
         error:
@@ -387,7 +353,7 @@ app.post('/api/gap-interview', async (req: Request, res: Response): Promise<void
 
     const prompt = `The candidate is interviewing for ${parsedJob.roleTitle} at ${parsedJob.company}.
 Their tailored fit score is ${fit.tailoredFitScore}/10 (8.0+).
-Generate up to 3 targeted, respectful interview questions for the candidate about specific gaps in hard requirements that could plausibly have been covered by undocumented past work at Disney or collegiate/personal projects.
+Generate up to 3 targeted, respectful interview questions for the candidate about specific gaps in hard requirements that could plausibly have been covered by undocumented past work in prior work or personal projects.
 Do NOT suggest inventing anything.
 NO em dashes.
 
@@ -417,8 +383,8 @@ Return JSON:
     const json = extractCleanJson(response.text || '{}');
     res.json(json);
   } catch (error: any) {
-    console.error('Error in /api/gap-interview:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate gap questions' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to generate gap questions' });
   }
 });
 
@@ -434,7 +400,7 @@ app.post('/api/generate-plan', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
     if (!ai) {
       res.status(503).json({
         error:
@@ -448,7 +414,7 @@ app.post('/api/generate-plan', async (req: Request, res: Response): Promise<void
     } at ${parsedJob.company} (${parsedJob.classifiedFamily}).
 
 RULES:
-- Select 5 to 7 strong Disney bullets from verified experience.
+- Select supported experience bullets from verified experience.
 - Default to the 2 strongest projects. Primary project 3 to 4 bullets, secondary project 2 to 3 bullets.
 - Skills: order by JD relevance, aim for 4 compact lines.
 - Withhold any unsupported claims.
@@ -493,8 +459,8 @@ Return JSON:
     const json = extractCleanJson(response.text || '{}');
     res.json(json);
   } catch (error: any) {
-    console.error('Error in /api/generate-plan:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate tailoring plan' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to generate tailoring plan' });
   }
 });
 
@@ -505,7 +471,7 @@ app.post('/api/generate-resume', async (req: Request, res: Response): Promise<vo
   try {
     const { parsedJob, tailoringPlan, candidateProfile, masterResume } = req.body;
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
     if (!ai) {
       res.status(503).json({
         error:
@@ -522,12 +488,12 @@ Role Family: ${parsedJob.classifiedFamily}
 
 ABSOLUTE MANDATORY RULES:
 1. NEVER USE EM DASHES (—) OR EN DASHES (–) ANYWHERE in any text. Replace with commas, colons, or parentheses.
-2. Candidate's title at Disney was "Software Engineer". NEVER use "Senior Software Engineer" or architect.
-3. The employer is "The Walt Disney Company". ESPN appears only when describing ESPN-specific web features.
+2. Preserve the candidate titles supplied in the master resume.
+3. Preserve employers from the supplied master resume.
 4. Safe verbs: built, implemented, shipped, contributed, supported, reviewed, validated, triaged, investigated, routed, documented, tested, collaborated.
-   Do NOT use "led", "owned", "architected" for Disney experience unless verified.
+   Do NOT use "led", "owned", "architected" for candidate experience unless verified.
 5. Professional summary: 2 to 3 rendered lines. Do NOT use generic buzzwords ("results-driven", "passionate", "proven track record"). Focus on React, TypeScript, GraphQL, testing, and production UI engineering.
-6. Disney bullets: exactly 5 to 6 strong bullets, approximately 2 rendered lines each. Distinguish activity from impact.
+6. Experience bullets: select supported bullets, approximately 2 rendered lines each. Distinguish activity from impact.
 7. Projects: 2 projects (SignalSafe as primary with 3 bullets; Accessible UI Component Primitive Library or Personal Engineering Portfolio with 2 bullets).
 8. Skills: 4 compact categories. Order by relevance to ${parsedJob.company}.
 9. Estimate line budget to fit exactly on ONE PAGE (approx 46 to 50 lines total).
@@ -604,17 +570,17 @@ Return JSON matching this schema:
       jobId: parsedJob.id || `job-${Date.now()}`,
       roleFamily: parsedJob.classifiedFamily,
       header: {
-        name: candidateProfile?.name || masterResume.header.name || 'Solomon Lucas-Thornton',
+        name: candidateProfile?.name || masterResume.header.name || '',
         title: candidateProfile?.title || masterResume.header.title || 'Software Engineer',
         email:
           candidateProfile?.email ||
           masterResume.header.email ||
-          'solomonlucasthornton@gmail.com',
+          '',
         phone: candidateProfile?.phone || masterResume.header.phone || '',
         location:
           candidateProfile?.location ||
           masterResume.header.location ||
-          'Los Angeles, CA / Remote',
+          '',
         links: candidateProfile?.links || masterResume.header.links || []
       },
       professionalSummary: (generated.professionalSummary || masterResume.professionalSummary || '')
@@ -622,19 +588,19 @@ Return JSON matching this schema:
       skills: generated.skills || masterResume.skills,
       experience: [
         {
-          id: 'disney-exp',
-          employer: 'The Walt Disney Company',
-          title: 'Software Engineer',
-          period: '2022 - Present',
-          location: 'Bristol, CT / Remote',
+          id: masterResume.experience[0]?.id || 'experience',
+          employer: masterResume.experience[0]?.employer || '',
+          title: masterResume.experience[0]?.title || '',
+          period: masterResume.experience[0]?.period || '',
+          location: masterResume.experience[0]?.location || '',
           bullets: (generated.experienceBullets || masterResume.experience[0]?.bullets || []).map(
             (b: any, idx: number) => ({
               id: b.id || `exp-bullet-${idx}`,
               section: 'experience',
-              parentId: 'disney-exp',
+              parentId: masterResume.experience[0]?.id || 'experience',
               text: (b.text || '').replace(/[—–]/g, ', '),
               targetRequirement: b.targetRequirement || '',
-              evidenceSource: b.evidenceSource || 'The Walt Disney Company (ESPN Consumer Web)',
+              evidenceSource: b.evidenceSource || masterResume.experience[0]?.employer || '',
               whyThisBullet: b.whyThisBullet || '',
               underlyingEvidence: b.underlyingEvidence || '',
               supportingEvidenceId: b.supportingEvidenceId,
@@ -672,8 +638,8 @@ Return JSON matching this schema:
 
     res.json({ resume: assembledResume });
   } catch (error: any) {
-    console.error('Error in /api/generate-resume:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate resume' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to generate resume' });
   }
 });
 
@@ -684,7 +650,7 @@ app.post('/api/generate-cover-letter', async (req: Request, res: Response): Prom
   try {
     const { parsedJob, candidateProfile, tailoredResume } = req.body;
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
     if (!ai) {
       res.status(503).json({
         error:
@@ -705,8 +671,8 @@ Role: ${parsedJob.roleTitle}
 
 CRITICAL RULES:
 1. STRICTLY NO EM DASHES (—) OR EN DASHES (–) ANYWHERE. Use commas or periods.
-2. Grounded strictly in actual Disney experience (ESPN consumer web, WNBA features, accessible component primitives, live event scoreboard debugging, 75+ Jira tickets, Draft Admin forms) and verified projects (SignalSafe, Accessible Component Library).
-3. Do NOT invent metrics, revenue, or leadership roles. Candidate title at Disney was Software Engineer.
+2. Grounded strictly in supplied candidate evidence and projects.
+3. Do NOT invent metrics, revenue, or leadership roles. Preserve supplied candidate titles.
 4. Professional tone: conversational, confident, free of empty clichés.
 5. Exactly 3 to 4 well-structured paragraphs.
 6. Return ONLY the body paragraphs and evidence themes used.
@@ -730,7 +696,7 @@ Return JSON:
       candidateProfile?.name ||
       candidateProfile?.fullName ||
       tailoredResume?.header?.name ||
-      'Solomon Lucas-Thornton';
+      '';
 
     const coverLetter = {
       id: `cl-${Date.now()}`,
@@ -746,8 +712,8 @@ Return JSON:
 
     res.json({ coverLetter });
   } catch (error: any) {
-    console.error('Error in /api/generate-cover-letter:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate cover letter' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to generate cover letter' });
   }
 });
 
@@ -794,13 +760,13 @@ app.post('/api/evaluate-resume', async (req: Request, res: Response): Promise<vo
         // Check verbs
         const firstWord = b.text.trim().split(/\s+/)[0]?.toLowerCase();
         const restricted = ['led', 'owned', 'architected', 'spearheaded', 'revolutionized'];
-        if (restricted.includes(firstWord) && exp.employer?.toLowerCase().includes('disney')) {
+        if (restricted.includes(firstWord)) {
           flags.push({
             id: `claim-${Math.random().toString(36).substring(2, 8)}`,
             type: 'CLAIM',
             severity: 'warning',
             target: `${exp.employer} Bullet ${idx + 1}`,
-            message: `Verb "${firstWord}" suggests unevidenced ownership or leadership for Disney experience. Safe verbs include: built, implemented, shipped, contributed, supported, triaged.`,
+            message: `Verb "${firstWord}" suggests unevidenced ownership or leadership for candidate experience. Safe verbs include: built, implemented, shipped, contributed, supported, triaged.`,
             suggestedFix: b.text.replace(new RegExp(`^${firstWord}`, 'i'), 'Built and delivered'),
             isSafeToAutoFix: true
           });
@@ -847,8 +813,8 @@ app.post('/api/evaluate-resume', async (req: Request, res: Response): Promise<vo
       }
     });
   } catch (error: any) {
-    console.error('Error in /api/evaluate-resume:', error);
-    res.status(500).json({ error: error.message || 'Failed to evaluate resume' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to evaluate resume' });
   }
 });
 
@@ -858,7 +824,7 @@ app.post('/api/evaluate-resume', async (req: Request, res: Response): Promise<vo
 app.post('/api/regenerate-bullet', async (req: Request, res: Response): Promise<void> => {
   try {
     const { targetRequirement, underlyingEvidence, currentText, employerOrProject } = req.body;
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
 
     if (!ai) {
       res.status(503).json({
@@ -901,91 +867,13 @@ Return JSON:
     }
     res.json(json);
   } catch (error: any) {
-    console.error('Error in /api/regenerate-bullet:', error);
-    res.status(500).json({ error: error.message || 'Failed to regenerate bullet' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to regenerate bullet' });
   }
 });
 
 // ==========================================
 // 9. Authentication & Session Management
-// ==========================================
-app.get('/api/auth/session', (req: Request, res: Response) => {
-  const isOwner = validateOwnerSession(req);
-  res.json({
-    isAuthenticated: isOwner,
-    userEmail: isOwner ? OWNER_EMAIL : null,
-    userName: isOwner ? 'Solomon Lucas-Thornton' : null,
-    isOwner,
-    mode: isOwner ? 'PRIVATE_WORKSPACE' : 'PUBLIC_DEMO'
-  });
-});
-
-app.post('/api/auth/login', (req: Request, res: Response) => {
-  const { email, passwordOrToken } = req.body;
-  const normalized = (email || '').toLowerCase().trim();
-
-  // Fail closed if unauthorized email attempts to log in as owner
-  if (normalized !== OWNER_EMAIL) {
-    res.status(401).json({
-      error:
-        'Access denied. This workspace is configured as a single-owner environment. Real career records and private endpoints are restricted to the authorized owner.'
-    });
-    return;
-  }
-
-  const token = generateSessionToken(normalized);
-  res.json({
-    token,
-    userEmail: OWNER_EMAIL,
-    userName: 'Solomon Lucas-Thornton',
-    isOwner: true,
-    mode: 'PRIVATE_WORKSPACE'
-  });
-});
-
-app.post('/api/auth/logout', (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.replace(/^Bearer\s+/i, '') || (req.body?.token as string);
-  if (token) {
-    ACTIVE_SESSIONS.delete(token);
-  }
-  res.json({ success: true });
-});
-
-// ==========================================
-// 10. Private Workspace Persistence (Protected)
-// ==========================================
-app.get('/api/workspace/data', requireWorkspaceOwner, (req: Request, res: Response) => {
-  res.json({ data: privateWorkspaceStore });
-});
-
-app.post('/api/workspace/data', requireWorkspaceOwner, (req: Request, res: Response) => {
-  const { data } = req.body;
-  privateWorkspaceStore = data;
-  res.json({ success: true, savedAt: new Date().toISOString() });
-});
-
-app.get('/api/workspace/audit-log', requireWorkspaceOwner, (req: Request, res: Response) => {
-  res.json({ logs: privateAuditLogs });
-});
-
-app.post('/api/workspace/audit-log', requireWorkspaceOwner, (req: Request, res: Response) => {
-  const { eventType, recordId, summary, actorId } = req.body;
-  const entry = {
-    id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    eventType,
-    recordId,
-    timestamp: new Date().toISOString(),
-    actorId: actorId || 'owner',
-    summary
-  };
-  privateAuditLogs.unshift(entry);
-  if (privateAuditLogs.length > 200) privateAuditLogs.pop();
-  res.json({ entry });
-});
-
-// ==========================================
-// 11. ATS Re-Verification Endpoint
 // ==========================================
 app.post('/api/verify-ats', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -998,8 +886,8 @@ app.post('/api/verify-ats', async (req: Request, res: Response): Promise<void> =
     const verification = await verifyPostingAts(url, provider, board, jobId);
     res.json(verification);
   } catch (error: any) {
-    console.error('Error in /api/verify-ats:', error);
-    res.status(500).json({ error: error.message || 'ATS verification failed' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'ATS verification failed' });
   }
 });
 
@@ -1016,7 +904,7 @@ app.post('/api/discover-jobs', async (req: Request, res: Response): Promise<void
       queryBudget = 4
     } = req.body;
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
     if (!ai) {
       res.status(503).json({
         error:
@@ -1026,25 +914,8 @@ app.post('/api/discover-jobs', async (req: Request, res: Response): Promise<void
     }
 
     // Formulate targeted ATS search queries based on candidate search profile
-    const profile: SearchProfile = searchProfile || {
-      preferredRoleFamilies: ['frontend-product', 'ui-platform-design-systems', 'frontend-heavy-fullstack'],
-      preferredModifiers: ['DESIGN_SYSTEMS', 'ACCESSIBILITY', 'DEVELOPER_TOOLING'],
-      excludedRolePatterns: ['Staff Architect', 'Senior Java Backend'],
-      targetSeniority: ['Mid-Level', 'Senior', 'Product Engineer'],
-      allowedEmploymentTypes: ['full-time'],
-      excludedEmploymentTypes: [],
-      remotePreference: 'remote_only',
-      hybridLocations: [],
-      maximumOnsiteFrequency: '0 days',
-      relocationAllowed: false,
-      clearancePolicy: 'exclude_clearance',
-      salaryPreference: { minTarget: 140000 },
-      hiringProcessPreferences: {},
-      companyExclusions: [],
-      technologyStrengths: ['React', 'TypeScript', 'GraphQL', 'Tailwind CSS', 'Next.js'],
-      technologyAdjacencies: ['Node.js', 'Express', 'Vite', 'Storybook'],
-      technologyGaps: ['Java', 'C++', 'Kubernetes cluster admin']
-    };
+    if (!searchProfile) { res.status(400).json({ error: 'Configure search preferences first.' }); return; }
+    const profile: SearchProfile = searchProfile;
 
     const targetLanes = profile.preferredRoleFamilies.join(', ');
     const targetTech = profile.technologyStrengths.slice(0, 4).join(' ');
@@ -1248,8 +1119,8 @@ CRITICAL RULES:
       }
     });
   } catch (error: any) {
-    console.error('Error in /api/discover-jobs:', error);
-    res.status(500).json({ error: error.message || 'Job discovery failed' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Job discovery failed' });
   }
 });
 
@@ -1259,7 +1130,7 @@ CRITICAL RULES:
 app.post('/api/generate-proof-pack', async (req: Request, res: Response): Promise<void> => {
   try {
     const { tailoredResume, candidateEvidence, parsedJob } = req.body;
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
 
     if (!ai) {
       res.status(503).json({
@@ -1335,8 +1206,8 @@ ${JSON.stringify(bullets.slice(0, 8))}`;
 
     res.json({ proofPack });
   } catch (error: any) {
-    console.error('Error in /api/generate-proof-pack:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate proof pack' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to generate proof pack' });
   }
 });
 
@@ -1346,7 +1217,7 @@ ${JSON.stringify(bullets.slice(0, 8))}`;
 app.post('/api/generate-outreach', async (req: Request, res: Response): Promise<void> => {
   try {
     const { parsedJob, candidateProfile, tailoredResume } = req.body;
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
 
     if (!ai) {
       res.status(503).json({
@@ -1402,8 +1273,8 @@ CRITICAL RULES:
 
     res.json({ outreach });
   } catch (error: any) {
-    console.error('Error in /api/generate-outreach:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate outreach' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to generate outreach' });
   }
 });
 
@@ -1413,7 +1284,7 @@ CRITICAL RULES:
 app.post('/api/generate-answers', async (req: Request, res: Response): Promise<void> => {
   try {
     const { questions, parsedJob, candidateEvidence } = req.body;
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
 
     if (!ai) {
       res.status(503).json({
@@ -1464,8 +1335,8 @@ CRITICAL RULES:
 
     res.json({ answers: sanitized });
   } catch (error: any) {
-    console.error('Error in /api/generate-answers:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate answers' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to generate answers' });
   }
 });
 
@@ -1475,7 +1346,7 @@ CRITICAL RULES:
 app.post('/api/generate-referral', async (req: Request, res: Response): Promise<void> => {
   try {
     const { contactName, relationship, company, roleTitle, jobUrl } = req.body;
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
 
     if (!ai) {
       res.status(503).json({
@@ -1512,35 +1383,13 @@ CRITICAL RULES:
       referralMessage: (json.referralMessage || '').replace(/[—–]/g, ', ')
     });
   } catch (error: any) {
-    console.error('Error in /api/generate-referral:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate referral request' });
+    console.error('Private operation failed');
+    res.status(500).json({ error: 'Failed to generate referral request' });
   }
 });
 
-// Health check
-app.get('/api/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.use('/api', (_req, res) => res.status(404).json({ error: 'Unknown API route' }));
+app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
+  res.status(error?.type === 'entity.too.large' ? 413 : 400).json({ error: 'Invalid request' });
 });
-
-// Setup Vite or Static File Serving
-async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa'
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req: Request, res: Response) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Resume Tailoring Studio server listening on http://0.0.0.0:${PORT}`);
-  });
-}
-
-startServer();
+export default app;

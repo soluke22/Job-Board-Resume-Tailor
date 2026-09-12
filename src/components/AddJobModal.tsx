@@ -135,7 +135,7 @@ Notice: This position is pure low-level storage engine architecture and contains
               Add Job for Fit Analysis
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              The AI evaluates requirements against Solomon’s verified evidence bank before any tailoring begins.
+              The AI evaluates requirements against the candidate evidence bank before any tailoring begins.
             </p>
           </div>
           <button

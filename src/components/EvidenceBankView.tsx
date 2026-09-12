@@ -22,7 +22,7 @@ export const EvidenceBankView: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // New evidence form state
-  const [newEmployer, setNewEmployer] = useState('The Walt Disney Company');
+  const [newEmployer, setNewEmployer] = useState('');
   const [newRole, setNewRole] = useState('Software Engineer');
   const [newRawEvidence, setNewRawEvidence] = useState('');
   const [newTechs, setNewTechs] = useState('React, TypeScript');

@@ -115,6 +115,7 @@ export interface SearchProfile {
 export type EvidenceStrength = 'Strong' | 'Moderate' | 'Weak' | 'Missing';
 
 export type VerificationStatus =
+  | 'requires-review'
   | 'verified'
   | 'provisional'
   | 'session-unreviewed'

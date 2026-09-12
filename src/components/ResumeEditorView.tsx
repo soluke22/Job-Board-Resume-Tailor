@@ -311,15 +311,15 @@ export const ResumeEditorView: React.FC = () => {
                 />
               </div>
 
-              {/* Disney Experience Bullets Manager */}
+              {/* Experience Bullets Manager */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-xs font-semibold uppercase tracking-wider text-slate-900 dark:text-white block">
-                      The Walt Disney Company (Experience)
+                      {resume.experience[0]?.employer || 'Experience'}
                     </span>
                     <span className="text-[11px] text-slate-400">
-                      Software Engineer · Verified Live-Traffic WNBA & Internal Tooling
+                      {resume.experience[0]?.title || 'Employment title not entered'}
                     </span>
                   </div>
                 </div>
@@ -359,7 +359,7 @@ export const ResumeEditorView: React.FC = () => {
                               onClick={() =>
                                 setInspectingBullet({
                                   bullet,
-                                  employerOrProject: 'The Walt Disney Company'
+                                  employerOrProject: resume.experience[0]?.employer || ''
                                 })
                               }
                               className="p-1 text-slate-500 hover:text-emerald-600 rounded cursor-pointer flex items-center space-x-0.5"
@@ -373,7 +373,7 @@ export const ResumeEditorView: React.FC = () => {
                               onClick={() => {
                                 setInspectingBullet({
                                   bullet,
-                                  employerOrProject: 'The Walt Disney Company'
+                                  employerOrProject: resume.experience[0]?.employer || ''
                                 });
                               }}
                               className="p-1 text-slate-500 hover:text-emerald-600 rounded cursor-pointer"
@@ -508,7 +508,7 @@ export const ResumeEditorView: React.FC = () => {
                 setSelectedBulletId(id);
                 // Locate bullet to inspect
                 let targetBullet: ResumeBullet | undefined;
-                let employerOrProject = 'The Walt Disney Company';
+                let employerOrProject = resume.experience[0]?.employer || '';
 
                 resume.experience.forEach((e) => {
                   e.bullets.forEach((b) => {

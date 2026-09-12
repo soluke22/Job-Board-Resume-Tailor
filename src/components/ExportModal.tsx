@@ -313,7 +313,7 @@ ${resume.education
                   <span>{copiedFormat === 'text' ? 'Copied' : 'Copy'}</span>
                 </button>
                 <button
-                  onClick={() => handleDownload('solomon_resume.txt', generatePlainText(), 'text/plain')}
+                  onClick={() => handleDownload('resume.txt', generatePlainText(), 'text/plain')}
                   className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
                   title="Download"
                 >
@@ -342,7 +342,7 @@ ${resume.education
                   <span>{copiedFormat === 'md' ? 'Copied' : 'Copy'}</span>
                 </button>
                 <button
-                  onClick={() => handleDownload('solomon_resume.md', generateMarkdown(), 'text/markdown')}
+                  onClick={() => handleDownload('resume.md', generateMarkdown(), 'text/markdown')}
                   className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
                   title="Download"
                 >
@@ -371,7 +371,7 @@ ${resume.education
                   <span>{copiedFormat === 'latex' ? 'Copied' : 'Copy'}</span>
                 </button>
                 <button
-                  onClick={() => handleDownload('solomon_resume.tex', generateLatex(), 'application/x-latex')}
+                  onClick={() => handleDownload('resume.tex', generateLatex(), 'application/x-latex')}
                   className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
                   title="Download"
                 >
@@ -400,7 +400,7 @@ ${resume.education
                   <span>{copiedFormat === 'json' ? 'Copied' : 'Copy'}</span>
                 </button>
                 <button
-                  onClick={() => handleDownload('solomon_resume.json', JSON.stringify(resume, null, 2), 'application/json')}
+                  onClick={() => handleDownload('resume.json', JSON.stringify(resume, null, 2), 'application/json')}
                   className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
                   title="Download"
                 >

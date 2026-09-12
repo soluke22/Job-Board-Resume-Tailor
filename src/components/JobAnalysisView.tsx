@@ -194,7 +194,7 @@ export const JobAnalysisView: React.FC = () => {
             </div>
             <p className="text-xs text-rose-800/90 dark:text-rose-200/90 leading-relaxed">
               {fit?.rejectionNotice ||
-                'Per core principle: We do not tailor resumes or cover letters for jobs that do not fit Solomon’s verified skills. If the job description is not a fit or a stretch, then we will not create a resume for this job.'}
+                'Per core principle: We do not tailor resumes or cover letters for jobs that do not fit the candidate’s verified skills. If the job description is not a fit or a stretch, then we will not create a resume for this job.'}
             </p>
             {fit?.blockers && fit.blockers.length > 0 && (
               <div className="pt-2">
@@ -226,7 +226,7 @@ export const JobAnalysisView: React.FC = () => {
           <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-900 dark:text-emerald-200 flex items-center space-x-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <p className="text-xs text-emerald-800 dark:text-emerald-300">
-              <strong>High Fit Confirmed:</strong> Solomon has direct production evidence (React, TypeScript, GraphQL, live-traffic testing) backing the core responsibilities of this role.
+              <strong>High Fit Confirmed:</strong> Review the assessment and supporting evidence for the core responsibilities of this role.
             </p>
           </div>
         )}
@@ -256,7 +256,7 @@ export const JobAnalysisView: React.FC = () => {
               Strongest Selling Point
             </h3>
             <p className="text-xs text-slate-700 dark:text-slate-300 mt-1.5">
-              {fit?.strongestMatch || 'Production React & TypeScript experience at Disney.'}
+              {fit?.strongestMatch || 'No supporting match has been recorded.'}
             </p>
           </div>
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -338,7 +338,7 @@ export const JobAnalysisView: React.FC = () => {
                   rows={2}
                   value={gapAnswers[q.id] || q.answer || ''}
                   onChange={(e) => handleGapAnswerChange(q.id, e.target.value)}
-                  placeholder="Enter specific, truthful context from Disney or prior projects..."
+                  placeholder="Enter specific, truthful context from your work or projects..."
                   className="w-full p-2.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
 
@@ -481,7 +481,7 @@ export const JobAnalysisView: React.FC = () => {
                   Experience Bullets Strategy:
                 </span>
                 <p className="text-slate-600 dark:text-slate-400">
-                  {tailoringPlan.disneyBulletsPlan.length} Disney bullets planned (prioritizing high-traffic WNBA and live-event reliability).
+                  {tailoringPlan.disneyBulletsPlan.length} experience bullets planned.
                 </p>
               </div>
             </div>

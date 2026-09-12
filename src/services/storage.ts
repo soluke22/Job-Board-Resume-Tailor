@@ -49,64 +49,36 @@ const KEYS = {
   DEMO_SEARCH_PROFILE: 'caos_demo_search_profile'
 };
 
+const privateMemory = new Map<string, string>();
+const publicSession = (): AuthSession => ({ isAuthenticated: false, userEmail: null, isOwner: false, mode: 'PUBLIC_DEMO' });
+let currentMode: WorkspaceMode = 'PUBLIC_DEMO';
+let currentSession = publicSession();
+export const PRIVATE_FIELDS = {
+  profile: KEYS.PRIVATE_PROFILE, searchProfile: KEYS.PRIVATE_SEARCH_PROFILE, evidence: KEYS.PRIVATE_EVIDENCE,
+  projects: KEYS.PRIVATE_PROJECTS, skills: KEYS.PRIVATE_SKILLS, jobs: KEYS.PRIVATE_JOBS,
+  masterResume: KEYS.PRIVATE_MASTER_RESUME, auditLog: KEYS.PRIVATE_AUDIT_LOG
+};
+const cache = {
+  getItem(key: string) { return key.startsWith('caos_priv_') ? privateMemory.get(key) ?? null : localStorage.getItem(key); },
+  setItem(key: string, value: string) { if (key.startsWith('caos_priv_')) privateMemory.set(key, value); else localStorage.setItem(key, value); },
+  removeItem(key: string) { if (key.startsWith('caos_priv_')) privateMemory.delete(key); else localStorage.removeItem(key); }
+};
 export const storageService = {
-  // Mode management
-  getWorkspaceMode(): WorkspaceMode {
-    try {
-      const mode = localStorage.getItem(KEYS.MODE);
-      if (mode === 'PRIVATE_WORKSPACE' || mode === 'PUBLIC_DEMO') {
-        return mode;
-      }
-      return 'PUBLIC_DEMO';
-    } catch {
-      return 'PUBLIC_DEMO';
+  getWorkspaceMode(): WorkspaceMode { return currentMode; },
+  setWorkspaceMode(mode: WorkspaceMode): void { currentMode = mode; },
+  getAuthSession(): AuthSession { return currentSession; },
+  saveAuthSession(session: AuthSession): void { currentSession = session; currentMode = session.mode; },
+  clearAuthSession(): void { privateMemory.clear(); currentMode = 'PUBLIC_DEMO'; currentSession = publicSession(); },
+  hydratePrivateWorkspace(data: any): void {
+    privateMemory.clear();
+    for (const [field, key] of Object.entries(PRIVATE_FIELDS)) {
+      if (data?.[field] != null) privateMemory.set(key, JSON.stringify(data[field]));
     }
   },
-
-  setWorkspaceMode(mode: WorkspaceMode): void {
-    try {
-      localStorage.setItem(KEYS.MODE, mode);
-    } catch (e) {
-      console.error('Failed to set workspace mode:', e);
-    }
+  privateSnapshot(): any {
+    return { profile: this.getProfile('PRIVATE_WORKSPACE'), searchProfile: this.getSearchProfile('PRIVATE_WORKSPACE'), evidence: this.getEvidence('PRIVATE_WORKSPACE'), projects: this.getProjects('PRIVATE_WORKSPACE'), skills: this.getSkills('PRIVATE_WORKSPACE'), jobs: this.getJobs('PRIVATE_WORKSPACE'), masterResume: this.getMasterResume('PRIVATE_WORKSPACE') };
   },
-
-  // Auth Session
-  getAuthSession(): AuthSession {
-    try {
-      const data = localStorage.getItem(KEYS.SESSION);
-      if (data) {
-        return JSON.parse(data);
-      }
-    } catch (e) {
-      console.error('Failed to get auth session:', e);
-    }
-    return {
-      isAuthenticated: false,
-      userEmail: null,
-      userName: null,
-      isOwner: false,
-      mode: 'PUBLIC_DEMO'
-    };
-  },
-
-  saveAuthSession(session: AuthSession): void {
-    try {
-      localStorage.setItem(KEYS.SESSION, JSON.stringify(session));
-      localStorage.setItem(KEYS.MODE, session.mode);
-    } catch (e) {
-      console.error('Failed to save auth session:', e);
-    }
-  },
-
-  clearAuthSession(): void {
-    try {
-      localStorage.removeItem(KEYS.SESSION);
-      localStorage.setItem(KEYS.MODE, 'PUBLIC_DEMO');
-    } catch (e) {
-      console.error('Failed to clear auth session:', e);
-    }
-  },
+  clearPrivateCache(): void { privateMemory.clear(); },
 
   // Candidate Profile
   getProfile(mode?: WorkspaceMode): CandidateProfile {
@@ -115,7 +87,7 @@ export const storageService = {
     const fallback = currentMode === 'PRIVATE_WORKSPACE' ? DEFAULT_PRIVATE_PROFILE : DEMO_CANDIDATE_PROFILE;
 
     try {
-      const data = localStorage.getItem(key);
+      const data = cache.getItem(key);
       return data ? JSON.parse(data) : fallback;
     } catch {
       return fallback;
@@ -125,7 +97,7 @@ export const storageService = {
   saveProfile(profile: CandidateProfile, mode?: WorkspaceMode): void {
     const currentMode = mode || this.getWorkspaceMode();
     const key = currentMode === 'PRIVATE_WORKSPACE' ? KEYS.PRIVATE_PROFILE : KEYS.DEMO_PROFILE;
-    localStorage.setItem(key, JSON.stringify(profile));
+    cache.setItem(key, JSON.stringify(profile));
     this.addAuditLog('RESUME_MANUALLY_EDITED', profile.name, 'Updated candidate profile');
   },
 
@@ -136,7 +108,7 @@ export const storageService = {
     const fallback = currentMode === 'PRIVATE_WORKSPACE' ? DEFAULT_SEARCH_PROFILE : DEMO_SEARCH_PROFILE;
 
     try {
-      const data = localStorage.getItem(key);
+      const data = cache.getItem(key);
       return data ? JSON.parse(data) : fallback;
     } catch {
       return fallback;
@@ -146,7 +118,7 @@ export const storageService = {
   saveSearchProfile(profile: SearchProfile, mode?: WorkspaceMode): void {
     const currentMode = mode || this.getWorkspaceMode();
     const key = currentMode === 'PRIVATE_WORKSPACE' ? KEYS.PRIVATE_SEARCH_PROFILE : KEYS.DEMO_SEARCH_PROFILE;
-    localStorage.setItem(key, JSON.stringify(profile));
+    cache.setItem(key, JSON.stringify(profile));
   },
 
   // Evidence Items
@@ -156,7 +128,7 @@ export const storageService = {
     const fallback = currentMode === 'PRIVATE_WORKSPACE' ? [] : DEMO_EVIDENCE_ITEMS;
 
     try {
-      const data = localStorage.getItem(key);
+      const data = cache.getItem(key);
       return data ? JSON.parse(data) : fallback;
     } catch {
       return fallback;
@@ -166,7 +138,7 @@ export const storageService = {
   saveEvidence(evidence: EvidenceItem[], mode?: WorkspaceMode): void {
     const currentMode = mode || this.getWorkspaceMode();
     const key = currentMode === 'PRIVATE_WORKSPACE' ? KEYS.PRIVATE_EVIDENCE : KEYS.DEMO_EVIDENCE;
-    localStorage.setItem(key, JSON.stringify(evidence));
+    cache.setItem(key, JSON.stringify(evidence));
   },
 
   // Projects
@@ -176,7 +148,7 @@ export const storageService = {
     const fallback = currentMode === 'PRIVATE_WORKSPACE' ? [] : DEMO_PROJECTS;
 
     try {
-      const data = localStorage.getItem(key);
+      const data = cache.getItem(key);
       return data ? JSON.parse(data) : fallback;
     } catch {
       return fallback;
@@ -186,7 +158,7 @@ export const storageService = {
   saveProjects(projects: ProjectItem[], mode?: WorkspaceMode): void {
     const currentMode = mode || this.getWorkspaceMode();
     const key = currentMode === 'PRIVATE_WORKSPACE' ? KEYS.PRIVATE_PROJECTS : KEYS.DEMO_PROJECTS;
-    localStorage.setItem(key, JSON.stringify(projects));
+    cache.setItem(key, JSON.stringify(projects));
   },
 
   // Skills
@@ -196,7 +168,7 @@ export const storageService = {
     const fallback = currentMode === 'PRIVATE_WORKSPACE' ? [] : DEMO_SKILLS;
 
     try {
-      const data = localStorage.getItem(key);
+      const data = cache.getItem(key);
       return data ? JSON.parse(data) : fallback;
     } catch {
       return fallback;
@@ -206,7 +178,7 @@ export const storageService = {
   saveSkills(skills: SkillItem[], mode?: WorkspaceMode): void {
     const currentMode = mode || this.getWorkspaceMode();
     const key = currentMode === 'PRIVATE_WORKSPACE' ? KEYS.PRIVATE_SKILLS : KEYS.DEMO_SKILLS;
-    localStorage.setItem(key, JSON.stringify(skills));
+    cache.setItem(key, JSON.stringify(skills));
   },
 
   // Jobs
@@ -216,7 +188,7 @@ export const storageService = {
     const fallback = currentMode === 'PRIVATE_WORKSPACE' ? [] : DEMO_JOBS;
 
     try {
-      const data = localStorage.getItem(key);
+      const data = cache.getItem(key);
       return data ? JSON.parse(data) : fallback;
     } catch {
       return fallback;
@@ -226,7 +198,7 @@ export const storageService = {
   saveJobs(jobs: JobRecord[], mode?: WorkspaceMode): void {
     const currentMode = mode || this.getWorkspaceMode();
     const key = currentMode === 'PRIVATE_WORKSPACE' ? KEYS.PRIVATE_JOBS : KEYS.DEMO_JOBS;
-    localStorage.setItem(key, JSON.stringify(jobs));
+    cache.setItem(key, JSON.stringify(jobs));
   },
 
   // Master Resume
@@ -236,7 +208,7 @@ export const storageService = {
     const fallback = currentMode === 'PRIVATE_WORKSPACE' ? DEFAULT_BLANK_MASTER_RESUME : DEMO_MASTER_RESUME;
 
     try {
-      const data = localStorage.getItem(key);
+      const data = cache.getItem(key);
       return data ? JSON.parse(data) : fallback;
     } catch {
       return fallback;
@@ -246,7 +218,7 @@ export const storageService = {
   saveMasterResume(resume: TailoredResume, mode?: WorkspaceMode): void {
     const currentMode = mode || this.getWorkspaceMode();
     const key = currentMode === 'PRIVATE_WORKSPACE' ? KEYS.PRIVATE_MASTER_RESUME : KEYS.DEMO_MASTER_RESUME;
-    localStorage.setItem(key, JSON.stringify(resume));
+    cache.setItem(key, JSON.stringify(resume));
     this.addAuditLog('RESUME_MANUALLY_EDITED', resume.id, 'Updated master resume');
   },
 
@@ -343,7 +315,7 @@ export const storageService = {
   // Audit Logging
   getAuditLog(): AuditLogEntry[] {
     try {
-      const data = localStorage.getItem(KEYS.PRIVATE_AUDIT_LOG);
+      const data = cache.getItem(KEYS.PRIVATE_AUDIT_LOG);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -368,18 +340,17 @@ export const storageService = {
       };
       logs.unshift(entry);
       // Keep recent 100 entries
-      localStorage.setItem(KEYS.PRIVATE_AUDIT_LOG, JSON.stringify(logs.slice(0, 100)));
+      cache.setItem(KEYS.PRIVATE_AUDIT_LOG, JSON.stringify(logs.slice(0, 100)));
     } catch (e) {
       console.error('Failed to log audit event:', e);
     }
   },
 
-  // Export Private Workspace as encrypted or formatted JSON
+  // In-memory serialization; authenticated export uses the server endpoint.
   exportPrivateWorkspace(): string {
     const data = {
       exportedAt: new Date().toISOString(),
       schemaVersion: '2.0.0',
-      owner: 'Solomon Lucas-Thornton',
       profile: this.getProfile('PRIVATE_WORKSPACE'),
       searchProfile: this.getSearchProfile('PRIVATE_WORKSPACE'),
       evidence: this.getEvidence('PRIVATE_WORKSPACE'),
@@ -392,57 +363,15 @@ export const storageService = {
     return JSON.stringify(data, null, 2);
   },
 
-  // Import workspace data with provenance review
-  importWorkspaceData(jsonString: string): { success: boolean; message: string; count?: number } {
-    try {
-      const parsed = JSON.parse(jsonString);
-      if (!parsed.profile && !parsed.evidence && !parsed.jobs) {
-        return { success: false, message: 'Invalid format: missing required candidate or job keys.' };
-      }
-
-      if (parsed.profile) {
-        this.saveProfile(parsed.profile, 'PRIVATE_WORKSPACE');
-      }
-      if (parsed.searchProfile) {
-        this.saveSearchProfile(parsed.searchProfile, 'PRIVATE_WORKSPACE');
-      }
-      if (Array.isArray(parsed.evidence)) {
-        // Tag newly imported evidence as imported-unreviewed unless verified
-        const normalized = parsed.evidence.map((item: any) => ({
-          ...item,
-          verificationStatus: item.verificationStatus === 'verified' ? 'verified' : 'session-unreviewed'
-        }));
-        this.saveEvidence(normalized, 'PRIVATE_WORKSPACE');
-      }
-      if (Array.isArray(parsed.projects)) {
-        this.saveProjects(parsed.projects, 'PRIVATE_WORKSPACE');
-      }
-      if (Array.isArray(parsed.skills)) {
-        this.saveSkills(parsed.skills, 'PRIVATE_WORKSPACE');
-      }
-      if (Array.isArray(parsed.jobs)) {
-        this.saveJobs(parsed.jobs, 'PRIVATE_WORKSPACE');
-      }
-      if (parsed.masterResume) {
-        this.saveMasterResume(parsed.masterResume, 'PRIVATE_WORKSPACE');
-      }
-
-      this.addAuditLog('FILE_IMPORTED', 'workspace-backup', 'Imported workspace data JSON backup');
-      return { success: true, message: 'Private workspace successfully imported.' };
-    } catch (err: any) {
-      return { success: false, message: err.message || 'Failed to parse JSON backup.' };
-    }
-  },
-
   // Reset/Clear Private Workspace
   clearPrivateWorkspace(): void {
-    localStorage.removeItem(KEYS.PRIVATE_PROFILE);
-    localStorage.removeItem(KEYS.PRIVATE_EVIDENCE);
-    localStorage.removeItem(KEYS.PRIVATE_PROJECTS);
-    localStorage.removeItem(KEYS.PRIVATE_SKILLS);
-    localStorage.removeItem(KEYS.PRIVATE_JOBS);
-    localStorage.removeItem(KEYS.PRIVATE_MASTER_RESUME);
-    localStorage.removeItem(KEYS.PRIVATE_SEARCH_PROFILE);
+    cache.removeItem(KEYS.PRIVATE_PROFILE);
+    cache.removeItem(KEYS.PRIVATE_EVIDENCE);
+    cache.removeItem(KEYS.PRIVATE_PROJECTS);
+    cache.removeItem(KEYS.PRIVATE_SKILLS);
+    cache.removeItem(KEYS.PRIVATE_JOBS);
+    cache.removeItem(KEYS.PRIVATE_MASTER_RESUME);
+    cache.removeItem(KEYS.PRIVATE_SEARCH_PROFILE);
     this.addAuditLog('FILE_DELETED', 'all-records', 'Private workspace cleared by owner');
   }
 };

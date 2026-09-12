@@ -33,8 +33,8 @@ export const AtsGuardsModal: React.FC<AtsGuardsModalProps> = ({ isOpen, onClose,
       id: 'single-column',
       title: '1. Single-Column Semantic Hierarchy',
       category: 'ATS Parsing Engine',
-      status: 'Enforced',
-      pass: true,
+      status: 'Review layout',
+      pass: false,
       description:
         'Standard semantic layout with top-to-bottom reading order. Zero tables, text boxes, multi-column sidebars, or floating canvas blocks that cause Workday, Greenhouse, or Taleo parsers to scramble content.',
       rule: 'Single-column Flow · Standard H1/H2 Headings · No Tables'
@@ -43,40 +43,40 @@ export const AtsGuardsModal: React.FC<AtsGuardsModalProps> = ({ isOpen, onClose,
       id: 'em-dash-safety',
       title: '2. Zero Em-Dash & Unicode Sanitation',
       category: 'Character Encoding',
-      status: evaluation?.flags.some((f) => f.type === 'EM_DASH') ? 'Warning' : 'Clean (100%)',
-      pass: !evaluation?.flags.some((f) => f.type === 'EM_DASH'),
+      status: evaluation?.flags.some((f) => f.type === 'EM_DASH') ? 'Warning' : 'Review characters',
+      pass: !!evaluation && !evaluation.flags.some((f) => f.type === 'EM_DASH'),
       description:
-        'Legacy ATS databases frequently corrupt em-dashes (—) and en-dashes (–) into garbled characters (e.g. â€” or ??). We convert all dashes to clean standard hyphens (-) and colons.',
+        'Inspect exported punctuation and special characters for encoding problems in the destination application.',
       rule: 'ASCII-safe Hyphens · Zero Em-Dashes · Clean Quotations'
     },
     {
       id: 'evidence-grounding',
-      title: '3. 100% Evidence Grounding (Anti-Hallucination)',
+      title: '3. Evidence Grounding Review',
       category: 'AI Hiring & Truthfulness',
-      status: 'Grounded (Disney + Projects)',
-      pass: true,
+      status: 'Review provenance',
+      pass: false,
       description:
-        'Every single line and metric is strictly backed by Solomon’s verified engineering repository and Disney production records. We never invent titles, teams, or accomplishments that fail background checks.',
+        'Verify each claim and metric against candidate evidence before submission. This checklist does not certify provenance.',
       rule: 'Zero Fabrications · Repository-Verified Evidence · Honest Scope'
     },
     {
       id: 'xyz-metrics',
       title: '4. Quantifiable XYZ Impact Metrics',
       category: 'Recruiter & AI Scoring',
-      status: `${evaluation?.metricCoverage?.metricsCount || 6} Metrics Active`,
-      pass: true,
+      status: evaluation ? `${evaluation.metricCoverage?.metricsCount ?? 0} Metrics Reported` : 'Not evaluated',
+      pass: false,
       description:
-        'Formulates bullets using the proven XYZ paradigm: Accomplished [X], measured by [Y], by doing [Z]. Surfaces high-traffic ESPN event stats, tournament state reliability, and UI component scale.',
+        'Formulates bullets using the proven XYZ paradigm: Accomplished [X], measured by [Y], by doing [Z]. Include only measurements supported by source evidence.',
       rule: 'XYZ Impact Formula · Concrete Scale Indicators · Real Engineering Stats'
     },
     {
       id: 'verb-taxonomy',
       title: '5. Safe Past-Tense Verb Taxonomy',
       category: 'AI Hiring Screeners',
-      status: 'Audited',
-      pass: !evaluation?.flags.some((f) => f.type === 'CLAIM'),
+      status: evaluation ? 'Evaluation available' : 'Not evaluated',
+      pass: !!evaluation && !evaluation.flags.some((f) => f.type === 'CLAIM'),
       description:
-        'Bans generic AI fluff words (e.g., "spearheaded", "synergized", "rockstar") and prevents unevidenced executive claims (e.g., "architected company-wide"). Enforces solid contributor verbs: built, implemented, shipped, triaged.',
+        'Review generic AI fluff words (e.g., "spearheaded", "synergized", "rockstar") and unevidenced executive claims (e.g., "architected company-wide"). Prefer supported contributor verbs: built, implemented, shipped, triaged.',
       rule: 'Contributive Verbs · No Unsubstantiated "Led/Architected" Claims'
     },
     {
@@ -84,7 +84,7 @@ export const AtsGuardsModal: React.FC<AtsGuardsModalProps> = ({ isOpen, onClose,
       title: '6. Hard Skill & Keyword Density',
       category: 'Keyword Matching',
       status: 'Targeted',
-      pass: true,
+      pass: false,
       description:
         'Contextual keyword placement across Technical Skills, Experience bullets, and Projects. Matches job description criteria naturally without robotic repetition or invisible text tricks that trigger disqualification.',
       rule: 'Authentic Keyword Matching · Semantic Relevance · No Robotic Stuffing'
@@ -94,9 +94,9 @@ export const AtsGuardsModal: React.FC<AtsGuardsModalProps> = ({ isOpen, onClose,
       title: '7. Strict 1-Page Vertical Geometry',
       category: 'Visual & Physical Format',
       status: 'Calibrated',
-      pass: true,
+      pass: false,
       description:
-        'Calculated typography scale (9.5pt to 10pt), 2-line bullet word caps (under 250 characters), and balanced vertical margins guarantee the document fits cleanly onto exactly 1 printed page (Letter / A4).',
+        'Inspect print preview after editing. Font selection, content length, and paper size can change pagination.',
       rule: 'Letter Format · Max 250 Characters per Bullet · Single Page Lock'
     },
     {
@@ -104,7 +104,7 @@ export const AtsGuardsModal: React.FC<AtsGuardsModalProps> = ({ isOpen, onClose,
       title: '8. Multi-Engine Clean Exports',
       category: 'Submission Readiness',
       status: 'Ready',
-      pass: true,
+      pass: false,
       description:
         'Provides 1-click ATS Plain Text (for form copy-pasting), Formatted Markdown (for developer portals), LaTeX (for academic/FAANG parsers), and crisp vector PDF printing.',
       rule: 'Plain Text · Markdown · LaTeX · Print/PDF Vector'
@@ -125,7 +125,7 @@ export const AtsGuardsModal: React.FC<AtsGuardsModalProps> = ({ isOpen, onClose,
                 ATS & AI Hiring Guardrails Audit System
               </h2>
               <p className="text-xs text-slate-500">
-                8 core pillars guaranteeing 100% parser pass-rates and recruiter trust.
+                Eight review areas for formatting and evidence quality. Parser acceptance is not guaranteed.
               </p>
             </div>
           </div>
@@ -184,7 +184,7 @@ export const AtsGuardsModal: React.FC<AtsGuardsModalProps> = ({ isOpen, onClose,
                 </p>
 
                 <div className="text-[11px] text-slate-400 font-mono pt-1">
-                  Enforced rule: {guard.rule}
+                  Review guidance: {guard.rule}
                 </div>
               </div>
             ))}
@@ -194,7 +194,7 @@ export const AtsGuardsModal: React.FC<AtsGuardsModalProps> = ({ isOpen, onClose,
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
           <span className="text-[11px] text-slate-500">
-            Validated against Workday, Greenhouse, Lever, Taleo, iCIMS, and Ashby parsers.
+            Review exported files before submission; external parser compatibility has not been certified.
           </span>
           <div className="flex items-center space-x-2">
             {onOpenStudio && (

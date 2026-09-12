@@ -83,7 +83,7 @@ export const MasterResumeView: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            This is Solomon’s canonical master resume. Tailored resumes branch from this baseline and never overwrite it.
+            This is your master resume. Tailored resumes branch from this baseline and never overwrite it.
           </p>
         </div>
 
@@ -148,15 +148,15 @@ export const MasterResumeView: React.FC = () => {
                 Official Employment Title:
               </span>
               <span className="text-slate-600 dark:text-slate-300">
-                Software Engineer at The Walt Disney Company
+                {[masterResume.experience[0]?.title, masterResume.experience[0]?.employer].filter(Boolean).join(' at ') || 'No employment entered'}
               </span>
             </div>
             <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
               <span className="font-semibold text-slate-800 dark:text-slate-200 block">
-                Production Traffic Context:
+                Experience Context:
               </span>
               <span className="text-slate-600 dark:text-slate-300">
-                WNBA live-event traffic, internal tooling systems, GraphQL aggregation.
+                Review employment claims against their source evidence.
               </span>
             </div>
           </div>

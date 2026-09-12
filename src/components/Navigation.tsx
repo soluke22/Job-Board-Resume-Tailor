@@ -45,7 +45,7 @@ export const Navigation: React.FC = () => {
     { id: 'candidate-setup', label: 'Setup', icon: UploadCloud }
   ];
 
-  const displayName = profile.name || (workspaceMode === 'PRIVATE_WORKSPACE' ? 'Solomon Lucas-Thornton' : 'Jordan Taylor');
+  const displayName = profile.name || 'Candidate';
 
   return (
     <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-slate-100 shadow-md">
