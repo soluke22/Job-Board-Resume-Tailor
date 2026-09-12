@@ -18,8 +18,9 @@ Next: Authentication + public/private boundary acceptance audit of inherited cod
 All 46 inherited files individually classified and preserved in 41a04f8;
 required npm lock and Drizzle metadata included, no user work discarded.
 Original failing test preserved there; only stale fixtures corrected in 0828816.
-Reconciliation checkpoint commits remaining docs/router state; working tree is
-expected clean after it, then verified clean and pushed. Ignore build/dependencies.
+Reconciliation checkpoint 9df3b71 committed docs/router state. Working tree was
+verified clean; normal push succeeded and fetch confirmed origin/dev=dev.
+This publication receipt is a final docs-only checkpoint, also fast-forward pushed.
 Full per-file disposition and remote classification: DEV_RECONCILIATION.md.
 
 ## Architecture Decisions
@@ -76,7 +77,7 @@ server/auth.ts → server.ts/workspaceRoutes/privateFiles guards → API/storage
 AppContext/AuthModal/setup. Existing DB/schema code reviewed only as dependency.
 
 ## Last Known Good Commit
-0828816f7d5ca68fa85d0231ed2c1c7a91fa25a5: code checkpoint with corrected fixtures;
+9df3b71c33d34d3764177948a3477d992ecfdec0: validated reconciliation checkpoint;
 final deterministic validation recorded above. Final state/docs checkpoint is
 latest commit touching this plan: git log -1 -- docs/exec-plans/active/productionization.md.
 Compare git rev-parse dev origin/dev after fetch; no self-referential hash needed.
