@@ -62,6 +62,26 @@ test('public demo session probing does not dispatch private access-loss events d
   } finally { globalThis.fetch = original; browser.removeEventListener('workspace-access-lost', count); loseAccess(); }
 });
 
+test('stale workspace save reports conflict without auto-merge, demo substitution or cache overwrite; reload adopts server state', async () => {
+  const original = globalThis.fetch;
+  try {
+    authenticate();
+    globalThis.fetch = async (_path, init) => {
+      assert.deepEqual(JSON.parse(init!.body as string), { data: { evidence: [] }, revision: 1 });
+      return Response.json({ error: 'Workspace changed. Reload before saving.' }, { status: 409 });
+    };
+    await assert.rejects(apiService.saveWorkspaceData({ evidence: [] }, 1), /Reload before saving/);
+    assert.equal(storageService.getAuthSession().isAuthenticated, true);
+    assert.equal(storageService.getEvidence('PRIVATE_WORKSPACE')[0].id, 'synthetic-private');
+    globalThis.fetch = async () => Response.json({ revision: 2, data: { evidence: [{ id: 'server-winner' }] } });
+    const result = await apiService.getWorkspaceData();
+    storageService.hydratePrivateWorkspace(result.data);
+    assert.equal(result.revision, 2); assert.equal(storageService.getEvidence('PRIVATE_WORKSPACE')[0].id, 'server-winner');
+    const context = await readFile('src/context/AppContext.tsx', 'utf8');
+    assert.match(context, /ready\.current = false; setSyncStatus\('Not saved — reload required'\)/);
+  } finally { globalThis.fetch = original; loseAccess(); }
+});
+
 test('pending workspace/export and AI replies cannot return private data after access generation changes', async () => {
   const original = globalThis.fetch;
   setBeforePrivateRequest(async () => {});

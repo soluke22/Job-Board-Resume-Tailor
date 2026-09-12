@@ -60,10 +60,15 @@ export function createAuthOptions(database: BetterAuthOptions['database'], findO
     },
   };
 }
-let auth: ReturnType<typeof betterAuth> | undefined;
+const authInstances = new WeakMap<ReturnType<typeof getDb>, ReturnType<typeof betterAuth>>();
 export function getAuth() {
   authConfiguration();
-  if (!auth) auth = betterAuth(createAuthOptions(drizzleAdapter(getDb(), { provider: 'pg', schema }), id => getDb().query.user.findFirst({ where: (u, { eq }) => eq(u.id, id) })));
+  const db = getDb();
+  let auth = authInstances.get(db);
+  if (!auth) {
+    auth = betterAuth(createAuthOptions(drizzleAdapter(db, { provider: 'pg', schema }), id => db.query.user.findFirst({ where: (u, { eq }) => eq(u.id, id) })));
+    authInstances.set(db, auth);
+  }
   return auth;
 }
 export const privateNoStore: RequestHandler = (_req, res, next) => {

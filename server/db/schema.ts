@@ -52,3 +52,10 @@ export const privateFiles = pgTable('private_files', {
   blobPath: text('blob_path').notNull().unique(), originalFilename: text('original_filename').notNull(),
   mimeType: text('mime_type').notNull(), size: integer('size').notNull(), purpose: text('purpose').notNull(), sourceType: text('source_type').notNull(), ...times(),
 }, t => [primaryKey({ columns: [t.ownerId, t.id] })]);
+// Committed before any Blob write. Failed/abandoned intents remain durable
+// tombstones so reconciliation can also remove late writes after connection loss.
+export const privateFileUploads = pgTable('private_file_uploads', {
+  ownerId: text('owner_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  id: text('id').notNull(), blobPath: text('blob_path').notNull().unique(),
+  state: text('state').notNull().default('pending'), ...times(),
+}, t => [primaryKey({ columns: [t.ownerId, t.id] }), index('private_file_uploads_owner_updated_idx').on(t.ownerId, t.updatedAt)]);

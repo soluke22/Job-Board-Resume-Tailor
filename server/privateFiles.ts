@@ -3,15 +3,16 @@ import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { put, get, del } from '@vercel/blob';
-import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { getDb } from './db/client';
-import { privateFiles } from './db/schema';
-import { requireWorkspaceOwner } from './auth';
+import { requireWorkspaceOwner, privateNoStore } from './auth';
+import { createPrivateFileRepository, type FileRecord, type FileRepository } from './privateFileRepository';
+export type { FileRepository } from './privateFileRepository';
 
 export const MAX_PRIVATE_FILE_BYTES = 2 * 1024 * 1024;
 const uploadSchema = z.object({
-  originalFilename: z.string().min(1).max(200).regex(/^[^/\\\x00-\x1f\x7f]+$/),
+  originalFilename: z.string().min(1).max(200).regex(/^[^/\\:*?"<>|\x00-\x1f\x7f]+$/).refine(value => {
+    try { encodeURIComponent(value); return !/^\.+$/.test(value); } catch { return false; }
+  }),
   mimeType: z.enum(['application/pdf', 'text/plain', 'application/x-tex', 'text/x-tex', 'application/json']),
   purpose: z.enum(['master-resume', 'evidence', 'resume-source', 'generated-resume', 'application-history']),
   sourceType: z.enum(['user-upload', 'legacy-import', 'generated']),
@@ -20,6 +21,7 @@ const uploadSchema = z.object({
 export function validateUpload(input: unknown) {
   const data = uploadSchema.parse(input);
   const content = Buffer.from(data.contentBase64, 'base64');
+  if (content.toString('base64') !== data.contentBase64) throw new Error('Invalid base64 encoding');
   if (!content.length || content.length > MAX_PRIVATE_FILE_BYTES) throw new Error('Invalid file size');
   if (data.mimeType === 'application/pdf') {
     if (content.subarray(0, 5).toString() !== '%PDF-') throw new Error('Invalid PDF file');
@@ -30,25 +32,18 @@ export function validateUpload(input: unknown) {
   }
   return { ...data, content };
 }
-type FileRecord = typeof privateFiles.$inferSelect;
-export interface FileRepository {
-  list(ownerId: string): Promise<FileRecord[]>;
-  find(ownerId: string, id: string): Promise<FileRecord | undefined>;
-  insert(record: typeof privateFiles.$inferInsert): Promise<FileRecord>;
-  remove(ownerId: string, id: string): Promise<void>;
-}
-const repository: FileRepository = {
-  list: ownerId => getDb().select().from(privateFiles).where(eq(privateFiles.ownerId, ownerId)),
-  find: async (ownerId, id) => (await getDb().select().from(privateFiles).where(and(eq(privateFiles.ownerId, ownerId), eq(privateFiles.id, id))).limit(1))[0],
-  insert: async record => (await getDb().insert(privateFiles).values(record).returning())[0],
-  remove: async (ownerId, id) => { await getDb().delete(privateFiles).where(and(eq(privateFiles.ownerId, ownerId), eq(privateFiles.id, id))); },
-};
+const repository = createPrivateFileRepository();
 const blobStore = { put, get, del };
 function publicMetadata(record: FileRecord) { const { blobPath, ownerId, ...metadata } = record; return metadata; }
 export function installPrivateFiles(app: Express, deps: { guard?: RequestHandler; repository?: FileRepository; blobs?: typeof blobStore } = {}) {
   const guard = deps.guard ?? requireWorkspaceOwner;
   const files = deps.repository ?? repository;
   const blobs = deps.blobs ?? blobStore;
+  app.use('/api/private/files', privateNoStore);
+  const cleanup = async (ownerId: string) => {
+    const abortSignal = AbortSignal.timeout(15_000);
+    return files.reconcile(ownerId, path => blobs.del(path, { abortSignal }));
+  };
   app.get('/api/private/files', guard, async (_req, res) => {
     try { res.json({ files: (await files.list(res.locals.ownerId)).map(publicMetadata) }); }
     catch { res.status(503).json({ error: 'Private file storage is unavailable' }); }
@@ -57,23 +52,33 @@ export function installPrivateFiles(app: Express, deps: { guard?: RequestHandler
     let data: ReturnType<typeof validateUpload>;
     try { data = validateUpload(req.body); } catch { res.status(400).json({ error: 'Upload requires a valid PDF, UTF-8 text, LaTeX or JSON file up to 2 MiB' }); return; }
     const id = randomUUID();
-    let path: string | undefined;
+    const path = `private/${res.locals.ownerId}/${id}`;
     try {
-      const blob = await blobs.put(`private/${res.locals.ownerId}/${id}`, data.content, { access: 'private', contentType: data.mimeType, addRandomSuffix: false });
-      path = blob.pathname;
-      const record = await files.insert({ id, ownerId: res.locals.ownerId, blobPath: path, originalFilename: data.originalFilename, mimeType: data.mimeType, size: data.content.length, purpose: data.purpose, sourceType: data.sourceType });
+      // Prior unresolved uploads remain recoverable across process restarts.
+      await cleanup(res.locals.ownerId);
+      const record = await files.upload({ id, ownerId: res.locals.ownerId, blobPath: path, originalFilename: data.originalFilename, mimeType: data.mimeType, size: data.content.length, purpose: data.purpose, sourceType: data.sourceType }, async () => {
+        const blob = await blobs.put(path, data.content, { access: 'private', contentType: data.mimeType, addRandomSuffix: false, allowOverwrite: false, abortSignal: AbortSignal.timeout(15_000) });
+        if (blob.pathname !== path) throw new Error('Unexpected private Blob path');
+      });
       res.status(201).json(publicMetadata(record));
     } catch {
-      if (path) await blobs.del(path).catch(() => {});
+      // If DB/Blob is down this may fail too; the committed intent remains for
+      // explicit reconciliation/next upload. Never delete a saved ambiguous commit.
+      await cleanup(res.locals.ownerId).catch(() => {});
       res.status(503).json({ error: 'Private file upload failed; retry later' });
     }
+  });
+  app.post('/api/private/files/reconcile', guard, async (_req, res) => {
+    try { res.json({ checked: await cleanup(res.locals.ownerId) }); }
+    catch { res.status(503).json({ error: 'Private file cleanup is unavailable; retry later' }); }
   });
   app.get('/api/private/files/:id', guard, async (req, res) => {
     try {
       const record = await files.find(res.locals.ownerId, req.params.id);
       if (!record) { res.status(404).json({ error: 'File not found' }); return; }
-      const result = await blobs.get(record.blobPath, { access: 'private' });
-      if (!result || result.statusCode !== 200 || !result.stream) { res.status(404).json({ error: 'File not found' }); return; }
+      const result = await blobs.get(record.blobPath, { access: 'private', useCache: false, abortSignal: AbortSignal.timeout(15_000) });
+      if (!result) { res.status(404).json({ error: 'File not found' }); return; }
+      if (result.statusCode !== 200 || !result.stream) throw new Error('Private Blob returned an unexpected response');
       res.setHeader('Content-Type', record.mimeType);
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
@@ -85,7 +90,7 @@ export function installPrivateFiles(app: Express, deps: { guard?: RequestHandler
     try {
       const record = await files.find(res.locals.ownerId, req.params.id);
       if (!record) { res.status(404).json({ error: 'File not found' }); return; }
-      await blobs.del(record.blobPath);
+      await blobs.del(record.blobPath, { abortSignal: AbortSignal.timeout(15_000) });
       await files.remove(res.locals.ownerId, record.id);
       res.status(204).end();
     } catch { res.status(503).json({ error: 'Private file deletion failed; retry later' }); }

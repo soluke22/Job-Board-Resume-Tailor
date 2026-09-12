@@ -3,7 +3,8 @@
 Baseline: clean dev == fetched origin/dev at b8c99995d88be4313587fa861ded2c8cf24e1980.
 Scope: inherited persistence acceptance and demonstrated fixes only; no Phase 3,
 remote migrations, deployment, or persistence redesign. Synthetic local data only.
-The supplied request ends mid-section 13; remaining instructions are unavailable.
+Request continuation received on 2026-09-12 (sections 13–23). Finish local acceptance,
+record live providers pending, checkpoint and push dev fast-forward; stop before Phase 3.
 
 ## Before-edit acceptance matrix
 
@@ -59,7 +60,17 @@ Read-only security review found no introduced owner/transaction defect in scalar
 or history replacement; focused tests passed 2/2. Nonempty history pruning and
 rollback specifically after history deletion remain coverage limitations.
 
-## Remaining acceptance — Phase 2 NOT complete
+## Checkpoint 936a869 remaining acceptance — historical, resolved below
+
+Continuation scope before edits: add a durable owner-scoped upload intent before
+Blob put; protect metadata finalization/cleanup with transaction row locks. Retain
+abandoned cleanup intents for repeated reconciliation (including a late Blob put
+after process/DB connection loss). Never compensate an ambiguous successful commit
+by deleting a saved object's Blob. Bound owner-triggered reconciliation; test persisted
+restart/failures and locking/fencing. Keep existing workspace/schema architecture.
+Also test and fix demonstrated history-ID parent collision or import review gaps,
+complete upload/stream/outage/owner/replacement tests, audit connection lifecycle,
+correct deployment docs and run final release checks. No provider resources created.
 
 Failed upload compensation demonstrably leaves an inaccessible private orphan.
 Implement minimal restart-safe reconciliation with explicit handling of ambiguous
@@ -71,3 +82,82 @@ import review/provenance audit, conflicting history IDs, real file repository qu
 isolation, comprehensive size/type/stream failures, connection lifecycle/cleanup,
 startup smoke and full final acceptance. Remote Neon/Blob durability remains a live
 gate without credentials. Obtain the request continuation after truncated section 13.
+
+## Final local acceptance matrix — 2026-09-12
+
+| Requirement | Implementation / evidence | Local result | Fix / limitation |
+| --- | --- | --- | --- |
+| Durable workspace | Neon/Drizzle queries; workspace.test.ts disk reopen | Pass | Live Neon pending |
+| Process/repository restart | DB close/reopen and recreated repositories for workspace/files | Pass | Not live Neon proof |
+| Owner scope/same IDs | Composite keys; two-owner repository/HTTP tests | Pass | No auth UI flag authority |
+| Revision protection | Conditional update; actual HTTP 409/400 tests | Pass | No stale auto-merge |
+| Concurrency/stale imports | One winner; stale save/import leaves exact snapshot | Pass | PGlite serializes connection |
+| Rollback | Real job/audit triggers fail after mutations/history deletion | Pass | Revision/data/deletion/audit restored |
+| Collections/replacement | Explicit evidence/projects/skills/experiences/jobs lists; application fields | Pass | Optional SQL scalar/history pruning fixed |
+| Job children/attachments | All seven mappings preserve omission and delete removed jobs | Pass | Master resume/other owners retained |
+| Import merge/conflicts | Selected IDs overwrite, unrelated state retained; duplicate/ambiguous IDs rejected | Pass | Parent-ID collision/duplicate versions fixed |
+| Import provenance/review | Evidence review, nested resume bullets, application SQL record, owner audit | Pass | Nested/application approval gaps fixed; ATS unknown stays unknown |
+| Migration/schema | Fresh PGlite migrator, additive SQL upgrade, db:generate no drift | Pass | 0002 adds intents; no remote migration |
+| DB outages | Actual HTTP read/write 503; SQL triggers and client access clearing | Pass | No demo/fake success |
+| DB lifecycle | Local reuse, request-local/auth isolation, close/failure/late work tests | Pass | Reviewer disconnect leak fixed |
+| File metadata ownership | Real repository same IDs/timestamps, owner lookup/removal, reopen | Pass | Unique paths; no path/owner API exposure |
+| Blob privacy/download | Private put/get, uncached proxy, attachment/nosniff/no-store | Pass | Live Blob pending |
+| Upload partial failures | Durable intent before put; real metadata failure and compensation failure/reopen | Pass | Retryable tombstones retain late puts; not distributed atomicity |
+| Download partial failures | Missing 404; outages/unexpected reply 503; partial stream disconnect | Pass | JSON never appended after headers |
+| Delete failure/retry | Blob failure preserves metadata; DB failure leaves metadata for idempotent retry | Pass | Missing Blob download 404; documented del semantics modeled |
+| Size/type/base64/filename | Oversize/empty/malformed/base64/UTF-8/PDF/JSON/MIME/purpose/source cases | Pass | Exact 2 MiB accepted; canonical/safe validation tightened |
+| Storage outage/retry | DB/Blob put/get/del/cleanup failure matrix; owner POST reconciliation | Pass | Owner retry required, no sweeper provisioned |
+| Public/demo independence | Auth/client isolation + built Node shell/assets and adapter with no private config | Pass | Client application source unchanged; Phase 1 rendered smoke retained |
+
+### Fixes and distributed failure semantics
+
+936a869 fixed stale optional SQL scalar resurrection and explicit history pruning.
+Continuation regressions demonstrated history delimiter collision moving a child,
+duplicate versions collapsing, verified nested import bullets and missing application
+import provenance. These now reject/review appropriately without altering ATS status.
+
+private_file_uploads commits owner/id/path before put, locks during finalization and
+retains abandoned tombstones for failed/late puts. Reconciliation skips active locks,
+fences delayed upload, checks saved metadata and never compensates an ambiguous
+successful commit. Actual DB commit + lost acknowledgement and delayed-uploader
+tests prove those local branches. Blob abort is unresolved, not proof of absence.
+Owner POST /api/private/files/reconcile or subsequent upload retries up to 20 paths
+with one 15-second batch abort signal; tombstones rotate and remain for repeat checks.
+No cleanup completion/automatic eventual deletion is claimed without retry.
+
+### Review and official behavior
+
+Reused Sol High read-only security-reviewer reproduced one P2: client disconnect
+allowed late DB access to create an unclosed second pool (2 created/1 ended).
+Terminal-boundary fix rechecked with identical HTTP reproduction: 1 created/1 ended,
+late access denied. Reviewer rechecked 7/7 relevant tests; no other demonstrated
+owner/transaction/file/compensation defect. Earlier review limits (nonempty pruning
+and post-history rollback) now have real SQL tests.
+
+Luna read-only docs-researcher verified official [Neon request lifecycle](https://neon.com/docs/serverless/serverless-driver),
+[Blob deletion/read semantics](https://vercel.com/docs/vercel-blob/using-blob-sdk),
+and [caller abort behavior](https://vercel.com/docs/vercel-blob/examples#aborting-requests).
+Installed Blob 2.8.0 supports useCache:false; missing-object del does not throw.
+No documented exactly-once or distributed atomicity guarantee is assumed.
+
+### Live gate and final validation
+
+Local persistence contract: verified.
+Live Neon persistence: pending external configuration.
+Live Vercel Private Blob: pending external configuration.
+No DATABASE_URL/Blob token or .env locally (only example); no resources, deployment,
+remote migrations or actual provider calls. Live multi-connection Neon transport/
+locking and Blob CDN/abort/late-write behavior remain live gates; PGlite's single
+serialized connection and synthetic provider doubles cannot certify them.
+
+Complete npm test passes 33/33; focused Phase 2 passes. Typecheck/build and strict
+public-build privacy scan (zero findings) pass. Fresh/upgrade migration and
+no-drift generation pass. Built Node/Node serverless startup smoke passes without
+private configuration. Plan rewrite temporarily omitted required harness headings;
+restored headings without weakening checks. Final release composition re-run passed.
+Semantic evidence validators are unaffected; harness positive/negative ID/privacy
+fixtures pass. No candidate/JD facts were invented; Phase 3 was not started.
+
+Phase 2 result: Pass / code-complete for deterministic local contracts, with the
+explicit live provider gates above. Normal fast-forward publication to origin/dev
+is authorized by the continuation; verify clean status and fetched HEAD equality.

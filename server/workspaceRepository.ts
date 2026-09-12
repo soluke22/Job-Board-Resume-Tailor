@@ -44,7 +44,13 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       }
     }
     const values = { ownerId, id, parentId, data: rest, label: String(data.name ?? data.title ?? data.company ?? ''), status: String(data.verificationStatus ?? data.applicationStatus ?? ''), updatedAt: new Date(), ...scalars };
-    await tx.insert(table).values(values).onConflictDoUpdate({ target: [table.ownerId, table.id], set: values });
+    const changed = await tx.insert(table).values(values).onConflictDoUpdate({
+      target: [table.ownerId, table.id], set: values,
+      // Legacy delimiter-based child IDs can be ambiguous. Never move an existing
+      // child to a different parent; reject the entire transaction instead.
+      setWhere: sql`${table.parentId} is not distinct from ${parentId}`,
+    }).returning({ id: table.id });
+    if (!changed.length) throw new WorkspaceValidationError('Record identifier conflicts with another parent');
   }
   async function rows(tx: any, table: EntityTable, ownerId: string) {
     return (await tx.select().from(table).where(eq(table.ownerId, ownerId))).map(row => decode(table, row));
@@ -89,7 +95,21 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       await tx.insert(s.workspaces).values({ ownerId }).onConflictDoNothing();
       const changed = await tx.update(s.workspaces).set({ revision: sql`${s.workspaces.revision} + 1`, updatedAt: new Date() }).where(and(eq(s.workspaces.ownerId, ownerId), eq(s.workspaces.revision, revision))).returning();
       if (!changed.length) throw new WorkspaceConflict('Workspace changed. Reload before saving.');
-      const normalize = (data: Record<string, unknown>, evidence = false) => importing ? { ...data, ...(evidence ? { verificationStatus: 'requires-review' } : {}), requiresUserReview: true, importProvenance: { source: 'owner-confirmed-import', importedAt: new Date().toISOString(), status: 'requires-review' } } : data;
+      const provenance = { source: 'owner-confirmed-import', importedAt: new Date().toISOString(), status: 'requires-review' };
+      const reviewImported = (value: unknown, depth = 0): any => {
+        if (depth > 100) throw new WorkspaceValidationError('Import nesting exceeds supported limit');
+        if (Array.isArray(value)) return value.map(child => reviewImported(child, depth + 1));
+        if (!value || typeof value !== 'object') return value;
+        const record = Object.fromEntries(Object.entries(value).map(([key, child]) => [key, reviewImported(child, depth + 1)]));
+        // Preserve ATS verificationStatus: it is not candidate claim approval.
+        // Candidate bullets and nested records cannot inherit approved provenance.
+        if ('provenanceStatus' in record || ('section' in record && 'underlyingEvidence' in record)) record.provenanceStatus = 'requires-review';
+        if ('id' in record || 'versionId' in record || 'requiresUserReview' in record || 'importProvenance' in record) {
+          record.requiresUserReview = true; record.importProvenance = provenance;
+        }
+        return record;
+      };
+      const normalize = (data: Record<string, unknown>, evidence = false) => importing ? { ...reviewImported(data), ...(evidence ? { verificationStatus: 'requires-review' } : {}), requiresUserReview: true, importProvenance: provenance } : data;
       for (const [key, table] of Object.entries(collections)) {
         if (!(key in input)) continue;
         const entries = input[key] as Record<string, unknown>[];
@@ -116,7 +136,7 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
           }
           const application: Record<string, unknown> = {};
           for (const key of applicationKeys) if (key in job) { application[key] = job[key]; delete job[key]; }
-          if (Object.keys(application).length) await upsert(tx, s.applications, ownerId, id, application, id);
+          if (Object.keys(application).length) await upsert(tx, s.applications, ownerId, id, normalize(application), id);
           for (const [key, table] of [['versionHistory', s.resumeVersions], ['statusHistory', s.applicationEvents]] as const) {
             if (job[key] !== undefined) {
               if (!Array.isArray(job[key])) throw new WorkspaceValidationError('Invalid job history');
