@@ -11,6 +11,7 @@ export const AuthModal: React.FC = () => {
     authSession,
     login,
     logout,
+    signOutPending,
     error,
     clearError
   } = useApp();
@@ -44,8 +45,7 @@ export const AuthModal: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await logout();
-    setIsAuthModalOpen(false);
+    if (await logout()) setIsAuthModalOpen(false);
   };
 
   return (
@@ -83,7 +83,7 @@ export const AuthModal: React.FC = () => {
                 <div>
                   <div className="font-semibold text-emerald-400">Authenticated Owner Active</div>
                   <div className="text-slate-300 mt-0.5">
-                    Logged in as <span className="text-white font-mono">{authSession.userEmail}</span>. Full access to private candidate records, search queries, and local backups.
+                    Logged in as <span className="text-white font-mono">{authSession.userEmail}</span>. Access to private candidate records, search queries, and authorized exports.
                   </div>
                 </div>
               </>
@@ -127,6 +127,7 @@ export const AuthModal: React.FC = () => {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <p className="text-sm text-slate-300">Continue with the workspace owner's verified Google account.</p>
+              {signOutPending && <button type="button" onClick={handleLogout} className="w-full py-2 text-red-300">Retry server sign-out</button>}
 
               {(loginError || error) && (
                 <div className="p-3 rounded-xl bg-red-950/60 border border-red-800 text-red-200 text-xs flex items-center space-x-2">
@@ -145,7 +146,7 @@ export const AuthModal: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || signOutPending}
                   className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium shadow-lg shadow-emerald-900/30 flex items-center justify-center space-x-1.5 transition cursor-pointer disabled:opacity-50"
                 >
                   <Lock className="w-4 h-4" />

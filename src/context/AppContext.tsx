@@ -18,7 +18,7 @@ import {
   RecruiterOutreach
 } from '../types';
 import { storageService } from '../services/storage';
-import { apiService, setBeforePrivateRequest, invalidatePrivateRequests } from '../services/api';
+import { apiService, setBeforePrivateRequest, invalidatePrivateRequests, signOutPrivateWorkspace } from '../services/api';
 
 export type AppView =
   | 'dashboard'
@@ -48,7 +48,8 @@ interface AppContextType {
   workspaceEpoch: number;
   syncStatus: string;
   sessionLoading: boolean;
-  logout: () => Promise<void>;
+  logout: () => Promise<boolean>;
+  signOutPending: boolean;
 
   // Data Models
   profile: CandidateProfile;
@@ -207,6 +208,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsAuthModalOpen(true);
       return;
     }
+    if (newMode !== storageService.getWorkspaceMode()) { epoch.current++; invalidatePrivateRequests(); setWorkspaceEpoch(v => v + 1); }
     setWorkspaceModeState(newMode);
     storageService.setWorkspaceMode(newMode);
     reloadDataForMode(newMode);
@@ -222,6 +224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
   const [syncStatus, setSyncStatus] = useState('');
   const [sessionLoading, setSessionLoading] = useState(true);
+  const [signOutPending, setSignOutPending] = useState(false);
 
   const clearPrivateView = () => {
     ready.current = false;
@@ -235,6 +238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthModalOpen(false); setIsQuickGrabOpen(false); setIsAtsGuardsOpen(false);
     setWorkspaceEpoch(v => v + 1);
     setSyncStatus('');
+    setIsAnalyzing(false); setIsGenerating(false); setIsDiscovering(false);
   };
   const adopt = (result: any) => {
     storageService.hydratePrivateWorkspace(result.data);
@@ -273,7 +277,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const restore = async () => {
       try {
         const session = await apiService.getSession();
-        if (cancelled || started !== epoch.current || !session.authenticated || !session.isOwner) return;
+        if (cancelled || started !== epoch.current) return;
+        if (!session.authenticated || !session.isOwner) {
+          if (new URLSearchParams(window.location.search).get('workspace') === 'private') setError('Private sign-in was not accepted. Continue with the configured owner Google account.');
+          return;
+        }
         const result = await apiService.getWorkspaceData();
         if (cancelled || started !== epoch.current) return;
         const identity: AuthSession = { isAuthenticated: true, isOwner: true, userEmail: session.user.email, userName: session.user.name, mode: 'PRIVATE_WORKSPACE' };
@@ -282,26 +290,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setWorkspaceModeState('PRIVATE_WORKSPACE');
         setCurrentView(result.data?.profile?.name ? 'dashboard' : 'candidate-setup');
         setSyncStatus('Saved privately');
+        scheduleExpiry(session.expiresAt);
       } catch (err: any) {
-        if (new URLSearchParams(window.location.search).get('workspace') === 'private') setError(err.message);
+        if (!cancelled && started === epoch.current && new URLSearchParams(window.location.search).get('workspace') === 'private') setError(err.message);
       } finally { if (!cancelled) setSessionLoading(false); }
     };
     void restore();
-    const lost = () => { clearPrivateView(); setError('Private access expired. Sign in again.'); };
+    const lost = () => { clearPrivateView(); setError('Private access is unavailable or expired. Sign in again.'); };
+    let expiryTimer: number | undefined;
+    const scheduleExpiry = (expiresAt: string) => {
+      window.clearTimeout(expiryTimer);
+      const remaining = new Date(expiresAt).getTime() - Date.now();
+      if (!Number.isFinite(remaining) || remaining <= 0) { lost(); return; }
+      const scheduledEpoch = epoch.current;
+      expiryTimer = window.setTimeout(() => { if (scheduledEpoch === epoch.current) lost(); }, remaining);
+    };
+    let checking = false;
+    const checkSession = async () => {
+      if (checking || !storageService.getAuthSession().isAuthenticated) return;
+      checking = true;
+      const checkedEpoch = epoch.current;
+      try {
+        const session = await apiService.getSession();
+        if (checkedEpoch === epoch.current) {
+          if (!session.authenticated || !session.isOwner) lost();
+          else scheduleExpiry(session.expiresAt);
+        }
+      } catch {
+        if (checkedEpoch === epoch.current) lost();
+      } finally { checking = false; }
+    };
+    const visible = () => { if (document.visibilityState === 'visible') void checkSession(); };
+    const timer = window.setInterval(() => void checkSession(), 30_000);
+    window.addEventListener('focus', checkSession);
+    document.addEventListener('visibilitychange', visible);
     const pagehide = () => { if (storageService.getWorkspaceMode() === 'PRIVATE_WORKSPACE') { document.documentElement.style.visibility = 'hidden'; clearPrivateView(); } };
     const pageshow = (event: PageTransitionEvent) => { if (event.persisted) window.location.reload(); else document.documentElement.style.visibility = ''; };
     const otherTab = (event: StorageEvent) => { if (event.key === 'caos_logout_event') clearPrivateView(); };
     window.addEventListener('workspace-access-lost', lost);
     window.addEventListener('pagehide', pagehide); window.addEventListener('pageshow', pageshow); window.addEventListener('storage', otherTab);
-    return () => { cancelled = true; window.removeEventListener('workspace-access-lost', lost); window.removeEventListener('pagehide', pagehide); window.removeEventListener('pageshow', pageshow); window.removeEventListener('storage', otherTab); };
+    return () => { cancelled = true; window.clearTimeout(expiryTimer); window.clearInterval(timer); window.removeEventListener('focus', checkSession); document.removeEventListener('visibilitychange', visible); window.removeEventListener('workspace-access-lost', lost); window.removeEventListener('pagehide', pagehide); window.removeEventListener('pageshow', pageshow); window.removeEventListener('storage', otherTab); };
   }, []);
   const login = async (): Promise<boolean> => { await apiService.login(); return true; };
-  const logout = async (): Promise<void> => {
+  const logout = async (): Promise<boolean> => {
     // Invalidate client access immediately; server sign-out revokes the durable session.
-    clearPrivateView();
-    localStorage.setItem('caos_logout_event', String(Date.now()));
-    try { await apiService.logout(); }
-    catch (err: any) { setError('Server sign-out could not be confirmed. Retry sign-out before leaving this device. ' + err.message); setIsAuthModalOpen(true); }
+    setSignOutPending(true);
+    try { await signOutPrivateWorkspace(clearPrivateView); setSignOutPending(false); return true; }
+    catch (err: any) { setError('Server sign-out could not be confirmed. Retry sign-out before leaving this device. ' + err.message); setIsAuthModalOpen(true); return false; }
   };
 
   // Profile and data setters with storage persistence
@@ -926,8 +961,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const importWorkspaceJson = async (jsonString: string) => {
     if (!authSession.isAuthenticated || workspaceMode !== 'PRIVATE_WORKSPACE') return { success: false, message: 'Owner sign-in required.' };
     try {
-      await persistCurrent();
       const started = epoch.current;
+      await persistCurrent();
+      if (started !== epoch.current) throw new Error('Session changed');
       const result = await apiService.importWorkspace(JSON.parse(jsonString), revision.current);
       if (started !== epoch.current) throw new Error('Session changed');
       adopt(result);
@@ -937,7 +973,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   const exportWorkspaceJson = async () => {
     if (!authSession.isAuthenticated || workspaceMode !== 'PRIVATE_WORKSPACE') throw new Error('Owner sign-in required.');
+    const started = epoch.current;
     await persistCurrent();
+    if (started !== epoch.current) throw new Error('Session changed');
     return JSON.stringify(await apiService.exportWorkspace(), null, 2);
   };
 
@@ -972,6 +1010,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         authSession,
         login,
         logout,
+        signOutPending,
         profile,
         setProfile,
         searchProfile,

@@ -1,67 +1,52 @@
 # Testing
 
-Reconciliation update (2026-09-12): descriptions of pending/uncommitted work and
-5/6 test results below are historical Phase 0 snapshots. All inherited product
-work is preserved in 41a04f8; stale test fixtures corrected in 0828816. Final
-suite passes 6/6. Use npm ci with package-lock.json. See
-[reconciliation record](DEV_RECONCILIATION.md) and active execution plan for
-current state; preserved integrations still require production acceptance.
-## Current State
-Committed baseline has lint (tsc --noEmit) and Vite/esbuild build, no product
-tests. Inherited uncommitted package/tests add node:test with tsx and PGlite.
-Phase 0 adds only script aliases and deterministic harness/triage validators.
+## Current state and commands
+Use npm ci with package-lock.json. Historical bun.lock is not the install source.
+The committed node:test suite runs through tsx; PGlite tests workspace contracts.
 
-## Commands
-- bun install --frozen-lockfile: only when dependencies are needed. Prior Bun
-  1.3.13 couldn't read tracked lock version 2; pending package-lock/dependencies
-  differ from committed bun.lock. Resolve package manager in a later phase.
-- npm run typecheck (same TypeScript check as npm run lint).
-- npm run build.
-- npm run harness:check: router links, skill metadata/doc/module paths, agent
-  TOML keys/model/effort/read-only policy, concurrency and plan integrity.
-- npm run privacy:scan: scans src, server, server.ts and dist/client when present
-  for non-synthetic emails, credential literals and high-risk private seed strings.
-  Only paths/rule labels printed. Warnings require review; not a complete PII audit.
-  Use --strict to fail on privacy triage findings; use --require-build at release.
-- node scripts/validate-evidence.mjs <synthetic-json-file>: explicit evidence
-  array plus records; evidence reference IDs must resolve to verified enabled
-  evidence. No default private reads; ID validation is not semantic provenance.
-- npm run release:check: type/build/harness, strict public-artifact scan and
-  npm test when an actual test script exists; missing suites remain explicit.
-- Pending tests: npm test, or node --import tsx --test tests/auth-security.test.ts.
-  No test:ats/test:security aliases until committed suite coverage supports them.
-- git diff --check, git diff --stat and scoped diff review (include untracked files).
-- Local production smoke: NODE_ENV=production then npm start; health and UI.
-  Configure server-only values manually; no paid/live providers by default.
+- npm test: complete deterministic suite.
+- node --import tsx --test tests/auth-security.test.ts tests/phase-1-auth.test.ts tests/phase-1-client.test.ts: focused Phase 1 acceptance.
+- npm run typecheck: TypeScript (lint is an alias).
+- npm run build: Vite client and esbuild server; existing chunk warning is tracked.
+- npm run harness:check: router/doc/skill/agent integrity and negative fixtures.
+- npm run privacy:scan: bounded source/client artifact privacy triage; use
+  --strict --require-build at release. Paths/rules only, no matched private text.
+- node scripts/validate-evidence.mjs <synthetic-json-file>: evidence reference
+  integrity; ID validation does not prove semantic candidate provenance.
+- npm run release:check: typecheck, build, harness, strict public-artifact privacy
+  scan and complete test suite. Never weaken validators to obtain a passing gate.
+- git diff --check and scoped source/untracked diff review before committing.
 
-## Results (2026-09-12)
-Inherited working tree: npm run lint pass; npm run build pass (531.60 kB chunk
-warning); npm test five pass, one fails in workspace.test.ts at repo.save:
-Invalid workspace or revision. Failure reproduced before harness edits.
-Dependency install unnecessary: installed modules supported type/build/tests.
-Harness validators include negative fixtures; final results are in active plan.
-A passing harness is not a production release verdict.
+## Phase 1 deterministic coverage
+The inherited auth-security tests cover guard identity denial, mutation origin,
+private file ownership/validation and isolated library sign-out.
+phase-1-auth tests use the exact production Better Auth options/hooks with a
+synthetic memory adapter, real signed cookies, real session lookup, owner session
+creation, expiry/revocation, logout adapter failure, secure cookie attributes,
+callback rejection and canonical OAuth redirect generation. Provider-profile
+checks do not mock Google token verification into success; live Google is pending.
+Installed Express route inventory plus actual HTTP requests cover every private
+application/file API and workspace read/import/export/audit denial, no-store and
+missing database behavior. Invalid expiry and auth-service errors fail closed.
 
-## Target State — required future coverage
-Security: anonymous/forged/expired/revoked/non-owner access denied; OAuth
-state/callback/origin; cross-owner records/files; auth/DB/storage outages;
-logout; no private data in public artifacts; private network/redirect SSRF.
-ATS: synthetic exact active/removed/board-only/error URLs, dedupe within/across
-batches, unknown/invalid/future dates and supported blockers.
-Evidence: rejected/disabled/cross-owner/unknown IDs, JD-derived claims,
-unsupported technology/metrics/ownership, manual invalidation, imports and export.
-Integration: empty private setup, durable restart, truthful end-to-end generation,
-public/private UX, provider unavailable states, qualification versus priority.
-Use mocked Gemini/ATS and synthetic fixtures by default.
+phase-1-client tests run real API/storage modules with controlled transport delays
+and synthetic browser storage/events. They cover memory-only records, distinct
+blank private/synthetic demo sources, 401/403/503/network loss, stale workspace,
+export/AI replies and old-network-failure races. Lifecycle wiring inspection is
+supplementary, not proof of rendered authenticated OAuth browser behavior.
 
-## Migration Notes
-Phase 0 fixes only harness-induced issues. Record baseline failures without
-claiming product phases complete. Release:check must fail on unresolved product
-failures or strict privacy findings. Live OAuth/DB/Blob, startup, preview, Studio
-and production acceptance require checks beyond build and static scanning.
+No credentials/private career records are used in these fixtures. Live Google
+OAuth acceptance pending external configuration. External live credentials,
+Google consent/registered callback, Neon schema and deployed Secure cookie behavior
+must be tested separately. Phase 2 persistence acceptance remains pending even
+though the inherited PGlite workspace contract test passes.
 
-Final Phase 0: harness/evidence/privacy positive and negative fixtures pass; strict
-privacy scan zero rule findings; five TOMLs parse. Bundled skill quick_validate
-is unavailable because PyYAML is absent in both Python runtimes; repository
-validator checks all eight skill metadata and links. Windows Git may warn about
-LF/CRLF conversion. release:check fails on the inherited persistence test.
+## Remaining gates
+Security: live OAuth redirect/state/callback, cross-owner persistence, auth/DB/Blob
+outages, durable restart and hosting; SSRF/private network redirect safety later.
+ATS: exact posting status, removed/unknown/error URLs, freshness and deduplication.
+Evidence: unsupported/JD-derived/cross-owner claims, manual invalidation and export.
+Integration: full authenticated browser lifecycle and truthful end-to-end workflows.
+Use synthetic Gemini/ATS/provider fixtures by default. Never log secrets or raw
+private workspace records. Build/static scanning cannot certify complete privacy.
+Results and reviewer findings belong in the active plan and Phase 1 acceptance.

@@ -1,40 +1,81 @@
 # Privacy boundary
 
-Reconciliation update (2026-09-12): descriptions of pending/uncommitted work and
-5/6 test results below are historical Phase 0 snapshots. All inherited product
-work is preserved in 41a04f8; stale test fixtures corrected in 0828816. Final
-suite passes 6/6. Use npm ci with package-lock.json. See
-[reconciliation record](DEV_RECONCILIATION.md) and active execution plan for
-current state; preserved integrations still require production acceptance.
 ## Public and private
-Public: source code, generic schemas, intentionally synthetic fixtures, static UI and non-secret configuration examples.
-Private: actual candidate identity/contact records, career evidence, imports, resumes, job/application history, interviews, outreach, audit records and exports. Do not copy their contents into docs, tests, screenshots, logs or public build artifacts.
+Public: source code, generic schemas, intentionally synthetic fixtures, static UI
+and non-secret configuration examples. Private: actual candidate/contact records,
+career evidence, imports, resumes, jobs/applications, interviews, outreach, audit
+records, private source files and exports. Never copy private contents into docs,
+tests, screenshots, logs or public artifacts.
 
-## Current State — committed baseline and violations
-- `server.ts` login compares email with OWNER_EMAIL but ignores passwordOrToken. Anyone knowing that email can obtain a token. This is not verified authentication or OAuth.
-- Owner middleware protects workspace/audit routes using process-local tokens with seven-day expiry. Tokens are accepted from bearer headers or query strings; URL tokens risk logging/leakage.
-- `src/services/storage.ts` stores auth metadata and candidate data in localStorage; AppContext's UI mode gate is not authorization.
-- `src/data/privateSeedTemplate.ts`, AuthModal, storage exports and server prompts contain actual identity or career assumptions. Client defaults are bundled. Do not repeat these values in new documentation.
-- AI routes generally accept caller-supplied candidate context without owner middleware. Claimed anonymization does not reliably remove PII from free text.
-- No database ownership enforcement or private file storage exists. Workspace exports are plain JSON, despite a comment mentioning encryption.
+## Current State — Phase 1 implementation
+Better Auth provides Google OAuth only. Email/password is disabled. The current
+Google profile, user creation and session creation must match the server-only
+OWNER_EMAIL with verified email. No email-only login or bearer/query-token
+middleware remains. Browser flags are UI state, never authorization.
 
-## Target State — required boundary
-Authenticate with verified identity provider credentials, validate OAuth state/PKCE and callback origins as appropriate to the selected integration, and authorize an explicitly configured owner server-side. Missing owner/auth configuration denies private access.
-Use server-validated sessions, secure HttpOnly cookies with suitable SameSite/CSRF protections, expiration and revocation; do not trust browser isOwner flags.
-Check ownership on every record, AI operation involving private records, and file upload/read/download/delete. Cross-owner identifiers must not disclose existence or contents.
-Keep demo data on an explicit separate path; a failed private read must never become a successful demo read. Empty private setup must contain no real candidate defaults.
-Only send necessary approved evidence to AI; redact identifiers and inspect free-text fields. Never log secrets, session tokens, full resumes or raw evidence.
-Store private files outside source/public assets, with server-authorized access and bounded signed delivery where needed. Imports require type/size/schema validation and provenance review; exports remain private.
-Keep provider keys, auth secrets, database credentials and storage tokens server-only. Never put them in browser-prefixed variables or bundles.
-Logout must revoke the server session and clear private UI/cache access. Storage failures must be explicit.
-See [TESTING.md](TESTING.md) for security acceptance gates.
+Required server configuration is OWNER_EMAIL, DATABASE_URL, BETTER_AUTH_SECRET
+(at least 32 non-padding characters), BETTER_AUTH_URL and Google client ID/secret.
+BETTER_AUTH_URL must be one canonical origin, HTTPS except local development.
+Missing/invalid configuration denies private access. Exact-origin mutation checks
+apply to private APIs and auth mutations; Better Auth validates OAuth state and
+callback URLs. Previews need their own explicitly configured origin and registered
+Google callback; arbitrary preview/wildcard origins are not trusted.
 
-## Migration Notes — pending working tree
-Inherited local auth.ts requires configured origin/owner/secrets, verified owner
-identity, Better Auth sessions, owner guard and mutation origin checks.
-Workspace DB queries and private file routes carry owner scope. Private browser
-cache is in memory; seed template is blank; legacy imports require review.
-privacy.ts redacts identifiers, but free-text minimization is not certified.
-These pending changes supersede baseline implementation descriptions only after
-review and commit. Five synthetic auth/file/session checks pass; persistence
-test fails. OAuth live flow, SSRF and full route authorization remain audit gates.
+Sessions use the Drizzle database adapter, opaque signed HttpOnly cookies,
+SameSite=Lax, HTTPS Secure cookies, one-day expiry and hourly renewal. Cookie
+session caching is disabled so every private authorization reads server session
+state. Invalid, expired, missing, unverified and non-owner sessions deny access.
+Account linking is disabled and identity updates are blocked. A Better Auth
+before-sign-out hook uses its session adapter to revoke before the library can
+swallow a deletion outage; failure returns 503 and the client offers retry.
+
+Workspace read/write/import/export/audit inherit a scoped owner router. Private
+file list/upload/download/delete use the owner guard directly, owner-scoped
+metadata queries, private Blob storage and authorized attachment streaming.
+All remaining application APIs (candidate context, evidence, resume, Gemini,
+search, jobs/ATS, proof, outreach, answers and referral) inherit /api owner
+middleware. Only health and configured Google auth flows are public API surfaces.
+Private/auth/file/export responses carry private, no-store cache semantics.
+
+Private browser records and session UI metadata are held in memory. Demo records
+use a separate synthetic source and public browser keys. Private defaults are
+blank and an empty authorized workspace opens candidate setup. Restore reads the
+server session then the workspace; a private read error never hydrates demo data.
+401/403/503 and network failures remove private UI/cache access. Logout invalidates
+outstanding requests immediately; failed server revocation is explicit and
+retryable. Server session expiry schedules local clearance; session checks run
+every 30 seconds and on focus/visibility restoration. Generation checks reject
+stale workspace/export/AI responses after session or workspace transitions.
+Switching to the public demo is an explicit view change; it does not revoke the
+server session. Returning private still requires server authorization for APIs.
+
+## Acceptance and limitations
+Phase 1 deterministic results and security-review disposition are recorded in
+[Phase 1 acceptance](exec-plans/active/phase-1-acceptance.md) and the
+[active plan](exec-plans/active/productionization.md).
+Live Google OAuth acceptance pending external configuration.
+Synthetic adapter/session tests prove architecture and denial behavior; they do
+not prove live Google, Neon, Blob or deployed cookie behavior. Phase 2 durable
+database/private file persistence acceptance remains pending.
+
+Legacy private browser data is read only through explicit owner import preview;
+originals remain on the device until the user removes them. New private/auth
+records are never written to localStorage. Privacy redaction exists, but free-text
+minimization, semantic evidence provenance and SSRF remain later acceptance work.
+No service worker/static cache stores real private records. No credentials belong
+in browser-prefixed variables, public bundles or repository files.
+
+## Required ongoing boundary
+Every record/file query must carry server-derived ownership; cross-owner IDs must
+not disclose contents. Private operations fail closed under auth/storage outages.
+Only necessary approved evidence may reach AI; never log raw career evidence,
+resumes, secrets or session tokens. Imports require bounded type/schema checks
+and provenance review; exports are private JSON, not encrypted backups.
+See [TESTING.md](TESTING.md) for validation and live acceptance limits.
+
+## History
+The pre-reconciliation baseline used email-only process tokens, bearer/URL token
+acceptance and private localStorage defaults. Those descriptions are historical,
+not current dev behavior. Inherited integrations were committed in 41a04f8;
+stale persistence fixtures were corrected in 0828816. Phase 1 audited and fixed
+the committed implementation without replacing Better Auth.
