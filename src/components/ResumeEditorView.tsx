@@ -28,6 +28,7 @@ import { EvaluationPanel } from './EvaluationPanel';
 import { WhyBulletModal } from './WhyBulletModal';
 import { ExportModal } from './ExportModal';
 import { ResumeBullet, TailoredResume } from '../types';
+import { canExportFinal } from '../utils/resumeReadiness';
 
 export const ResumeEditorView: React.FC = () => {
   const {
@@ -256,12 +257,13 @@ export const ResumeEditorView: React.FC = () => {
               title={`${estimatedLines} estimated rendered lines.`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-current" />
-              <span>Page Fit: {overflowRisk} Risk (~1.0 pg)</span>
+              <span>Page fit estimate: {overflowRisk} risk; check print preview</span>
             </div>
           )}
 
           <button
-            onClick={() => window.print()}
+            disabled={!canExportFinal(resume, activeJob.assessmentStatus)}
+            onClick={() => setIsExportOpen(true)}
             className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
             title="Print / Save as PDF"
           >
@@ -279,6 +281,13 @@ export const ResumeEditorView: React.FC = () => {
       </div>
 
       {/* Two-Pane Desktop Layout */}
+      <div className="p-3 rounded-lg border border-amber-200 text-xs">
+        <strong>Resume: {activeJob.assessmentStatus === 'STALE' ? 'STALE' : resume.readiness || 'DRAFT'}</strong>
+        <p>{resume.readinessIssues?.join('; ') || 'Exact current text must retain eligible evidence support.'}</p>
+        <button disabled={isGenerating} onClick={()=>evaluateResume(activeJob.id)} className="mt-2 underline">Save checkpoint and validate current claims</button>
+        <div className="mt-2">{resume.claimLedger?.map(c=><div key={c.claimId}>{c.claimType}: {activeJob.assessmentStatus === 'STALE' ? 'stale' : c.validationStatus} — {c.text.slice(0,90)}</div>)}</div>
+        <details className="mt-2"><summary>Version history ({activeJob.versionHistory?.length || 0})</summary>{activeJob.versionHistory?.map(v=><details key={v.versionId}><summary>{v.timestamp}: {v.note} ({v.resume.readiness || 'DRAFT'})</summary>{v.resume.claimLedger?.map(c=><div key={c.claimId}>{c.text} — {c.validationStatus}; evidence: {c.supportingEvidenceIds.join(', ')}</div>)}</details>)}</details>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT PANE: Editor & Tailoring Controls (5 cols) */}
         <div className="lg:col-span-5 space-y-4 overflow-y-auto max-h-[calc(100vh-140px)] pr-1">
@@ -316,16 +325,16 @@ export const ResumeEditorView: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-xs font-semibold uppercase tracking-wider text-slate-900 dark:text-white block">
-                      {resume.experience[0]?.employer || 'Experience'}
+                      Professional experience
                     </span>
                     <span className="text-[11px] text-slate-400">
-                      {resume.experience[0]?.title || 'Employment title not entered'}
+                      All selected employment records
                     </span>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  {resume.experience[0]?.bullets.map((bullet, idx) => {
+                  {resume.experience.flatMap(exp => exp.bullets.map(bullet => ({bullet, exp}))).map(({bullet, exp}, idx) => {
                     const isSelected = selectedBulletId === bullet.id;
                     const isEnabled = bullet.enabled !== false;
 
@@ -349,7 +358,7 @@ export const ResumeEditorView: React.FC = () => {
                               className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                             />
                             <span className="font-semibold text-slate-700 dark:text-slate-300">
-                              Bullet #{idx + 1}
+                              {exp.employer}, {exp.title} ({exp.period}) · Bullet #{idx + 1}
                             </span>
                           </label>
 
@@ -359,7 +368,7 @@ export const ResumeEditorView: React.FC = () => {
                               onClick={() =>
                                 setInspectingBullet({
                                   bullet,
-                                  employerOrProject: resume.experience[0]?.employer || ''
+                                  employerOrProject: exp.employer
                                 })
                               }
                               className="p-1 text-slate-500 hover:text-emerald-600 rounded cursor-pointer flex items-center space-x-0.5"
@@ -373,7 +382,7 @@ export const ResumeEditorView: React.FC = () => {
                               onClick={() => {
                                 setInspectingBullet({
                                   bullet,
-                                  employerOrProject: resume.experience[0]?.employer || ''
+                                  employerOrProject: exp.employer
                                 });
                               }}
                               className="p-1 text-slate-500 hover:text-emerald-600 rounded cursor-pointer"
@@ -386,7 +395,7 @@ export const ResumeEditorView: React.FC = () => {
 
                         <textarea
                           rows={3}
-                          value={bullet.text}
+                          aria-label={`${exp.employer}, ${exp.title}: bullet ${idx + 1}`} value={bullet.text}
                           onChange={(e) => handleBulletTextChange(bullet.id, e.target.value, true)}
                           className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs text-slate-900 dark:text-white leading-relaxed focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans"
                         />

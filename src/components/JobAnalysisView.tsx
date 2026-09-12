@@ -52,7 +52,7 @@ export const JobAnalysisView: React.FC = () => {
   const { parsed, evidenceMatches, sessionQuestions, tailoringPlan } = activeJob;
   const fit = activeJob.assessmentStatus === 'STALE' ? undefined : activeJob.fit;
   const verdict = fit?.verdict || 'Borderline';
-  const canTailor = fit?.canTailor ?? false;
+  const canTailor = activeJob.assessmentStatus === 'ASSESSED' && !!fit?.recommendation && fit.recommendation !== 'SKIP';
 
   const handleGapAnswerChange = (qId: string, value: string) => {
     setGapAnswers((prev) => ({ ...prev, [qId]: value }));
@@ -308,7 +308,7 @@ export const JobAnalysisView: React.FC = () => {
                 <span>Evidence Gap Interview (High Fit Opportunity)</span>
               </h3>
               <p className="text-xs text-slate-500">
-                Fit is 8.0+. Answer targeted questions regarding past undocumented work. You may optionally save answers to your permanent Evidence Bank.
+                Capture undocumented work for evidence review. Answers cannot support final resume claims until approved.
               </p>
             </div>
             <button
@@ -484,7 +484,7 @@ export const JobAnalysisView: React.FC = () => {
                   Experience Bullets Strategy:
                 </span>
                 <p className="text-slate-600 dark:text-slate-400">
-                  {tailoringPlan.disneyBulletsPlan.length} experience bullets planned.
+                  {tailoringPlan.decisions?.filter(d=>d.action !== 'omit').length || 0} requirement selections supported by approved evidence.
                 </p>
               </div>
             </div>

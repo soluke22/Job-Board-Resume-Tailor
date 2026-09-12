@@ -23,7 +23,8 @@ Phase 2 local persistence contracts are covered by synthetic Postgres-compatible
 restart/rollback/isolation/fault tests; live Neon/Blob remain separate gates.
 Explicit top-level collection saves replace only supplied collections. Retained
 jobs preserve omitted attachments/histories; explicit histories replace that
-owner's job history (empty lists clear). Imports merge selected IDs. Removed jobs
+owner's legacy job history (empty lists clear). Phase 5 certified resume versions
+are immutable and retained through saves/imports until job removal. Imports merge selected IDs. Removed jobs
 delete owner-scoped children transactionally. Upserted scalar fields replace prior
 values, including omitted optional SQL scalars. Ambiguous parent IDs reject atomically.
 Imports merge selected IDs and reset imported candidate provenance/review, not ATS status.

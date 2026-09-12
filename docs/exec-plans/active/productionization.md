@@ -5,162 +5,158 @@ Truthful discovery and evidence-grounded career workflows with durable owner-onl
 private storage and a separate synthetic demo. GitHub is canonical.
 
 ## Current Branch
-Phase 4 starts clean at 89b3596bdf442cf22b35c670c86791253cd9fe31, verified equal
-to freshly fetched origin/dev. User authorizes Phase 4 checkpoint and normal
-fast-forward origin/dev push. dev only; no main, release PR, Studio, production
-Vercel or Phase 5 work.
+dev; Phase 5 started clean at freshly fetched dev == origin/dev ==
+8882f7207060ec5182ede4e424963c8102863c94 (published Phase 4).
+User requests coherent Phase 5 checkpoints and normal fast-forward origin/dev push.
+No main, release PR, Studio or production deployment.
 
 ## Current Phase / Scope and Acceptance
-Phase 4 — Evidence-grounded qualification/ranking.
-Actual canonical or explicit user JD -> source excerpts -> owner-approved evidence
--> bounded retrieval -> validated semantic matches -> deterministic arithmetic
--> explainable constraint-aware recommendation. Gemini cannot supply final scores.
-Acceptance matrix: [Phase 4](phase-4-acceptance.md). Completion gate is focused/full
-tests, typecheck/build/harness/privacy/evidence/release/startup/diff checks plus
-normal checkpoint publication. Live Gemini is a separate external acceptance gate.
+Phase 5 — Resume provenance + tailoring + manual validation.
+Acceptance: [Phase 5 matrix](phase-5-acceptance.md). Current certified assessment,
+owner-resolved eligible evidence, exact-text claim ledger, deterministic identity,
+manual invalidation/revalidation, safe regeneration, version history and final export.
+No Phase 6. Parent owns writes; one narrow read-only security-reviewer.
 
 ## Current Status
-Phase 4 deterministic assessment contract verified locally; implementation checkpoint
-a17570c committed cleanly. Publication blocked by automatic approval review twice:
-it rejects attached-request authorization as untrusted for exporting the commit to
-the verified GitHub origin. No push occurred. Direct user approval required before
-retrying; origin/dev remains 89b3596. Live Gemini semantic acceptance pending external
-configuration: GEMINI_API_KEY absent (environment and only .env.example).
-No real private evidence sent to a live model. No applications performed.
+Phase 5 conservative deterministic contract implemented. Focused 11/11 and full
+63/63 tests pass; initial release composition passes typecheck/build/harness/tests
+and strict required-build privacy scan, zero findings. Final validation complete; publication pending checkpoint. Live Gemini acceptance pending external configuration; no key exists
+in process and only .env.example is present. No private records sent to a live model.
+This is complete-statement certification; general semantic paraphrases require
+reviewed atomic evidence before certification. Authenticated/deployed browser and
+actual print pagination remain live gates, not fabricated success.
 
 ## Architecture Decisions
 React/Vite + Express/Gemini, Better Auth owner sessions, Neon/Drizzle revisioned
 owner workspace, private Blob/recovery intents and isolated synthetic demo retained.
+Phase 5 adds strict reusable claim/basis types and a server provenance service.
+No database migration: JSON-backed owner resume/version records retain the ledger.
+
 ## Completed Work
 Phase 1 b8c9999: auth/session/origin/browser-memory contracts; live OAuth pending.
-Phase 2 936a869/3154e0d: durable owner storage, replacement/restart/rollback,
-private files/recovery and terminal database lifecycle; live Neon/Blob pending.
-Phase 3 89b3596: exact ATS canonical content/status/date provenance, safe bounded
-fetch, conservative dedupe/history refresh and explicit unassessed discovery.
-See [Phase 1](phase-1-acceptance.md), [Phase 2](phase-2-acceptance.md),
-[Phase 3](phase-3-acceptance.md) and [provider contracts](phase-3-provider-contracts.md).
+Phase 2 936a869/3154e0d: durable storage/private file/recovery/runtime contracts.
+Phase 3 89b3596: canonical ATS/status/date/dedupe and unassessed discovery.
+Phase 4 published at 8882f72: persisted-owner strict requirement/evidence matching,
+deterministic qualification/coverage/strategy and current versioned assessment.
+See earlier phase acceptance matrices for details and external limitations.
 
-Phase 4: analyze-job/match-evidence accept jobId only and resolve owner repository
-JD/evidence/SearchProfile. Canonical AVAILABLE or explicit user-provided JD is
-required; generic URL fetch alone/snippets fail insufficient-JD. Shared strict
-Zod extraction/match schemas use SDK structured output, separate system instructions,
-MEDIUM thinking, 30-second timeout per request and no fabricated fallback/retry.
-Exact excerpts must occur in JD; stable hashed requirement IDs retain offsets.
-Canonical five families/modifiers; role classification is not qualification.
-Enabled verified owner evidence only, additionally excluding requiresUserReview.
-All other states and disabled/import assertions/project/skill free text cannot score.
-Deterministic lexical/adjacency relevance plus per-requirement round-robin retrieves
-at most 32 approved records independent of bank order. Unknown evidence/requirement
-IDs, incomplete matching and Strong adjacency fail validation; support IDs deduplicate.
-Contact/identity free text is redacted against persisted profile, IDs preserved.
+Phase 5: plan/generate/evaluate/validate/regenerate/export accept persisted jobId
+and optional claimId only; browser facts and underlyingEvidence are rejected.
+Current ASSESSED Phase 4 basis required for new certification; SKIP/hard blockers
+excluded without an 8.0 threshold. Matched eligible IDs narrow model context.
+Plans retain keep/omit requirement decisions, verified skills and project selection.
+Gemini may select/reorder complete evidence statements and supported skill labels;
+strict structured schemas prohibit identity, dates, invented IDs and certification.
+MEDIUM thinking, 30-second request timeout, one request, no JSON extraction fallback.
+Master supplies deterministic header/education and employment/project identity;
+all source experiences are selectable with original employer/title/period links.
+Master presentation is never evidence authority. Original bullet text is retained
+when linked master material exists, without inheriting certification.
 
-## Scoring Algorithm / Strategy
-phase4-v1: average coefficients per present requirement group; weights hard .80,
-preferred .15, responsibilities .05 renormalized over present groups. Multiply by
-10 and round to one decimal. Qualification coefficients Strong 1, Moderate .70,
-Weak .25, Missing 0; coverage 1/.50/.10/0. Each score capped at 5.9 when its
-hard-group average < .50. Requirements encode actual years/seniority/domain gaps;
-no candidate years inferred, no title/family numeric constants.
-Constraints remain categorical and separate. Configured employment, relocation,
-clearance, required onsite/location/frequency, comparable authoritative minimum
-salary, company and literal title exclusions may block. Known hiring-process,
-family/modifier/seniority and target salary preferences affect strategy only.
-Unknown salary/location/process is unknown. No inherited Java/Python/Staff blockers.
-SKIP: real blocker, NOT_LISTED posting or qualification < 5. APPLY FIRST:
-qualification >= 8.5, coverage >= 7.5, no concerns. Otherwise STRONG WITH GAP:
-qualification >= 7; CALIBRATED STRETCH: >= 5. Recommendation SKIP agrees;
-APPLY for >= 7 without concerns, otherwise SELECTIVE_APPLY. Uncertain posting/old
-publication lowers strategy only. All explanations derive from validated matches,
-gaps or deterministic constraints. No 8.0 apply gate.
+Claim ledger covers summary, experience/project bullets, skills and project tech.
+Stable claim/artifact IDs, exact text and SHA-256 hash, source/generation mode,
+multiple normalized evidence IDs, target requirement IDs, scope, validation hash,
+time, algorithm and issues. States: verified/requires-review/manual-edit-unvalidated/
+unsupported/rejected. Server checks eligible IDs, full statement support, explicit
+technology labels and exact employment/project scope. Requirement targets need a
+Phase 4 match to supporting evidence. No metric/verb/ownership inflation.
 
-## Invalidation / Legacy Migration
-Metadata: JD/source SHA-256, sorted eligible semantic-evidence fingerprint,
-SearchProfile plus posting/compensation/effective freshness fingerprint, algorithm
-version and timestamp. Repository reads mark legacy/changed assessments STALE,
-retain history, and unchanged certified metadata reuses without Gemini. Ordinary
-client saves cannot certify changed assessments or derived display fields.
-Assessment commits use original revision; concurrent updates fail 409. Local edits
-are never overwritten by assessment adoption; reload required on in-flight edits.
-UI hides stale scores and shows reassess notice. Evidence/profile edits conservatively
-invalidate; canonical refresh/direct job source/status/compensation edits invalidate.
-Removed process-local cache and unused candidate blocker heuristics. Deprecated
-initial/tailored scores derive from qualification; UI displays qualification/coverage.
-New priority STRONG WITH GAP; old strings remain only historical compatibility.
-Legacy verdict/canTailor derive from recommendation. Automatic interview generation
-removed from assessment. Existing deeper gap/resume/artifact provenance is Phase 5/6,
-not certified by Phase 4.
+Browser manual edits clear approval immediately; server saves recompute actual hash.
+Explicit checkpoint-and-validate compares actual text to current evidence. Restore
+awaits validation; toggling inclusion preserves support but empty work is non-ready.
+Regeneration uses only persisted claim/evidence envelope, validates before saving;
+model failure preserves the previous version. Revision conflicts return 409 and
+local in-flight edits are never overwritten by response adoption.
+
+Readiness: DRAFT, NEEDS_VALIDATION, READY, STALE. Repository reads recheck assessment,
+complete eligible-evidence and master/profile basis, identity and every enabled
+claim. Legacy artifacts stay historical/stale. Real evaluation derives checks;
+no optimistic summary/skills defaults. Edited, generated, regenerated, revalidated
+and export-selected snapshots retain full text/ledger. Certified history is
+immutable even through imports; ordinary saves cannot forge validation or basis.
+
+Final export is fenced for plaintext/Markdown/LaTeX/JSON/app print/PDF. Server
+rechecks persisted READY content, records the selected version and browser compares
+it to visible content. Native print carries a draft label without app confirmation.
+Cover letters remain visibly uncertified drafts. Page fit is a character-based
+estimate, with print preview required; no verified single-page/ATS guarantee.
+Print styling preserves identity header and isolates the printable artifact.
 
 ## Acceptance Criteria
-Strict owner-source/evidence contracts, complete supplied-requirement matching,
-deterministic arithmetic and independent constraint/priority/recommendation,
-auditable explanations, stale history and safe persisted reuse. All available
-local gates must pass; no live semantic/provider acceptance fabricated.
+For every enabled resume claim: exact current text linked to resolvable eligible
+owner evidence, support within original scope, current assessment basis and explicit
+validated hash. Any unresolved claim, changed identity, empty work or stale basis
+blocks final export. Complete local gates pass; live semantic/rendering proofs
+remain explicit external gates. Truth precedes relevance/readability/page fit.
 
 ## Tests Passed
-Focused Phase 4: 12 grouped tests. Full npm test: 52/52 including all Phase 1–3.
-Typecheck, build, harness and strict required-build privacy scan: pass, zero findings.
-Final npm run release:check passes all 52 tests, typecheck/build/harness and strict
-required-build privacy scan (zero findings). npm run privacy:scan also passes.
-Standalone synthetic evidence validator, startup smoke (1/1) and diff check pass.
-Existing client >500 kB chunk warning remains (537.21 kB).
+Focused Phase 5 11/11; full npm test 63/63. Typecheck/build/harness and initial
+release composition pass, strict required-build privacy zero findings.
+Final npm run release:check passes typecheck/build/harness, 63/63 tests and strict
+required-build privacy scan (zero findings). npm run privacy:scan, standalone
+synthetic evidence validator, startup smoke 1/1 and git diff --check pass.
+Existing client >500 kB warning remains (541.45 kB).
 
 ## Tests Failing / Security Review
-No remaining failures in completed checks. Initial retrieval fixture accidentally
-labeled unrelated records React; corrected synthetic fixture. Final diff whitespace
-cleaned. Initial rewritten plan omitted exact required headings; restored them,
-final harness/release composition passes without checker changes.
-Narrow read-only docs-researcher verified official structured-output syntax
-and Zod dialect normalization. Narrow read-only security-reviewer demonstrated
-omitted top-level certification fields and omitted freshness fingerprint; both fixed
-with repository/fingerprint regression tests. Reviewer rechecked both original
-reproductions and confirmed resolved. Parent owns writes; no mapper/triager.
+No failures in latest focused suite. Full initial suite found protected route count
+and legacy artifact metadata expectations; updated assertions retain denied HTTP
+coverage and exact legacy text/identity preservation. Reviewer demonstrated negative
+context detached by sentence splitting; fixed by complete approved statement reuse.
+Reviewer demonstrated all-work-disabled and unsupported-skill client export gap;
+fixed with broader invalidation and shared client/server fence regressions.
+Reviewer found imports overwriting certified history; existing protected versions
+now preserve stored originals through imports without normalization/upsert.
+Import round-trip test also found review flags added to strict JD requirement shapes;
+source records remain structurally intact while imported assessment stays stale.
+All fixes have deterministic regression coverage. Reviewer directly rechecked all
+three original reproductions and focused 11/11 suite: resolved; no remaining defect
+in this focused boundary review.
 
 ## Known Blockers / Remaining Limitations
-Live Google OAuth/authenticated browser, Neon multi-connection transport/locking,
-private Blob CDN/abort/late-put and deployed network/runtime remain external gates.
-PGlite uses a serialized connection; Blob fault fixtures are not live proofs.
-Live Gemini 3.8/schema acceptance and semantic completeness/correctness pending.
-Exact excerpts prove source presence, not complete interpretation or semantic truth.
-Dictionary retrieval may miss synonyms; bounded retrieval may exclude some relevant
-records in very large banks. Constraint text parsing handles explicit interpretable
-facts conservatively; ambiguous frequency/location remains unknown. Salary only
-comparable annual USD, no unsupported currency/hour conversion. Client invalidation
-may reassess after irrelevant evidence/profile edits; no targeted dependency graph.
-No claim-level project/skill/resume provenance redesign or interview certification.
-Prior artifacts/history preserved; no Phase 5 work or remote deployment/migration.
+Live OAuth, Neon multi-connection transport/locking, private Blob CDN/faults and
+Vercel/browser/network acceptance remain earlier external gates.
+Live Gemini generation/schema/service acceptance awaits server-only configuration.
+Exact complete-statement reuse proves preservation of approved evidence; it does
+not independently establish truth of owner approval or semantic equivalence of
+paraphrases. Longer evidence may need separate reviewed concise statements.
+Project evidence requires exact persisted project ID/name sourceLocation;
+ambiguous scope is withheld. No automatic years calculation or evidence backfill.
+Page-fit heuristic cannot certify actual print/PDF pagination, font/device rendering
+or ATS behavior. No document-format ecosystem rewrite. Export snapshot records
+selected validated version, not OS/download completion. Native print is draft.
+Certified versions persist until explicit job removal; no retention policy redesign.
+Legacy gap interviews/cover letters/Phase 6 artifacts remain uncertified.
 
 ## External Configuration Needed
 Server-only OWNER_EMAIL, Google ID/secret/callback, BETTER_AUTH_SECRET/URL,
 Neon DATABASE_URL/schema, private BLOB_READ_WRITE_TOKEN and GEMINI_API_KEY.
-No secrets/private records logged; no remote resources created.
+Only synthetic candidate evidence authorized for a live Gemini smoke.
+No secrets/private data logged or remote resources created.
 
 ## Files / Modules Currently Involved
-server/assessment.ts, assessmentRoutes.ts, server.ts assessment SDK adapter,
-workspaceRepository certification/read invalidation, workspaceValidation schemas,
-searchEngine freshness; shared assessment/index types; AppContext/API and triage
-UI/analytics/refresh handoff; phase-4-assessment tests and domain docs.
+server/resumeProvenance.ts, resumeRoutes.ts, server.ts structured adapter;
+workspaceRepository certification/history/import and workspaceValidation;
+shared provenance/index types; API/AppContext, editor/evidence/history/export/print
+views and CSS; Phase 5 tests, auth/storage expectation updates and domain docs.
 
 ## Last Known Good Commit
-Baseline published Phase 3: 89b3596. Locate Phase 4 checkpoint with git log -1 --
-docs/exec-plans/active/productionization.md; normal push then clean/equal fetched
-refs verify publication without self-hash loop.
+Published Phase 4 baseline 8882f72. Locate Phase 5 checkpoint with git log -1 --
+docs/exec-plans/active/productionization.md; publication verified by clean/equal
+freshly fetched refs without a self-hash loop.
 
 ## Next Exact Step
-Obtain direct user approval for normal git push origin dev to
-https://github.com/soluke22/Job-Board-Resume-Tailor.git, publish the local Phase 4
-implementation/documentation checkpoints, fetch and verify clean equal refs.
-Phase 5 — Resume provenance + tailoring + manual validation.
-Begin only on a new explicit continuation; this task stops after Phase 4 report.
-Live Phase 4 synthetic Gemini semantic acceptance also awaits configuration.
-Release audit precedes dev/main PR, merged-main Google AI Studio verification
-and final Vercel production.
+Phase 6 — Proof packs + outreach + application answers.
+Begin only on a new explicit continuation; this task stops after Phase 5 publication
+and report. Live Phase 5 synthetic Gemini acceptance awaits external configuration.
+Release audit precedes dev/main PR, merged-main AI Studio verification and final
+Vercel production. Do not begin Phase 6 in this task.
 
 ## Remaining Phases
-1. Authentication code-complete; live Google/cookie/browser acceptance pending.
+1. Authentication code-complete; live Google/browser acceptance pending.
 2. Durable database/private files code-complete; live Neon/Blob acceptance pending.
-3. Discovery/ATS/freshness/dedupe code-complete; live provider/Gemini smoke pending.
+3. Discovery/ATS deterministic contracts complete; live provider/Gemini gates pending.
 4. Qualification/ranking deterministic contract complete; live semantics pending.
-5. Resume provenance + tailoring + manual validation.
+5. Conservative resume provenance/tailoring/manual validation implemented; live gates pending.
 6. Proof packs + outreach + application answers.
 7. Application tracking + outcome analytics.
 8. Vercel-compatible architecture completion/live runtime acceptance.

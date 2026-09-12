@@ -1,3 +1,4 @@
+import { invalidateEditedResume } from '../utils/resumeReadiness';
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { mergeDiscoveredJobs } from '../utils/jobIdentity';
 import {
@@ -109,6 +110,7 @@ interface AppContextType {
   generateResume: (jobId: string) => Promise<void>;
   generateCoverLetter: (jobId: string) => Promise<void>;
   evaluateResume: (jobId: string) => Promise<void>;
+  prepareResumeExport: (jobId: string) => Promise<TailoredResume>;
   updateResume: (jobId: string, resume: TailoredResume) => void;
   updateCoverLetter: (jobId: string, coverLetter: TailoredCoverLetter) => void;
   regenerateBullet: (
@@ -612,66 +614,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateJob(updatedJob);
   };
 
-  const generatePlan = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target || !target.parsed || !target.fit || !target.evidenceMatches) return;
-    if (target.assessmentStatus === 'STALE') { setError('Reassess before planning.'); return; }
-
-    setIsGenerating(true);
-    setError(null);
+  const runResumeOperation = async (operation: 'plan'|'generate'|'evaluate'|'validate'|'regenerate', jobId:string, claimId?:string) => {
+    setIsGenerating(true); setError(null);
     try {
-      const { plan } = await apiService.generatePlan(
-        target.parsed,
-        target.fit,
-        target.evidenceMatches,
-        target.sessionAnswers
-      );
-      const updated: JobRecord = {
-        ...target,
-        tailoringPlan: plan,
-        status: 'Plan Ready'
-      };
-      updateJob(updated);
-    } catch (err: any) {
-      console.error('Tailoring plan generation failed:', err);
-      setError(err.message || 'Plan generation failed');
-    } finally {
-      setIsGenerating(false);
-    }
+      await persistCurrent();
+      const startedSnapshot=JSON.stringify(storageService.privateSnapshot());
+      await apiService.resumeOperation(operation,jobId,claimId);
+      const result=await apiService.getWorkspaceData();
+      if(startedSnapshot!==JSON.stringify(storageService.privateSnapshot())) {
+        ready.current=false;
+        throw new Error('Local edits occurred during resume operation. Reload required; local edits have not been overwritten.');
+      }
+      adopt(result); setActiveJobId(jobId);
+      if(operation==='generate')setCurrentView('resume-editor');
+    }catch(err:any){setError(err.message || 'Resume operation failed');}
+    finally{setIsGenerating(false);}
   };
-
-  const generateResume = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target || !target.parsed || !target.tailoringPlan) return;
-
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const { resume } = await apiService.generateResume(
-        target.parsed,
-        target.tailoringPlan,
-        profile,
-        masterResume
-      );
-      const updated: JobRecord = {
-        ...target,
-        tailoredResume: resume,
-        status: 'Resume Generated',
-        applicationStatus: 'TAILORED'
-      };
-      updateJob(updated);
-      setCurrentView('resume-editor');
-
-      // Also evaluate resume automatically
-      await evaluateResume(jobId);
-    } catch (err: any) {
-      console.error('Resume generation failed:', err);
-      setError(err.message || 'Resume generation failed');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
+  const generatePlan = (jobId:string) => runResumeOperation('plan',jobId);
+  const generateResume = (jobId:string) => runResumeOperation('generate',jobId);
   const generateCoverLetter = async (jobId: string) => {
     const target = jobs.find((j) => j.id === jobId);
     if (!target || !target.parsed || !target.tailoredResume) return;
@@ -697,26 +657,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const evaluateResume = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target || !target.parsed || !target.tailoredResume) return;
-
-    try {
-      const { evaluation } = await apiService.evaluateResume(target.tailoredResume, target.parsed);
-      const updated: JobRecord = {
-        ...target,
-        evaluation
-      };
-      updateJob(updated);
-    } catch (err: any) {
-      console.error('Resume evaluation failed:', err);
+  const evaluateResume = (jobId:string) => runResumeOperation('validate',jobId);
+  const prepareResumeExport = async (jobId:string):Promise<TailoredResume> => {
+    await persistCurrent();
+    const startedSnapshot=JSON.stringify(storageService.privateSnapshot());
+    const exported=await apiService.resumeOperation('export',jobId);
+    const result=await apiService.getWorkspaceData();
+    if(startedSnapshot!==JSON.stringify(storageService.privateSnapshot())) {
+      ready.current=false;
+      throw new Error('Local edits occurred during export validation. Reload required; local edits have not been overwritten.');
     }
+    adopt(result);
+    return exported.resume;
   };
-
   const updateResume = (jobId: string, resume: TailoredResume) => {
     const target = jobs.find((j) => j.id === jobId);
     if (!target) return;
-    updateJob({ ...target, tailoredResume: resume });
+    updateJob({ ...target, tailoredResume: invalidateEditedResume(target.tailoredResume || resume, structuredClone(resume)), evaluation: undefined });
     storageService.addAuditLog('RESUME_MANUALLY_EDITED', jobId, 'Edited resume in Studio');
   };
 
@@ -726,61 +683,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateJob({ ...target, coverLetter });
   };
 
-  const regenerateBullet = async (
-    jobId: string,
-    bulletId: string,
-    employerOrProject: string,
-    currentText: string,
-    targetReq: string,
-    underlyingEvidence: string
-  ) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target || !target.tailoredResume) return;
-
-    setIsGenerating(true);
-    try {
-      const { bulletText, whyThisBullet } = await apiService.regenerateBullet(
-        targetReq,
-        underlyingEvidence,
-        currentText,
-        employerOrProject
-      );
-
-      // Deep clone and replace bullet
-      const resume = JSON.parse(JSON.stringify(target.tailoredResume)) as TailoredResume;
-      let replaced = false;
-
-      resume.experience?.forEach((exp) => {
-        exp.bullets?.forEach((b) => {
-          if (b.id === bulletId) {
-            b.text = bulletText;
-            if (whyThisBullet) b.whyThisBullet = whyThisBullet;
-            replaced = true;
-          }
-        });
-      });
-
-      if (!replaced) {
-        resume.projects?.forEach((proj) => {
-          proj.bullets?.forEach((b) => {
-            if (b.id === bulletId) {
-              b.text = bulletText;
-              if (whyThisBullet) b.whyThisBullet = whyThisBullet;
-              replaced = true;
-            }
-          });
-        });
-      }
-
-      updateResume(jobId, resume);
-    } catch (err: any) {
-      console.error('Failed to regenerate bullet:', err);
-      setError(err.message || 'Failed to regenerate bullet');
-    } finally {
-      setIsGenerating(false);
-    }
+  const regenerateBullet = async (jobId:string, bulletId:string, employerOrProject:string, currentText:string, targetReq:string, underlyingEvidence:string) => {
+    await runResumeOperation('regenerate',jobId,bulletId);
   };
-
   // Preparation & Outreach
   const generateProofPack = async (jobId: string) => {
     const target = jobs.find((j) => j.id === jobId);
@@ -1010,6 +915,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         generateResume,
         generateCoverLetter,
         evaluateResume,
+        prepareResumeExport,
         updateResume,
         updateCoverLetter,
         regenerateBullet,

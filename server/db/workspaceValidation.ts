@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { claimSchema, resumeBasisSchema } from '../../src/types/provenance';
 import { metadataSchema, requirementSchema, extractionSchema } from '../../src/types/assessment';
 
 // Runtime counterparts of the persisted UI contracts. Unknown optional metadata is
@@ -39,6 +40,7 @@ const bullet = object({ id, section: z.enum(['experience', 'project']), parentId
 export const experienceSchema = object({ id, employer: text, title: text, period: text, location: text, bullets: list(bullet), ...review });
 const resumeProject = object({ id, name: text, period: text, technologies: strings, bullets: list(bullet) });
 export const resumeSchema = object({ id, jobId: text, roleFamily: text,
+  claimLedger:list(claimSchema).optional(),basis:resumeBasisSchema.optional(),readiness:z.enum(['DRAFT','NEEDS_VALIDATION','READY','STALE']).optional(),readinessIssues:strings.optional(),
   header: object({ name: text, title: text, email: text, phone: text, location: text, links }), professionalSummary: text,
   skills: list(object({ category: text, skills: strings })), experience: list(experienceSchema), projects: list(resumeProject),
   education: list(object({ institution: text, degree: text, period: text, location: text, details: text.optional() })),

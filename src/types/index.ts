@@ -286,6 +286,7 @@ export interface GapInterviewQuestion {
 }
 
 export interface TailoringPlan {
+  decisions?: { targetRequirementId: string; evidenceIds: string[]; action: 'keep' | 'rewrite' | 'omit' | 'reorder'; reason: string }[];
   professionalSummaryAngle: string;
   disneyBulletsPlan: {
     evidenceId: string;
@@ -358,6 +359,10 @@ export interface PageEstimate {
 }
 
 export interface TailoredResume {
+  claimLedger?: import('./provenance').ResumeClaim[];
+  basis?: import('./provenance').ResumeBasis;
+  readiness?: import('./provenance').ResumeReadiness;
+  readinessIssues?: string[];
   id: string;
   jobId: string;
   roleFamily: RoleFamily;

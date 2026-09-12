@@ -1,5 +1,7 @@
 import React from 'react';
 import { TailoredResume } from '../types';
+import { useApp } from '../context/AppContext';
+import { canExportFinal } from '../utils/resumeReadiness';
 
 interface ResumePaperProps {
   resume: TailoredResume;
@@ -12,6 +14,7 @@ export const ResumePaper: React.FC<ResumePaperProps> = ({
   onBulletClick,
   selectedBulletId
 }) => {
+  const { activeJob } = useApp();
   const { header, professionalSummary, skills, experience, projects, education } = resume;
 
   return (
@@ -22,6 +25,7 @@ export const ResumePaper: React.FC<ResumePaperProps> = ({
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
       }}
     >
+      <p className={`print-draft-warning mb-3 font-bold text-amber-800 ${canExportFinal(resume,activeJob?.assessmentStatus)?'hidden':''}`}>DRAFT / NOT VALIDATED FOR SUBMISSION</p>
       {/* Contact Header */}
       <header className="border-b border-slate-300 pb-3 mb-3 text-center space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-slate-950 uppercase">

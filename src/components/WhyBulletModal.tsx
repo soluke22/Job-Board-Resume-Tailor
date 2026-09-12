@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Sparkles, Database, Target, RotateCcw, Loader2 } from 'lucide-react';
 import { ResumeBullet } from '../types';
+import { useApp } from '../context/AppContext';
 
 interface WhyBulletModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export const WhyBulletModal: React.FC<WhyBulletModalProps> = ({
   onRegenerate,
   onRestoreMaster
 }) => {
+  const { evidence, activeJob } = useApp();
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   if (!isOpen || !bullet) return null;
@@ -79,7 +81,11 @@ export const WhyBulletModal: React.FC<WhyBulletModalProps> = ({
               <span>Grounded Evidence Record</span>
             </span>
             <div className="p-3 bg-blue-50/40 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 rounded-lg text-slate-800 dark:text-slate-200">
-              {bullet.underlyingEvidence || 'Verified engineering record from candidate repository.'}
+              <p>Status: {activeJob?.assessmentStatus === 'STALE' ? 'stale' : activeJob?.tailoredResume?.claimLedger?.find(c=>c.claimId===bullet.id)?.validationStatus || 'requires-review'}</p>
+              {(activeJob?.tailoredResume?.claimLedger?.find(c=>c.claimId===bullet.id)?.supportingEvidenceIds || []).map(id=>{
+                const record=evidence.find(e=>e.id===id);
+                return <div key={id} className="mt-2"><strong>{id}</strong><p>{record ? `${record.enabled ? record.verificationStatus : 'disabled'}: ${record.rawEvidence}` : 'Evidence record unavailable'}</p></div>;
+              })}
             </div>
           </div>
 

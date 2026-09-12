@@ -141,7 +141,7 @@ export const MasterResumeView: React.FC = () => {
               <span>Grounding Principles</span>
             </h3>
             <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-              Every tailored bullet generated in this application must map back to an authorized claim inside this master document or the verified Evidence Bank.
+              The master resume provides presentation and deterministic identity. It does not establish claim truth. Tailored claims require current eligible Evidence Bank records and exact-text validation.
             </p>
             <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
               <span className="font-semibold text-slate-800 dark:text-slate-200 block">
