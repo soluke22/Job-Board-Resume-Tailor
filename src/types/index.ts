@@ -1,3 +1,4 @@
+import type { AssessmentMetadata, Requirement, Extraction } from './assessment';
 export type PrimaryRoleFamily =
   | 'frontend-product'
   | 'ui-platform-design-systems'
@@ -51,6 +52,7 @@ export type ApplicationPriority =
   | 'UNASSESSED'
   | 'APPLY FIRST'
   | 'STRONG'
+  | 'STRONG WITH GAP'
   | 'CALIBRATED STRETCH'
   | 'LOW PRIORITY'
   | 'SKIP'
@@ -238,6 +240,12 @@ export interface ParsedJob {
 }
 
 export interface FitAssessment {
+  recommendation?: 'APPLY' | 'SELECTIVE_APPLY' | 'SKIP';
+  constraintBlockers?: string[];
+  preferenceConcerns?: string[];
+  unknownConstraints?: string[];
+  whyFits?: string[];
+  whyNot?: string[];
   qualificationFit: number; // 0 - 10
   evidenceCoverage: number; // 0 - 10
   applicationPriority: ApplicationPriority;
@@ -254,6 +262,7 @@ export interface FitAssessment {
 }
 
 export interface RequirementMatch {
+  relationship?: 'direct' | 'adjacent' | 'none';
   id: string;
   requirement: string;
   isHardRequirement: boolean;
@@ -534,7 +543,11 @@ export interface JobRecord {
   canonicalContentStatus?: 'AVAILABLE' | 'UNAVAILABLE' | 'UNSUPPORTED';
   canonicalContentSource?: string;
   canonicalMetadata?: unknown;
-  assessmentStatus?: 'UNASSESSED' | 'ASSESSED';
+  assessmentStatus?: 'UNASSESSED' | 'ASSESSED' | 'STALE';
+  jdSource?: 'user-provided';
+  requirements?: Requirement[];
+  assessmentMetadata?: AssessmentMetadata;
+  assessmentFacts?: Extraction['facts'];
   description: string;
   location: string;
   secondaryLocations?: string[];

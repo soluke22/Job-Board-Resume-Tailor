@@ -1,7 +1,10 @@
+import { z } from 'zod';
+import { AssessmentError } from './server/assessment';
+import { createAssessmentHandler } from './server/assessmentRoutes';
 import express, { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { installAuth, requireWorkspaceOwner } from './server/auth';
 import { installPrivateFiles } from './server/privateFiles';
 import { createWorkspaceRouter } from './server/workspaceRoutes';
@@ -11,10 +14,10 @@ import { executeDiscoveryRequest, validateDiscoveryInput } from './server/discov
 import { mergeDiscoveredJobs } from './src/utils/jobIdentity';
 import { safeFetchText } from './server/safeFetch';
 import {
-  evaluateDeterministicBlockers,
+
   calculateFreshnessBand,
-  hashJobDescription,
-  analysisCache
+
+
 } from './server/searchEngine';
 import { JobRecord, SearchProfile } from './src/types';
 
@@ -32,7 +35,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api', requireWorkspaceOwner);
 
 // Lazy initialization of GoogleGenAI
-function getGeminiClient(req: Request): GoogleGenAI | null {
+function getGeminiClient(req: Request, alreadyMinimized = false): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return null;
@@ -46,7 +49,7 @@ function getGeminiClient(req: Request): GoogleGenAI | null {
     }
   });
   const generate = client.models.generateContent.bind(client.models);
-  client.models.generateContent = (params: any) => generate(redactAiPayload(params, req.body?.candidateProfile));
+  if (!alreadyMinimized) client.models.generateContent = (params: any) => generate(redactAiPayload(params, req.body?.candidateProfile));
   return client;
 }
 
@@ -111,200 +114,16 @@ app.post('/api/fetch-job-url', async (req: Request, res: Response): Promise<void
 // ==========================================
 // 1. Analyze Job & Classify Role Family & Multi-Factor Fit
 // ==========================================
-app.post('/api/analyze-job', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { rawDescription, candidateProfile, evidenceItems } = req.body;
-
-    if (!rawDescription || typeof rawDescription !== 'string') {
-      res.status(400).json({ error: 'Job description text is required.' });
-      return;
-    }
-
-    const ai = getGeminiClient(req);
-    if (!ai) {
-      res.status(503).json({
-        error:
-          'Gemini API key is not configured. Studio fails closed to prevent unverified hallucinations. Please configure GEMINI_API_KEY in Settings.'
-      });
-      return;
-    }
-
-    // Anonymized candidate profile and evidence context to protect PII
-    const anonymizedEvidence = (evidenceItems || []).map((e: any) => ({
-      id: e.id,
-      experienceOrProject: e.employer || e.role || 'Candidate evidence',
-      skills: e.technologies || [],
-      domain: e.domain || 'Frontend Web',
-      claim: e.rawEvidence,
-      verified: e.verificationStatus !== 'unverified'
-    }));
-
-    const systemPrompt = `You are a skeptical tech recruiter and engineering hiring manager evaluating a job description against verified candidate evidence.
-Candidate Background:
-- Use only the supplied candidate evidence to determine specialization.
-- Do not assume any employer, project, degree or professional history.
-- Do not infer candidate qualifications without evidence.
-
-Your task:
-1. Parse the job description into structured details.
-2. Classify into EXACTLY ONE role family:
-   - "frontend-product-engineer" (React, TypeScript, product UI, consumer web, data integration, testing, a11y)
-   - "ui-platform-design-systems" (component libraries, design systems, Storybook, design tokens, shared primitives)
-   - "internal-tools-fullstack-frontend" (internal applications, CRUD workflows, API-backed admin interfaces)
-   - "production-support-frontend" (use ONLY when role materially emphasizes production support, triage, observability, page validation)
-3. Calculate multi-factor fit assessments:
-   - qualificationFit: score from 0.0 to 10.0 reflecting hard requirement match and seniority alignment.
-   - evidenceCoverage: score from 0.0 to 10.0 reflecting the proportion of required skills supported by verified evidence.
-   - initialFitScore: conservative out of 10.0. An 8.0+ must be hard to earn and requires strong stack, level, and evidence alignment.
-   - tailoredFitScore: conservative out of 10.0 (maximum realistic fit achievable purely with truthful tailoring).
-   - applicationPriority: "High" | "Medium" | "Low" | "Do Not Apply".
-   - verdict: "Apply" (tailoredFit >= 8.0), "Borderline" (tailoredFit between 6.5 and 7.9), "Skip" (tailoredFit < 6.5 or fundamental domain/seniority mismatch).
-   - strongestMatch: candidate's verified evidence most aligned with JD.
-   - biggestActualGap: major unevidenced requirement or domain gap (do not treat preferred requirements as hard gaps).
-   - blockers: array of hard requirements candidate does not have evidence for.
-   - unsupportedRequirements: requirements candidate cannot truthfully claim.
-   - canTailor: boolean. Set to FALSE if the job is a "Skip" or fundamental mismatch/unviable stretch. If not a fit, we will NOT create a tailored resume for this job.
-   - rejectionNotice: clear statement if canTailor is false explaining why we refuse to generate a misleading resume.
-
-CRITICAL RULES:
-- Never use em dashes (—) or en dashes (–) anywhere in any generated text (use commas, colons, or parentheses).
-- Do not assume missing evidence exists.
-- Return ONLY valid JSON matching this schema:
-{
-  "parsed": {
-    "company": string,
-    "roleTitle": string,
-    "seniority": string,
-    "employmentType": string,
-    "locationExpectations": string,
-    "coreResponsibilities": string[],
-    "hardRequirements": string[],
-    "preferredRequirements": string[],
-    "primaryTechnologies": string[],
-    "productDomainExpectations": string,
-    "recruiterScreeningSignals": string[],
-    "classifiedFamily": "frontend-product-engineer" | "ui-platform-design-systems" | "internal-tools-fullstack-frontend" | "production-support-frontend",
-    "familyRationale": string
-  },
-  "fit": {
-    "initialFitScore": number,
-    "tailoredFitScore": number,
-    "qualificationFit": number,
-    "evidenceCoverage": number,
-    "applicationPriority": "High" | "Medium" | "Low" | "Do Not Apply",
-    "verdict": "Apply" | "Borderline" | "Skip",
-    "verdictReason": string,
-    "strongestMatch": string,
-    "biggestActualGap": string,
-    "blockers": string[],
-    "unsupportedRequirements": string[],
-    "canTailor": boolean,
-    "rejectionNotice": string
-  }
-}`;
-
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [
-        { text: systemPrompt },
-        {
-          text: `Candidate Summary:\nUse only the verified evidence below.\n\nVerified Evidence Context:\n${JSON.stringify(
-            anonymizedEvidence
-          )}\n\nJob Description:\n${rawDescription}`
-        }
-      ],
-      config: {
-        responseMimeType: 'application/json'
-      }
-    });
-
-    const json = extractCleanJson(response.text || '{}');
-    res.json(json);
-  } catch (error: any) {
-    console.error('Private operation failed');
-    res.status(500).json({ error: 'Failed to analyze job description' });
-  }
+function geminiJsonSchema(schema: z.ZodType) { const { ['$schema']: dialect, ...json } = z.toJSONSchema(schema); return json; }
+const assessmentHandler = createAssessmentHandler((req) => async (schema, system, data) => {
+  const ai = getGeminiClient(req, true);
+  if (!ai) throw new AssessmentError('Gemini is not configured; no assessment produced');
+  const response = await ai.models.generateContent({model:MODEL_NAME,contents:JSON.stringify(data),config:{systemInstruction:system,responseMimeType:'application/json',responseJsonSchema:geminiJsonSchema(schema),thinkingConfig:{thinkingLevel:ThinkingLevel.MEDIUM},httpOptions:{timeout:30000}}});
+  return schema.parse(JSON.parse(response.text || ''));
 });
-
-// ==========================================
-// 2. Evidence Matching (Full Evidence Bank Retrieval)
-// ==========================================
-app.post('/api/match-evidence', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { parsedJob, evidenceItems, projects, skills } = req.body;
-    const ai = getGeminiClient(req);
-
-    if (!ai) {
-      res.status(503).json({
-        error:
-          'Gemini API key is not configured. Studio fails closed to prevent unverified hallucinations.'
-      });
-      return;
-    }
-
-    const prompt = `You are an evidence auditing engine matching job description requirements to verified candidate evidence.
-CRITICAL CONSTRAINT: You must NOT infer missing evidence. If evidence does not exist in the candidate bank, label it "Missing".
-Do NOT convert collaboration into ownership, contribution into leadership, or frontend API integration into backend ownership.
-NO em dashes (—) or en dashes (–) anywhere in your text.
-
-Requirements to Match:
-Hard: ${JSON.stringify(parsedJob.hardRequirements || [])}
-Preferred: ${JSON.stringify(parsedJob.preferredRequirements || [])}
-
-Candidate Evidence Bank:
-${JSON.stringify(
-  (evidenceItems || []).map((e: any) => ({
-    id: e.id,
-    raw: e.rawEvidence,
-    tech: e.technologies,
-    domain: e.domain,
-    status: e.verificationStatus
-  }))
-)}
-
-Candidate Projects:
-${JSON.stringify(
-  (projects || []).map((p: any) => ({
-    id: p.id,
-    name: p.name,
-    tech: p.technologies,
-    contribution: p.solomonContribution
-  }))
-)}
-
-Return JSON matching this schema:
-{
-  "matches": [
-    {
-      "id": string,
-      "requirement": string,
-      "isHardRequirement": boolean,
-      "candidateEvidence": string,
-      "strength": "Strong" | "Moderate" | "Weak" | "Missing",
-      "gap": string,
-      "matchedEvidenceId": string (optional),
-      "supportingEvidenceIds": string[] (optional),
-      "supportingSkillIds": string[] (optional),
-      "concern": string (optional)
-    }
-  ]
-}`;
-
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ text: prompt }],
-      config: {
-        responseMimeType: 'application/json'
-      }
-    });
-
-    const json = extractCleanJson(response.text || '{}');
-    res.json(json);
-  } catch (error: any) {
-    console.error('Private operation failed');
-    res.status(500).json({ error: 'Failed to match evidence' });
-  }
-});
+app.post('/api/analyze-job', assessmentHandler);
+// Compatibility route uses the same persisted deterministic assessment, never a second scoring path.
+app.post('/api/match-evidence', assessmentHandler);
 
 // ==========================================
 // 3. Gap Interview Questions

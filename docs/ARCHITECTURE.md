@@ -57,7 +57,11 @@ current/history matches without replacing application lifecycle/attachments.
 server/safeFetch.ts bounds and DNS-pins arbitrary URL retrieval; generic reachability
 does not establish listing state. See [JOB_SEARCH_PIPELINE.md](JOB_SEARCH_PIPELINE.md).
 Evidence contracts and gaps belong in [EVIDENCE_MODEL.md](EVIDENCE_MODEL.md).
-Analysis cache remains process-local and is separate from workspace persistence.
+Phase 4 server/assessment.ts plus assessmentRoutes.ts use owner repository context,
+strict shared structured schemas, bounded retrieval and deterministic arithmetic.
+Assessments persist under revision guards; fingerprinted certification/cache and
+stale-history reads replace the old process-local analysis cache. Later artifact
+routes are not certified by this assessment change.
 
 ## Acceptance versus target
 Phase 1 audits authentication and public/private isolation. Deterministic tests
@@ -66,7 +70,7 @@ behavior. Live Google OAuth acceptance pending external configuration.
 Live Neon/Blob durability, multi-connection transport/locking, deployment and authenticated browser
 acceptance remain external/persistence gates; do not infer them from builds.
 
-Future phases retrieve approved owner evidence, enforce generated claims, complete
+Future phases enforce generated claims, complete
 live discovery/storage acceptance, and validate deployed Vercel runtime.
 Server operations must derive identity from verified sessions and authorize every
 record/file. Client state is a view/cache, never authentication or storage authority.

@@ -7,6 +7,14 @@ suite passes 6/6. Use npm ci with package-lock.json. See
 [reconciliation record](DEV_RECONCILIATION.md) and active execution plan for
 current state; preserved integrations still require production acceptance.
 ## Current State — contracts
+Phase 4 assessment resolves only persisted authenticated-owner evidence; enabled
+AND verificationStatus verified AND no requiresUserReview. All other states,
+disabled records and imported assertions cannot increase qualification/coverage.
+Strict requirement/match contracts reject unknown supplied IDs and enforce complete
+coverage. Project/Skill free text assists no independent scored assertion.
+Exact JD excerpts/offsets and stable requirement IDs establish source presence;
+JD is never candidate evidence. Direct/adjacent relationships remain explicit.
+See JOB_SEARCH_PIPELINE for deterministic weights and versioned invalidation.
 `src/types/index.ts` defines EvidenceItem, ProjectItem, SkillItem, RequirementMatch and ResumeBullet.
 EvidenceItem has id, sourceType, sourceLocation, source, rawEvidence, verificationStatus, supportedVerbs, supportedMetrics, enabled and optional review/verification metadata.
 ProjectItem contains contribution, implementation, leadership and outcome text but no uniform evidence-ID linkage. SkillItem has professional/project evidence text and confidence; confidence is not verification.
@@ -15,6 +23,7 @@ ResumeBullet has optional supportingEvidenceId/supportingProjectId, evidenceSour
 ## Verification states
 | State | Meaning and permitted use |
 | --- | --- |
+| requires-review | Imported assertion or pending review; no scored support |
 | verified | Reviewed support; eligible when enabled and relevant |
 | provisional | Incomplete corroboration; review before approved claims |
 | session-unreviewed | Interview/import assertion awaiting review |
@@ -36,14 +45,16 @@ Import review must not trust an external verification flag. Rejected, disabled a
 
 ## Migration Notes — baseline gaps and entry points
 `src/services/storage.ts` imports can preserve caller-supplied verified status.
-`server.ts` analysis treats all states except unverified as verified; prompts and JSON parsing do not enforce claim linkage.
+Historical analysis accepted nearly all verification states. Phase 4 replaces that
+path with server-resolved enabled verified support and strict structured matches.
+The later artifact routes still require Phase 5/6 provenance acceptance.
 Inspect match-evidence, generate-plan, generate-resume, regenerate-bullet and evaluate-resume routes for claim changes.
 UI entry points: EvidenceBankView, ProjectsView, SkillsView, ResumeEditorView, WhyBulletModal; AppContext orchestrates them.
 Validation scenarios live in [TESTING.md](TESTING.md).
 
-Pending local workspaceValidation.ts adds strict schemas and requires-review
-state; legacy DB import downgrades asserted verification. This does not establish
-semantic support or authorize claims. The baseline browser-import warning above
-must be rechecked against legacyImport before Phase 1/2 acceptance.
+Committed workspaceValidation schemas and owner-confirmed legacy DB import
+downgrade imported assertions to requires-review, including nested provenance.
+Ordinary owner review persists the new status; imports cannot self-verify.
+This does not establish semantic support or authorize downstream artifact claims.
 The standalone ID validator checks approved enabled reference integrity only;
 it cannot infer unsupported technologies, metrics or ownership from prose.

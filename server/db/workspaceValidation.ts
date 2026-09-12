@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { metadataSchema, requirementSchema, extractionSchema } from '../../src/types/assessment';
 
 // Runtime counterparts of the persisted UI contracts. Unknown optional metadata is
 // preserved for forwards compatibility; known fields never bypass shape validation.
@@ -73,7 +74,8 @@ export const jobSchema = object({ id, atsProvider: text, atsBoard: text.optional
   discoveryTitle: text.optional(), discoveryCompany: text.optional(), discoverySummary: text.optional(),
   discoverySourceUrls: strings.optional(), discoveryAliases: strings.optional(),
   canonicalContentStatus: z.enum(['AVAILABLE', 'UNAVAILABLE', 'UNSUPPORTED']).optional(), canonicalContentSource: text.optional(),
-  canonicalMetadata: z.unknown().optional(), publicationDateSource: text.optional(), assessmentStatus: z.enum(['UNASSESSED', 'ASSESSED']).optional(),
+  canonicalMetadata: z.unknown().optional(), publicationDateSource: text.optional(), assessmentStatus: z.enum(['UNASSESSED', 'ASSESSED', 'STALE']).optional(),
+  jdSource: z.literal('user-provided').optional(), requirements: list(requirementSchema).optional(), assessmentMetadata: metadataSchema.optional(), assessmentFacts: extractionSchema.shape.facts.optional(),
   secondaryLocations: strings.optional(), remoteStatus: z.enum(['remote', 'hybrid', 'onsite', 'unknown']), workplaceType: text.optional(), employmentType: text,
   compensation: object({ min: number.optional(), max: number.optional(), currency: text.optional(), interval: z.enum(['year', 'hour', 'month']).optional(), raw: text.optional() }).optional(),
   department: text.optional(), team: text.optional(), publishedAt: text.optional(), updatedAt: text.optional(), firstSeenAt: text, lastVerifiedAt: text.optional(),

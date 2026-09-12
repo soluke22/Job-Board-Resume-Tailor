@@ -1,3 +1,4 @@
+import { currentFit } from '../utils/assessmentView';
 import React from 'react';
 import {
   LayoutDashboard,
@@ -124,15 +125,15 @@ export const Navigation: React.FC = () => {
                 <span className="font-semibold text-white max-w-[120px] truncate">{activeJob.company}</span>
                 <ChevronRight className="w-3 h-3 text-slate-500" />
                 <span className="text-slate-300 max-w-[120px] truncate">{activeJob.title}</span>
-                {activeJob.fit && (
+                {currentFit(activeJob) && (
                   <span
                     className={`ml-1 px-2 py-0.2 rounded text-[10px] font-semibold uppercase ${
-                      activeJob.fit.verdict === 'Apply'
+                      currentFit(activeJob).verdict === 'Apply'
                         ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
                         : 'bg-amber-950 text-amber-300 border border-amber-800'
                     }`}
                   >
-                    {activeJob.fit.tailoredFitScore}/10
+                    {currentFit(activeJob).qualificationFit}/10
                   </span>
                 )}
               </div>

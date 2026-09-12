@@ -41,6 +41,7 @@ export function refreshJob(existing: JobRecord, incoming: JobRecord): JobRecord 
   }
   merged.discoveryAliases = [...new Set([...(existing.discoveryAliases || []), ...(incoming.discoveryAliases || []), incoming.discoveryUrl].filter(Boolean))];
   merged.discoverySourceUrls = [...new Set([...(existing.discoverySourceUrls || []), ...(incoming.discoverySourceUrls || [])])];
+  if (existing.fit && (merged.description !== existing.description || merged.verificationStatus !== existing.verificationStatus || merged.publishedAt !== existing.publishedAt || merged.freshnessBand !== existing.freshnessBand || JSON.stringify(merged.compensation) !== JSON.stringify(existing.compensation))) merged.assessmentStatus = 'STALE';
   // IDs, firstSeenAt, assessment, notes, lifecycle and every application attachment survive.
   return merged;
 }
