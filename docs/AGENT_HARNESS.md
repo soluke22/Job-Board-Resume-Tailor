@@ -1,36 +1,60 @@
-# Harness audit and roles
-## Initial audit
-Inspected tracked files and hidden repository instruction/skill paths plus ancestor AGENTS files on 2026-09-11. No existing AGENTS.md, AGENTS.override.md, repository skill directories or Markdown documentation were found.
-Useful package commands and code contracts are preserved through links. Existing comments claiming clean private defaults, protected identity or database synchronization conflict with implementation; domain docs record these as gaps rather than duplicating or legitimizing them. Application code is unchanged in Phase 1.
+# Codex operating harness
+## Audit
+Historical pre-change 2026-09-12 inventory found root router, seven domain docs, seven manually routed
+skills and three generic agent TOMLs; no nested AGENTS/overrides, active plans,
+discoverable repo skills or validation scripts outside dependencies/build.
+Consolidated useful skills into .agents/skills; split ATS and ranking.
+Replaced inherited-model generic roles with four focused read-only specialists.
+Old Phase 1 harness terminology is superseded by current plan Phase 0.
+Pending product work preserved, excluded from harness checkpoint.
 
-## Minimal roles
-Three project-scoped definitions live in `.codex/agents/`: `context-scout.toml`, `implementer.toml`, and `reviewer.toml`. Their standalone TOML format follows the [official custom-agent documentation](https://learn.chatgpt.com/docs/agent-configuration/subagents). Model settings inherit from the parent. Scout and reviewer are read-only. A new session may be needed to discover definitions; roles can also be used conceptually.
-| Role | Work | Output / boundary |
+## Model policy
+Productionization parent GPT-5.6 Sol Medium owns writes, stays fixed per phase.
+High for demonstrated subtle auth, difficult migration/integration problems or
+final architecture review. No Fast unless requested. No XHigh/Max/Ultra merely
+for importance. Astra only after a coherent Sol attempt fails on a concrete
+complex/cross-system problem; requested Astra Light maps to supported low
+effort and must be disclosed. Never default Astra or stronger escalation.
+| Specialist | Model | Effort |
 | --- | --- | --- |
-| Context Scout | Narrow read-only feature/dependency lookup | Relevant files, skill, dependencies, tests, risks; no edits or architecture redesign |
-| Implementer | Consume scout findings, load relevant workflow, implement active scope, run focused checks | Scoped changes and validation; broaden exploration only for missing dependencies |
-| Reviewer | Inspect diff, relevant invariants, tests and security | Correctness, security, maintainability or requirement findings; no style-driven rewrite |
-Use roles conceptually in a single agent when delegation adds no value. Do not create agents just because slots exist, or send multiple agents to inspect the whole repository. No extra roles are needed.
+| code-mapper | gpt-5.6-terra | medium |
+| docs-researcher | gpt-5.6-luna | medium |
+| test-triager | gpt-5.6-terra | medium |
+| security-reviewer | gpt-5.6-sol | high |
+All read-only, no recursive delegation. Parent plus at most two helpers; no
+duplicate repository-wide analysis or overlapping writes. Mapper only when
+ownership unclear; reviewer only after meaningful diff; reuse findings/docs.
 
-## Navigation dry run
-Root routing yields the following task-specific loads:
-| Task | Skill | Domain documents |
-| --- | --- | --- |
-| Fix OAuth authorization | private-workspace-security | PRIVACY_BOUNDARY |
-| Fix Ashby verification | job-discovery | JOB_SEARCH_PIPELINE |
-| Fix resume claim provenance | evidence-grounding | EVIDENCE_MODEL |
-| Migrate to Vercel | vercel-productionization | ARCHITECTURE, PRIVACY_BOUNDARY, DEPLOYMENT |
-| Run release audit | verify-release | PRODUCT_INVARIANTS, TESTING |
-Each document name resolves to the sibling Markdown file. Validation procedures may reference TESTING as needed without loading unrelated product domains.
+## Supported configuration
+npm CLI 0.111.0 differs from desktop binary 0.153.4. Installed CLI static
+inspection plus [official custom-agent docs](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+supports .codex/agents/*.toml: name, description, developer_instructions, model,
+model_reasoning_effort and sandbox_mode. Project config sets Sol Medium and
+legacy agents.max_threads=2 conservatively. Installed CLI counting semantics
+are unverified locally; policy remains parent plus at most two helpers. Newer docs use
+max_concurrent_threads_per_session=2 excluding parent; retain legacy compatibility.
+No unsupported default_subagent_* keys. Current host exposes requested IDs;
+other account/host availability is conditional. Trust/security policy may ignore
+repo configuration; restart if discovery stale. Files do not switch live parent.
+Syntax/static support checked; no paid live model probe. State rejected override
+rather than silently substitute. Browsing/MCP requires available capability.
+[Official skill discovery](https://learn.chatgpt.com/docs/build-skills) uses .agents/skills.
 
-## Maintenance
-AGENTS owns routing, skills own procedures, domain docs own knowledge, code owns enforcement, tests own machine-verifiable behavior.
-Keep root routing under approximately 100 lines and skill bodies short. Change the domain source once rather than copying it across skills. Update current/target distinctions as implementation catches up.
+## Routing simulation
+| Request | Skill | Specialist if useful | Parent | Validation |
+| --- | --- | --- | --- | --- |
+| Google OAuth owner auth | workspace-security | Mapper if unclear; security-reviewer after diff | Sol Medium | Type/build, auth denial tests, configured OAuth smoke |
+| Removed Greenhouse role shows LISTED | ats-verification | Terra mapper if unclear | Sol Medium | Type/build, exact/removed/board/error fixtures; ATS suite needed |
+| Unsupported technology after resume edit | evidence-provenance | None normally | Sol Medium | ID integrity plus semantic/manual edit/save/export rejection |
+| Neon migration fails in preview | vercel-deployment | Luna docs; Terra failure triager | Sol Medium; High only if sensitive | Migration tests, build, authorized preview smoke |
+| Dashboard card | None; repo-context only if unclear | Mapper only if needed | Terra Medium or AI Studio for isolated UI | Type/build/UI smoke |
+| Final security review | release-validation | Sol High security-reviewer | Sol High review | Release composition and manual security gates |
+Rows load only applicable domain knowledge; TESTING distinguishes missing suites.
 
-## Phase 1 verification
-- Root guide: 63 lines; seven skills: 15 lines each.
-- All seven skills passed the bundled skill-creator `quick_validate.py` validator.
-- All five navigation exercises above passed without unrelated domain documents.
-- Baseline TypeScript check and build passed. Build warns about CommonJS/import.meta compatibility and a large client chunk; these are product follow-up items, not resolved by documentation.
-- Private-data audit found existing client identity defaults and server career assumptions; locations and required boundaries are recorded in PRIVACY_BOUNDARY.md without copying private values.
-- No product test suite exists at this baseline. Harness completion does not certify production readiness.
+## Maintenance and resilience
+AGENTS routes/global invariants; skills procedures; docs durable knowledge;
+TOMLs specialist behavior; plan current state; scripts enforceable checks.
+Five-hour interruptions recover from scoped checkpoint, recorded validations
+and next exact action in active plan. Do not depend on conversation or resets.
+Baseline type/build pass, tests 5/6 with workspace validation failure.
+Bounded scanner/ID integrity cannot certify private-data absence or claim support.

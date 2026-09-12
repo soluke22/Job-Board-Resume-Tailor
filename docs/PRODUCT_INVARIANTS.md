@@ -1,5 +1,8 @@
 # Product invariants
-These are acceptance requirements; current code does not enforce all of them.
+## Current State
+Current code does not enforce all requirements; see domain gaps and active plan.
+
+## Target State
 
 - Evidence over keywords: rank and tailor using substantiated work, not token overlap.
 - Qualification fit is distinct from application priority. Priority may incorporate timing and preferences; it must not inflate qualifications.
@@ -15,3 +18,7 @@ These are acceptance requirements; current code does not enforce all of them.
 - Failure and uncertainty must remain visible through ranking, export and downstream application artifacts.
 
 Implementation-specific gaps and acceptance scenarios live in the domain docs and [TESTING.md](TESTING.md).
+
+## Migration Notes
+Phase 0 changes operating infrastructure only. Pending product changes are not
+certified by the harness checkpoint; later phases update domain enforcement.

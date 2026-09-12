@@ -1,5 +1,5 @@
 # Job search pipeline
-## Intended stages
+## Target State — intended stages
 Discover -> Canonicalize -> Verify -> Deduplicate -> Deterministic blockers -> Fast fit -> Evidence retrieval -> Deep fit -> Rank -> Tailor
 
 1. Discover: retain source URL, query and observed time; search results are unverified leads.
@@ -13,7 +13,7 @@ Discover -> Canonicalize -> Verify -> Deduplicate -> Deterministic blockers -> F
 9. Rank: combine qualification, coverage and application preferences without conflating them.
 10. Tailor: pass screened analysis and selected evidence to resume generation.
 
-## Modules and current gaps
+## Current State — modules and gaps
 `server.ts` orchestrates Gemini search and constructs JobRecord objects. `server/searchEngine.ts` provides blockers, freshness, description hashing and a bounded 24-hour process cache.
 Current discovery deduplicates by company/title, starts verification as LISTED, defaults publication to now, assigns constant fit/coverage by family and generates fixed responsibilities. These violate the target; don't preserve them as specifications.
 Discovery summaries are not authoritative full job descriptions. Blockers currently include candidate-specific assumptions; derive future rules from supported evidence/preferences.
@@ -35,3 +35,9 @@ LISTED requires evidence for the exact active posting; NOT_LISTED means authorit
 An active board does not verify an individual role. HTTP 200 does not prove an active job.
 Current Ashby/Greenhouse board-level success and generic reachable-page success are too permissive. Provider detection uses substring checks; URL host validation, redirect handling and SSRF defenses need review.
 Network/provider failures must preserve uncertainty, not promote a lead.
+
+## Migration Notes
+Inherited working-tree discovery still initializes LISTED, substitutes current
+publication dates, uses role-family score constants and fixed responsibilities
+(server.ts near discovery record assembly). These are demonstrated pending gaps,
+not Phase 0 fixes. Add focused ATS/ranking suites with Phases 3/4.

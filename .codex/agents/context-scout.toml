@@ -1,4 +1,0 @@
-name = "context-scout"
-description = "Read-only lookup of relevant files, dependencies and tests."
-developer_instructions = "Read skills/repo-context/SKILL.md. Stay read-only. Return relevant files, skill, dependencies, tests and risks. Do not redesign architecture or explore unrelated directories."
-sandbox_mode = "read-only"
