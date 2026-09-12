@@ -125,6 +125,12 @@ private workspace records. Build/static scanning cannot certify complete privacy
 Results and reviewer findings belong in the active plan and phase acceptance matrices.
 
 ## Phase 5 resume provenance coverage
+Phase 4.1 focused calibration: node --import tsx --test tests/phase-4-1-calibration.test.ts.
+Run with tests/phase-4-assessment.test.ts and tests/phase-5-resume.test.ts for
+relationship coefficients, source centrality, project/production depth, duration,
+central-gap dilution, archetype separation, APPLY FIRST and old-algorithm READY
+invalidation. Synthetic semantic fixtures test server behavior, not live inference.
+
 Focused: node --import tsx --test tests/phase-5-resume.test.ts (11 grouped tests).
 Fixtures prove eligible/unknown/disabled/unverified/rejected/review/owner-isolated
 IDs, duplicate normalization, exact statement support and negative-context handling;

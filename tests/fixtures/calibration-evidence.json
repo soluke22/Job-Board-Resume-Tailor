@@ -1,0 +1,5 @@
+{
+  "ownerId": "synthetic-owner",
+  "evidence": [{"id": "synthetic-calibration", "ownerId": "synthetic-owner", "verificationStatus": "verified", "enabled": true}],
+  "records": [{"supportingEvidenceIds": ["synthetic-calibration"]}]
+}

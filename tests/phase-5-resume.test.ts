@@ -107,6 +107,16 @@ test('Phase 5 full basis staleness and deterministic metadata are checked',()=>{
   bad.experience[0].title='Intern';bad.projects[0].period='2025';assert.equal(inspectResume(bad,w,job).readiness,'NEEDS_VALIDATION');
 });
 
+test('Phase 4.1 algorithm migration makes Phase 4 stale and removes Phase 5 READY/export',()=>{
+  const {w,job,resume}=fixture();
+  assert.equal(resume.readiness,'READY');
+  const old={...job,assessmentMetadata:{...job.assessmentMetadata,algorithmVersion:'phase4-v1'}};
+  assert.throws(()=>currentJob({...w,jobs:[old]},old.id));
+  const stale=inspectResume(resume,{...w,jobs:[old]},old);
+  assert.equal(stale.readiness,'STALE');assert.equal(canExportFinal(stale,'STALE'),false);
+  assert.equal(resume.professionalSummary,stale.professionalSummary,'migration retains historical text');
+});
+
 test('Phase 5 repository and routes: owner-only generation, forged certification, manual checkpoints, invalid regeneration preserves artifact',async()=>{
   const {pg,db}=await persistenceDb();const repository=createWorkspaceRepository(()=>db as any);
   try{

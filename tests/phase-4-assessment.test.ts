@@ -54,9 +54,9 @@ test('matching direct Strong, adjacency Moderate/Weak, Missing; unknown IDs and 
   assert.throws(()=>validateMatches({matches:matching().matches.map(m=>({...m,requirementId:'unknown'}))},c.requirements,[evidence()]));
 });
 test('fixed arithmetic, stronger evidence improves results, role family cannot assign score',()=>{
-  assert.equal(ALGORITHM_VERSION,'phase4-v1');assert.equal(scored().qualificationFit,10);
-  assert.equal(scored('Moderate').qualificationFit,7);assert.equal(scored('Moderate').evidenceCoverage,5);
-  assert.equal(scored('Moderate').recommendation,'APPLY');assert.equal(scored('Missing').qualificationFit,0);
+  assert.equal(ALGORITHM_VERSION,'phase4.1-v2');assert.equal(scored().qualificationFit,10);
+  assert.equal(scored('Moderate').qualificationFit,5.5);assert.equal(scored('Moderate').evidenceCoverage,3.5);
+  assert.equal(scored('Moderate').recommendation,'SELECTIVE_APPLY');assert.equal(scored('Missing').qualificationFit,0);
   const c=contract(),m=validateMatches(matching(),c.requirements,[evidence()]);
   assert.equal(scoreAssessment(job,{...c.extraction,roleFamily:'forward-deployed-software'},c.requirements,m,profile).qualificationFit,10);
 });
@@ -111,8 +111,11 @@ test('real owner repository certification, caller forgery, stale history and HTT
     assert.equal((await invoke({jobId:'j'})).status,200);
     const current=await repo.read('owner-a');assert.equal(current.jobs[0].assessmentStatus,'ASSESSED');
     assert.equal((await invoke({jobId:'j'})).payload.reused,true);assert.equal(calls,2);
+    const migrated=await repo.saveAssessment('owner-a',{jobs:[{...current.jobs[0],assessmentMetadata:{...current.jobs[0].assessmentMetadata,algorithmVersion:'phase4-v1'}}]},current.revision,'j');
+    assert.equal(migrated.jobs[0].assessmentStatus,'STALE','repository reads invalidate previous algorithm');
+    const restored=await repo.saveAssessment('owner-a',{jobs:[current.jobs[0]]},migrated.revision,'j');
     const forged={...current.jobs[0],qualificationFit:1,applicationPriority:'SKIP',roleModifiers:['ENTERPRISE']};
-    const bad=await repo.save('owner-a',{jobs:[forged]},current.revision);assert.equal(bad.jobs[0].assessmentStatus,'STALE');
+    const bad=await repo.save('owner-a',{jobs:[forged]},restored.revision);assert.equal(bad.jobs[0].assessmentStatus,'STALE');
     assert.equal(bad.jobs[0].fit.qualificationFit,10,'historical assessment retained');
     const changed=await repo.save('owner-a',{evidence:[{...syntheticEvidence('e'),rawEvidence:'Different React scope'}]},bad.revision);
     assert.equal(changed.jobs[0].assessmentStatus,'STALE');

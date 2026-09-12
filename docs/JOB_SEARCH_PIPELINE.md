@@ -139,15 +139,46 @@ order irrelevant. Domain language is available in evidence prose. No project/ski
 free text becomes independent support. This lightweight dictionary is deliberately
 limited and may miss synonyms; no vector database or first-N selection is used.
 
-### Deterministic algorithm phase4-v1
-For each present requirement group, average match coefficients. Weights are hard
-0.80, preferred 0.15, responsibilities 0.05, renormalized over present groups.
-qualificationFit = round(10 * weighted average, 1 decimal), with Strong 1,
-Moderate 0.70, Weak 0.25, Missing 0. Evidence coverage uses Strong 1, Moderate
-0.50, Weak 0.10, Missing 0 and the same groups. If the respective hard-group
-average is below 0.50, cap that score at 5.9. Seniority/years/domain influence
-qualification through actual extracted requirements and demonstrated support,
-never invented candidate years or title-to-years mappings. No family coefficient.
+### Deterministic algorithm phase4.1-v2
+Phase 4.1 calibration hardening preserves Phase 4 provenance and Phase 5 gates.
+Qualification coefficients: Strong direct 1; Moderate direct .80, adjacent .55;
+Weak direct .30, adjacent .15; Missing 0. Strong adjacent is rejected.
+Coverage: Strong direct 1; Moderate direct .65, adjacent .35; Weak direct .15,
+adjacent .05; Missing 0. Relationships affect both scores.
+
+Server group weights: hard/minimum .60, core scope .30, other standard
+responsibilities .05, preferred .05. Average within each present group,
+renormalize absent groups, multiply by ten and round to one decimal.
+Core responsibilities represent material delivery/ownership from JD prose,
+never inferred from title. Centrality is categorical, with exact contiguous
+centralityExcerpt containing the requirement excerpt; no model numerical weights.
+Critical classifications require hard requirements and explicit minimum context.
+Explicit hard years/senior ownership depth is critical regardless of model
+classification. Professional/production domain criticality uses source-backed
+classification; a production keyword alone does not make a minor requirement
+critical. Legacy shapes remain readable: hard defaults
+standard and responsibilities default core. Requirement IDs remain kind/excerpt
+hashes; classifications do not change source identity.
+
+Caps apply to both scores: any critical partial support (<1) caps at 8.4;
+any critical Weak/Missing (qualification value <=.30)
+caps at 7.4; at least half of core scope adjacent/Weak/Missing (<=.55) caps at
+7.2; at least half of core scope Weak/Missing (<=.30) caps at 6.4. Respective
+hard-group average below .50 retains the 5.9 cap. Lowest applicable cap wins.
+One minor standard hard gap has no individual cap. Caps are explained in whyNot.
+
+Professional depth requires eligible employment-scoped evidence (Full-time,
+Contract or Internship, employer/role/period/sourceLocation, no project/hackathon
+source). Project or unknown-scope support is at most Moderate adjacent. Duration
+requires explicit approved evidence years meeting the stated minimum in the same
+source sentence as the requirement domain terms, using the lower bound of ranges,
+with negative/qualified statements
+withheld conservatively; unknown or
+short duration is at most Weak adjacent. Calendar periods are retained for scope,
+not summed into invented tenure. The semantic matcher must establish that duration
+and ownership refer to the required domain. Exact source/context checks cannot
+independently certify semantic support; live/manual extraction/matching remains
+an external gate. No candidate, title, role-family or outcome coefficients.
 
 Constraint fit stays categorical, separate from qualification. Persisted policy
 can block explicit excluded/unsupported employment types, mandatory relocation,
@@ -164,8 +195,10 @@ conversion or hourly extrapolation. Constraint language parsing is bounded and
 conservative, not a universal policy reasoner.
 
 SKIP when a real constraint blocker exists, exact posting NOT_LISTED, or
-qualificationFit < 5. APPLY FIRST when fit >= 8.5, coverage >= 7.5 and no
-preference/status/freshness concerns. Otherwise STRONG WITH GAP for fit >= 7,
+qualificationFit < 5. APPLY FIRST requires fit >= 8.8, coverage >= 8.5, no
+preference/status/freshness concerns or critical/core cap, all central requirements
+direct with at least Moderate support and at least 80% Strong. If no central
+requirements exist, hard requirements form that profile. Otherwise STRONG WITH GAP for fit >= 7,
 CALIBRATED STRETCH for fit >= 5. STRONG WITH GAP replaces legacy STRONG for
 new assessments; historical strings remain compatibility types only.
 Recommendation SKIP agrees with SKIP; APPLY when fit >= 7 with no concerns;
@@ -178,7 +211,11 @@ validated matches; gaps/constraint/preferences derive the negative explanation.
 Persisted metadata includes source, JD SHA-256, sorted eligible semantic-evidence
 fingerprint, SearchProfile plus posting-status/publication/effective-freshness/
 compensation fingerprint, algorithm version and timestamp. Repository reads mark
-changed/legacy results STALE; history is retained. Canonical refresh invalidates
+changed/legacy results STALE; history is retained. Phase 4.1 includes evidence context/employer/role/period/source scope
+in the fingerprint. phase4-v1 assessments become STALE; linked Phase 5 resumes
+lose READY/final export through existing basis validation without regeneration.
+The UI displays a ten-point score and priority; no separate five-point fit exists.
+Canonical refresh invalidates
 immediately; client evidence/profile edits conservatively mark scores stale.
 Current triage hides stale scores, without deleting history. Unchanged certified
 metadata reuses persisted assessment and invokes no Gemini; process-local cache
