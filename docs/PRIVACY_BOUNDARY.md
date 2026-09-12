@@ -1,4 +1,11 @@
 # Privacy boundary
+
+Reconciliation update (2026-09-12): descriptions of pending/uncommitted work and
+5/6 test results below are historical Phase 0 snapshots. All inherited product
+work is preserved in 41a04f8; stale test fixtures corrected in 0828816. Final
+suite passes 6/6. Use npm ci with package-lock.json. See
+[reconciliation record](DEV_RECONCILIATION.md) and active execution plan for
+current state; preserved integrations still require production acceptance.
 ## Public and private
 Public: source code, generic schemas, intentionally synthetic fixtures, static UI and non-secret configuration examples.
 Private: actual candidate identity/contact records, career evidence, imports, resumes, job/application history, interviews, outreach, audit records and exports. Do not copy their contents into docs, tests, screenshots, logs or public build artifacts.
