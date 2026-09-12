@@ -38,15 +38,52 @@ supplementary, not proof of rendered authenticated OAuth browser behavior.
 No credentials/private career records are used in these fixtures. Live Google
 OAuth acceptance pending external configuration. External live credentials,
 Google consent/registered callback, Neon schema and deployed Secure cookie behavior
-must be tested separately. Phase 2 persistence acceptance remains pending even
-though the inherited PGlite workspace contract test passes.
+must be tested separately. Phase 2 local contracts have dedicated tests below;
+they do not claim live provider acceptance.
+
+## Phase 2 persistence coverage
+
+Focused: node --import tsx --test tests/workspace.test.ts tests/phase-2-workspace.test.ts
+tests/phase-2-files.test.ts tests/phase-2-db-client.test.ts.
+Startup smoke after build: node --import tsx --test tests/phase-2-runtime.smoke.ts.
+The smoke is separate so normal npm test does not require a pre-existing build.
+
+Disk PGlite closes/reopens with new DB/repository instances; saved workspace and
+file metadata survive. Synthetic owners share IDs without collisions, cannot
+replace/delete each other's records and retain owner-scoped audit/import/file data.
+Real SQL triggers fail mid-save and after history deletion/audit insertion;
+snapshot equality proves complete rollback. Tests cover explicit collection/history
+replacement, all mapped job attachments, application fields, child removal,
+duplicate/ambiguous IDs, nested import review/provenance and stale/concurrent revisions.
+Real HTTP handlers cover 400/409/503; client conflict test retains memory state until
+explicit reload while existing 503/network tests clear private access without demo substitution.
+
+Real Postgres-compatible file metadata tests use synthetic Blob calls to exercise
+put/DB insert/cleanup/read/delete outages, actual intent write failure, restart
+reconciliation, retained late-put tombstones, delayed-upload fencing and ambiguous
+commit acknowledgement. They cover size/type/encoding limits, safe proxy metadata/
+headers, missing objects and partial streaming disconnect without JSON append.
+DB boundary tests cover lazy public requests, local reuse, request isolation, pool
+cleanup, per-DB auth and rejected late continuations. Startup smoke checks the built
+Node shell/assets and Node serverless adapter without any private configuration.
+Client application source is unchanged from Phase 1 rendered public-demo smoke.
+
+Safe migration validation: npm run db:generate must report no drift; fresh migrations
+apply via PGlite migrator, and committed SQL upgrade preserves existing workspace,
+files and sessions. No remote migration is part of these tests.
+
+PGlite uses a single serialized connection; it executes real PostgreSQL transaction/
+locking SQL but cannot certify Neon multi-connection transport/disconnect behavior.
+Synthetic Blob calls model documented semantics, not live CDN/abort/cleanup behavior.
+Failed cleanup is durable and retryable, not guaranteed automatic/eventual without
+an owner retry. Live Neon and Private Blob acceptance remain pending configuration.
 
 ## Remaining gates
-Security: live OAuth redirect/state/callback, cross-owner persistence, auth/DB/Blob
-outages, durable restart and hosting; SSRF/private network redirect safety later.
+Security: live OAuth redirect/state/callback, Neon/Blob integration, multi-connection
+transport/locking, deployed cookies/runtime; SSRF/private network redirects later.
 ATS: exact posting status, removed/unknown/error URLs, freshness and deduplication.
 Evidence: unsupported/JD-derived/cross-owner claims, manual invalidation and export.
 Integration: full authenticated browser lifecycle and truthful end-to-end workflows.
 Use synthetic Gemini/ATS/provider fixtures by default. Never log secrets or raw
 private workspace records. Build/static scanning cannot certify complete privacy.
-Results and reviewer findings belong in the active plan and Phase 1 acceptance.
+Results and reviewer findings belong in the active plan and phase acceptance matrices.

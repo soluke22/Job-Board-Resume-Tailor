@@ -81,7 +81,7 @@ export const jobSchema = object({ id, atsProvider: text, atsBoard: text.optional
   channel: text.optional(), appliedDate: text.optional(), rejectionReason: text.optional(), parsed: parsed.optional(), fit: fit.optional(),
   evidenceMatches: list(match).optional(), sessionQuestions: list(question).optional(), gapQuestions: list(question).optional(), sessionAnswers: z.record(z.string(), text).optional(),
   tailoringPlan: plan.optional(), tailoredResume: resumeSchema.optional(), tailoredCoverLetter: letter.optional(), coverLetter: letter.optional(), evaluation: evaluation.optional(),
-  versionHistory: list(object({ versionId: id, timestamp: text, note: text, resume: resumeSchema })).optional(),
+  versionHistory: list(object({ versionId: id, timestamp: text, note: text, resume: resumeSchema })).refine(records => new Set(records.map(r => r.versionId)).size === records.length, 'Duplicate version ids').optional(),
   proofPack: proof.optional(), outreachDrafts: outreach.optional(), recruiterOutreach: outreach.optional(), referralContact: contact.optional(),
   applicationAnswers: list(object({ id, question: text, answer: text, evidenceIds: strings, rationale: text.optional() })).optional(),
   statusHistory: list(object({ from: text, to: text, timestamp: text, note: text.optional() })).optional(), ...review });

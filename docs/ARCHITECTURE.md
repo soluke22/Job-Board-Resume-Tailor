@@ -19,12 +19,20 @@ server/db contains Neon/Drizzle schemas and migrations for auth and owner-scoped
 workspace entities. workspaceRepository handles revisioned reads/writes/imports;
 workspaceRoutes provides private data/import/export/audit APIs. privateFiles
 uses owner metadata and Private Blob with authorized server-proxied attachments.
-These integrations exist; Phase 2 durable persistence acceptance is not complete.
+Phase 2 local persistence contracts are covered by synthetic Postgres-compatible
+restart/rollback/isolation/fault tests; live Neon/Blob remain separate gates.
 Explicit top-level collection saves replace only supplied collections. Retained
 jobs preserve omitted attachments/histories; explicit histories replace that
 owner's job history (empty lists clear). Imports merge selected IDs. Removed jobs
 delete owner-scoped children transactionally. Upserted scalar fields replace prior
-values, including omitted optional SQL scalars. Blob/DB cleanup remains an open gate.
+values, including omitted optional SQL scalars. Ambiguous parent IDs reject atomically.
+Imports merge selected IDs and reset imported candidate provenance/review, not ATS status.
+Private Blob uploads first commit a durable recovery intent, then lock it during
+put/metadata finalization. Owner-triggered reconciliation fences delayed uploads,
+protects saved metadata and retains abandoned tombstones for late-put retry.
+Blob/DB operations are compensated, not distributed-atomic; see DEPLOYMENT.md.
+Local Node pools reuse until shutdown; Node serverless pools/auth instances are
+request-local and closed boundaries reject late continuations without reopening.
 
 Private data flow: server session -> authorized workspace read -> in-memory
 browser cache -> AppContext -> API -> guarded Express -> database/Gemini/Blob.
@@ -50,11 +58,11 @@ Analysis cache remains process-local and is separate from workspace persistence.
 Phase 1 audits authentication and public/private isolation. Deterministic tests
 exercise production options, hooks, cookies, route denial and client request/cache
 behavior. Live Google OAuth acceptance pending external configuration.
-Live Neon/Blob durability, restart, deployment and full authenticated browser
+Live Neon/Blob durability, multi-connection transport/locking, deployment and authenticated browser
 acceptance remain external/persistence gates; do not infer them from builds.
 
 Future phases retrieve approved owner evidence, enforce generated claims, complete
-ATS truthfulness and durable storage acceptance, and validate Vercel runtime.
+ATS truthfulness and live storage acceptance, and validate deployed Vercel runtime.
 Server operations must derive identity from verified sessions and authorize every
 record/file. Client state is a view/cache, never authentication or storage authority.
 Private failures must remain explicit, never synthetic replacements.

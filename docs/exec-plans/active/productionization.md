@@ -1,141 +1,171 @@
 # Productionization execution plan
+
 ## Project Goal
+
 Truthful discovery and evidence-grounded career workflows with durable owner-only
 private storage and a separate synthetic demo. GitHub remains canonical.
 
 ## Current Branch
-dev. Phase 1 starts at clean 82ffed041c7c2153b8c0ef485916a2fc1e9273bc;
-fetch confirmed dev == origin/dev. Publish Phase 1 by normal fast-forward only;
-verify fetched origin/dev == dev and a clean working tree. No main mutation/PR.
+
+dev only. Phase 2 began at clean b8c99995d88be4313587fa861ded2c8cf24e1980,
+equal to fetched origin/dev. First checkpoint 936a869 was retained unpublished;
+request continuation explicitly authorizes normal fast-forward push of Phase 2.
+No main mutation, main PR, Studio opening, deployment or Phase 3 implementation.
 
 ## Current Phase
-Phase 2 started: audit inherited durable database/private files against the
-[before-edit matrix](phase-2-acceptance.md). Scope is persistence acceptance and
-demonstrated fixes only, with local synthetic PGlite and file fault tests; no
-remote migrations/deployment or Phase 3. Acceptance requires restart-safe owner
-state, transactional revisions, deterministic replace/import and file consistency.
-First local checkpoint passed release:check (21 tests), typecheck/build/harness and
-strict public-build privacy scan. db:generate reports no drift. Scalar/history
-replacement fixes and real SQL-trigger rollback pass. File fault tests demonstrate
-failed compensation can orphan a private Blob. Phase 2 NOT complete.
 
-Phase 1 code-complete: authentication + public/private boundary acceptance and
-demonstrated fixes. Deterministic gates pass; live Google acceptance is pending
-external configuration. Phase 2 is in progress; Phase 1 results below are historical.
+Phase 2 code-complete: local persistence contracts pass; live Neon/Blob acceptance
+pending external configuration. Publish validated checkpoints by normal fast-forward
+and verify fetched dev == origin/dev and clean status before handoff.
+Scope: acceptance and demonstrated fixes to inherited Neon/Drizzle/private Blob,
+not a persistence redesign or Phase 8 hosting migration. Full before-edit matrix,
+checkpoint history and final local evidence: [phase-2-acceptance.md](phase-2-acceptance.md).
+Phase 1 is deterministic code-complete; live Google OAuth remains pending.
 
 ## Current Status
-Retained Better Auth/Google OAuth, Drizzle database sessions, server owner guards,
-private-file infrastructure and revisioned workspace APIs. All private surfaces
-classified and tested; no custom auth replacement or unrelated domain changes.
-Full before-edit matrix and final evidence: [phase-1-acceptance.md](phase-1-acceptance.md).
-Public production-build browser smoke passed with all auth config absent.
 
-## Architecture Decisions
-React/Vite + Express/Gemini retained. Better Auth Google identity must be verified
-and match server-only OWNER_EMAIL; owner database session required on every private
-API. Signed HttpOnly/Lax cookies, Secure over HTTPS, one-day expiry/hourly renewal,
-no cookie session cache and exact configured mutation origin. Previews require an
-explicit canonical auth origin and Google callback; no wildcard trust added.
-Sign-out uses Better Auth's adapter in a before hook to surface revocation outages.
-Private browser records/auth UI state are memory-only; demo is a separate source.
-Session expiration, loss and unavailable responses clear private UI/cache and
-invalidate pending requests. Database/Blob integrations exist but their durable
-acceptance belongs to Phase 2. npm/package-lock is authoritative; Next.js conditional.
-Release audit -> dev/main PR -> merged main -> AI Studio verification -> Vercel.
+All 33 deterministic tests and final release composition pass. Missing harness
+headings after the plan rewrite were restored; validator unchanged and re-run passed.
+Startup smoke and migration no-drift/fresh/upgrade preservation pass.
 
-## Completed Work
-Phase 0/reconciliation checkpoints preserved (41a04f8 inherited integrations,
-0828816 fixture correction, 82ffed0 published reconciliation state).
-Phase 1: production-options and signed-cookie acceptance tests; actual installed
-route denial inventory; authenticated workspace handler and storage-outage tests;
-client API/cache/session generation tests; current Google profile validation;
-malformed expiry and padded-secret denial; explicit server sign-out outage and
-retry; best-effort cross-tab notification; idle/focus/expiry session validation;
-stale workspace/export/AI rejection; public auth probing isolation.
-Corrected stale current-state/privacy/architecture/testing descriptions.
+## Architecture Decisions / Persistence Semantics
+
+React/Vite + Express/Gemini, Better Auth Google/database sessions, Neon/Drizzle
+owner-scoped tables and Vercel Private Blob retained. No production memory fallback.
+JSONB is valid for evolving record content; ownership/lifecycle remain structured.
+All domain/file queries are owner-qualified; composite owner/id keys isolate shared
+IDs. Auth/domain/file FK cascades are tested; job children delete in owner transaction.
+
+Reads are repeatable-read snapshots. Writes/imports increment conditional revisions
+inside one transaction containing entity writes/deletions and audit. Stale revision
+409, invalid input/revision 400, storage unavailable 503; no stale full-save auto-merge.
+Supplied collections replace; omitted ones preserve. Retained job attachments and
+histories preserve when omitted; explicit histories replace/empty clears. Supplied
+application fields replace the application record. Removed jobs leave no children;
+masterResume/other owners persist. Omitted optional SQL scalars cannot resurrect.
+
+Imports merge selected IDs and retain unrelated state; conflicts replace the selected
+record, duplicate/version/ambiguous child-parent IDs reject atomically. Imported
+evidence requires-review; imported records/application data carry server import
+provenance/review and nested candidate bullet provenance resets. ATS status is not
+invented by import. Malformed legacy data requires explicit conversion.
+
+Files use private Blob and durable owner metadata. A committed upload intent precedes
+put; row-locked transaction finalizes metadata/removes intent. Failed cleanup leaves
+retryable durable intent/tombstone. Reconciliation checks saved metadata, fences
+delayed uploads, skips active locks and repeats idempotent deletes to catch late puts.
+No distributed atomicity or automatic cleanup is claimed. Owner POST reconcile/next
+upload retries bounded batches (20 paths, one 15-second Blob abort signal). Abandoned
+tombstones retain paths until a future reviewed retention policy, not file contents.
+Blob-first deletion retains metadata on either failure; retry safely removes missing
+Blob/remaining DB record. Missing download 404, outage/unexpected reply 503; partial
+stream error destroys connection. Paths never appear in client metadata; private/
+no-store, attachment, nosniff/CSP retained. Types bounded at 2 MiB with canonical
+base64, UTF-8/PDF-signature/JSON and safe filename validation.
+
+Persistent Node reuses pool until shutdown. Node serverless uses lazy request-local
+pool/auth instances and drains on completion/disconnect. Closed boundaries reject
+late async access rather than opening an unclosed pool. No private credentials
+or records in client/source/build. Existing browser memory is cache only; auth loss/
+storage 503 clears it, conflict 409 retains edits but requires explicit reload.
+
+## Completed Work / Fixes
+
+Historical: 41a04f8 inherited integrations, 0828816 fixture correction, 82ffed0
+reconciliation; Phase 1 validated at b8c9999. Phase 1 matrix records cookie/origin/
+owner/session/client lifecycle acceptance and logout storage-error fix.
+Phase 2 checkpoint 936a869: scalar/history replacement fixes, restart/rollback/
+revision/owner/import extensions and initial file failure matrix.
+Continuation: ambiguous history parent collision rejection, duplicate version
+validation, nested candidate/application import provenance, durable upload recovery,
+consistent private downloads, safe validation, DB lifecycle/disconnect fix, additive
+migration and complete fault/HTTP/client/startup acceptance tests. Deployment/current
+state docs corrected; no discovery/evidence ranking/tailoring work begun.
 
 ## Acceptance Criteria
-Phase 1 deterministic pass: email-only/forged/missing/non-owner/unverified/expired/
-revoked access denied; verified configured owner accepted; session/database outages
-fail closed; invalid origin denied and valid owner mutation reaches handler;
-private failures never return demo content; no bearer/query/localStorage auth;
-private/auth/file/export no-store; coherent cache clearing and blank private setup.
-Live Google OAuth acceptance pending external configuration.
-Authenticated rendered OAuth browser lifecycle and deployed cookies remain live gates.
+
+Local contracts covered: disk DB/repository reopen, exact transaction rollback via
+real SQL triggers (including after history deletion), conditional/stale/concurrent
+revisions, same-ID owners, replacement/job-child isolation, atomic merge/import
+review, file metadata restart/ownership, upload intent recovery/late-write retries,
+ambiguous commit protection, delete retries, private stream failure/validation and
+provider-independent public shell. See matrix for exact evidence and limitations.
 
 ## Tests Passed
-2026-09-12: focused auth-security + phase-1-auth + phase-1-client (19 tests);
-complete npm test (20 tests including inherited PGlite workspace contract);
-typecheck/build; harness integrity/evidence/privacy positive and negative fixtures;
-strict privacy scan with required public build (zero rule findings); release:check.
-Public browser smoke: production build loads synthetic dashboard with missing auth
-config; private toggle opens Google-only modal; sign-in explicitly unavailable;
-cancel returns to functioning synthetic demo. No live provider call succeeded.
-Build: 533.65 kB client chunk versus 531.60 kB inherited baseline; same warning,
-about 0.4% growth, no material Phase 1 bundle regression. git diff --check passes.
+
+Focused Phase 2 and auth/client suites pass; complete npm test passes 33/33.
+Final release:check passes typecheck/build, harness/evidence/privacy fixtures, all
+tests and strict public-build privacy scan (zero findings). Startup smoke 1/1 passes.
+db:generate reports no drift; fresh committed migrations apply through PGlite;
+SQL upgrade 0002 preserves workspace/files/auth sessions. No remote migration run.
+Built Node shell/assets and source Node serverless startup smoke pass with all
+private configuration absent. Client chunk remains 533.65 kB (existing warning),
+client application source unchanged from Phase 1 public-demo acceptance.
+No new rendered OAuth claim.
 
 ## Tests Failing
-None in final deterministic gate. No validator weakened. Synthetic auth outage
-and invalid callback tests intentionally produce library error logs without secrets.
-Full live authenticated browser and remote persistence tests are unavailable.
+
+None in final gate. Harness heading failure corrected; final re-run passed.
+Synthetic provider/DB failures are intentional test fixtures, not live outages.
 
 ## Security Review
-Configured read-only security-reviewer (Sol High) reviewed Phase 1 only.
-One concrete P2 finding: blocked/quota-limited browser storage could abort logout
-before server revocation. Reviewer reproduced zero server logout calls with a
-SecurityError. Fixed via tested signOutPrivateWorkspace helper: clear private
-client state, best-effort broadcast, guaranteed server request, explicit retry.
-Reviewer rechecked fix and six client tests; finding resolved, no other demonstrated
-boundary defect. Later public-probe/body-read outage regressions passed final gate.
 
-## Known Blockers
-Live Google OAuth acceptance pending external configuration. All required auth
-values absent from local process environment and no local .env file exists.
-Neon/Blob durable persistence, deployed cookie behavior and complete authenticated
-browser lifecycle remain unverified. ATS/evidence semantics and SSRF remain later
-phases. Static privacy/ID checks cannot certify all privacy or provenance.
+Reused read-only security-reviewer (Sol High) found one demonstrated P2: response
+disconnect followed by late route work reopened a second pool after cleanup
+(2 created/1 ended). Fixed terminal boundaries; identical HTTP reproduction now
+1 created/1 ended and late access denied. Reviewer rechecked relevant tests (7/7);
+no additional demonstrated owner/transaction/unsafe-file/compensation defect.
+Read-only docs-researcher confirmed official Neon Pool/Blob deletion/private read/
+abort behavior before file/lifecycle decisions. No unsupported atomicity assumptions.
 
+## Known Blockers / External Configuration
+
+Local persistence contract: verified (synthetic Postgres-compatible/Blob faults).
+Live Neon persistence: pending external configuration.
+Live Vercel Private Blob: pending external configuration.
+DATABASE_URL and BLOB_READ_WRITE_TOKEN are absent from local process; no .env exists,
+only .env.example. No provider resources created, remote migrations or deployment.
+PGlite serializes transactions on one connection, so live Neon multi-connection
+locking/disconnect transport remains a live gate. Blob CDN/abort/late-put semantics
+need live acceptance. Cleanup requires owner retry; no unattended sweeper provisioned.
+Live Google OAuth/cookies and full authenticated browser remain Phase 1/live gates.
+SSRF, ATS, semantic evidence/ranking/tailoring correctness remain later phases.
 ## External Configuration Needed
-Server-only OWNER_EMAIL, Google client ID/secret and registered callback,
-BETTER_AUTH_SECRET, canonical BETTER_AUTH_URL and Neon DATABASE_URL/schema.
-Phase 2/live file workflows additionally need private BLOB_READ_WRITE_TOKEN;
-Gemini workflows need GEMINI_API_KEY. No secrets added or remote migration/deploy run.
+
+Needed server-only config: OWNER_EMAIL, Google ID/secret/callback, BETTER_AUTH_SECRET,
+canonical BETTER_AUTH_URL, Neon DATABASE_URL/schema, private BLOB_READ_WRITE_TOKEN;
+GEMINI_API_KEY for later AI workflows. No secrets/private data added or logged.
 
 ## Files / Modules Currently Involved
-server/auth.ts, workspaceRoutes.ts, server.ts/privateFiles.ts installation and guards;
-API/storage/AppContext/AuthModal/setup lifecycle; tests/auth-security.test.ts and
-phase-1-auth/phase-1-client.test.ts; PRIVACY_BOUNDARY, ARCHITECTURE, TESTING and matrix.
-DB schema/client reviewed as auth dependencies; no Phase 2 persistence redesign.
+
+server/db, workspaceRepository/validation/routes acceptance, privateFileRepository/
+privateFiles, auth per-DB instances, api/index.ts and server/local.ts DB lifecycle;
+focused Phase 2 tests/helpers and auth/client regressions; DEPLOYMENT, ARCHITECTURE,
+PRIVACY_BOUNDARY, TESTING and Phase 2 matrix/plan. Parent owns writes; no swarm.
 
 ## Last Known Good Commit
-82ffed041c7c2153b8c0ef485916a2fc1e9273bc: clean published Phase 1 starting baseline.
-The validated Phase 1 checkpoint is the latest commit touching this plan:
-git log -1 -- docs/exec-plans/active/productionization.md.
-Use git rev-parse dev origin/dev after fetch for publication receipt; avoid a
-self-referential commit hash. Final deterministic results are recorded above.
+
+Last validated checkpoint: 936a869. Locate final plan checkpoint with
+git log -1 -- docs/exec-plans/active/productionization.md; no self-hash loop.
+Verify git rev-parse dev origin/dev after fetch and clean status after publication.
 
 ## Next Exact Step
-Continue Phase 2: resolve failed-upload Blob orphan reconciliation with a minimal
-durable race-safe strategy and tests, then finish remaining acceptance in
-phase-2-acceptance.md. Obtain request continuation after truncated section 13.
-No Phase 3, remote migration or deployment. The prior start step below is completed.
 
-On clean dev, fetch origin and confirm dev == origin/dev. Read
-.agents/skills/vercel-deployment/SKILL.md and docs/DEPLOYMENT.md; audit inherited
-Neon/Drizzle workspace and Private Blob persistence against durable restart,
-owner scoping, revisions/import integrity and storage-outage acceptance before
-changing code. Record a Phase 2 acceptance matrix; Phase 1 did not certify
-persistence. Phase 2 is Durable database + private file persistence acceptance.
+Phase 3 — Job discovery + ATS truthfulness + freshness + dedupe.
+Begin only on a new explicit continuation after Phase 2 publication verification;
+this Phase 2 task stops after its final report. Release audit precedes dev/main PR,
+merged-main Google AI Studio verification and final Vercel production.
 
 ## Remaining Phases
-1. Authentication boundary code-complete; live Google OAuth acceptance pending.
-2. Durable database + private file persistence acceptance.
+
+1. Authentication code-complete; live Google/cookie/browser acceptance pending.
+2. Durable database/private files code-complete; live Neon/Blob acceptance pending.
 3. Job discovery + ATS truthfulness + freshness + dedupe.
 4. Evidence-grounded qualification/ranking.
 5. Resume provenance + tailoring + manual validation.
 6. Proof packs + outreach + application answers.
 7. Application tracking + outcome analytics.
-8. Vercel-compatible architecture completion.
+8. Vercel-compatible architecture completion/live runtime acceptance.
 9. Security/privacy/release audit.
 10. dev -> main PR (separate authorization).
 11. Google AI Studio verifies merged canonical main.

@@ -32,6 +32,9 @@ swallow a deletion outage; failure returns 503 and the client offers retry.
 Workspace read/write/import/export/audit inherit a scoped owner router. Private
 file list/upload/download/delete use the owner guard directly, owner-scoped
 metadata queries, private Blob storage and authorized attachment streaming.
+File reconciliation uses the same guard/origin check and owner-qualified durable
+upload intents. Pending/abandoned uploads are not API file metadata. Recovery never
+deletes an object with saved metadata; closed serverless DB boundaries deny late work.
 All remaining application APIs (candidate context, evidence, resume, Gemini,
 search, jobs/ATS, proof, outreach, answers and referral) inherit /api owner
 middleware. Only health and configured Google auth flows are public API surfaces.
@@ -56,7 +59,8 @@ Phase 1 deterministic results and security-review disposition are recorded in
 Live Google OAuth acceptance pending external configuration.
 Synthetic adapter/session tests prove architecture and denial behavior; they do
 not prove live Google, Neon, Blob or deployed cookie behavior. Phase 2 durable
-database/private file persistence acceptance remains pending.
+database/private file contracts have local synthetic restart/transaction/ownership
+and failure/retry tests. Live Neon/Blob and multi-connection behavior remain pending.
 
 Legacy private browser data is read only through explicit owner import preview;
 originals remain on the device until the user removes them. New private/auth
