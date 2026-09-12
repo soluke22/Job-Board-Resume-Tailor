@@ -50,7 +50,12 @@ through Gemini; analysis, evidence matches, plans, resumes, letters, evaluations
 proof packs and outreach run through owner-protected API routes. AI outputs remain
 untrusted; route authorization does not establish semantic candidate provenance.
 JSON parsing and redaction are not sufficient evidence validation.
-Job discovery/ATS acceptance remains in [JOB_SEARCH_PIPELINE.md](JOB_SEARCH_PIPELINE.md).
+Phase 3 discovery uses server/discovery.ts and exact public ATS adapters, preserving
+search provenance separately from canonical content, independent source/local dates,
+uncertain freshness and unassessed jobs. Shared src/utils/jobIdentity.ts merges
+current/history matches without replacing application lifecycle/attachments.
+server/safeFetch.ts bounds and DNS-pins arbitrary URL retrieval; generic reachability
+does not establish listing state. See [JOB_SEARCH_PIPELINE.md](JOB_SEARCH_PIPELINE.md).
 Evidence contracts and gaps belong in [EVIDENCE_MODEL.md](EVIDENCE_MODEL.md).
 Analysis cache remains process-local and is separate from workspace persistence.
 
@@ -62,7 +67,7 @@ Live Neon/Blob durability, multi-connection transport/locking, deployment and au
 acceptance remain external/persistence gates; do not infer them from builds.
 
 Future phases retrieve approved owner evidence, enforce generated claims, complete
-ATS truthfulness and live storage acceptance, and validate deployed Vercel runtime.
+live discovery/storage acceptance, and validate deployed Vercel runtime.
 Server operations must derive identity from verified sessions and authorize every
 record/file. Client state is a view/cache, never authentication or storage authority.
 Private failures must remain explicit, never synthetic replacements.

@@ -225,7 +225,7 @@ export const apiService = {
     customQueries?: string[],
     queryBudget?: number,
     existingJobs?: any[]
-  ): Promise<{ discoveredJobs: any[]; queryBudgetUsed: number; freshnessStats: any }> {
+  ): Promise<{ discoveredJobs: any[]; refreshedJobs?: any[]; discoveryRequestsUsed?: number; queryBudgetUsed: number; freshnessStats: any }> {
     const res = await privateFetch('/api/discover-jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

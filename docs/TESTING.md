@@ -78,10 +78,42 @@ Synthetic Blob calls model documented semantics, not live CDN/abort/cleanup beha
 Failed cleanup is durable and retryable, not guaranteed automatic/eventual without
 an owner retry. Live Neon and Private Blob acceptance remain pending configuration.
 
-## Remaining gates
+## Phase 3 discovery/ATS coverage
+
+Focused: node --import tsx --test tests/phase-3-discovery.test.ts.
+Synthetic provider fixtures exercise Ashby listed/unlisted/feed absence/network,
+Greenhouse exact success/404/error/board-only, Lever public exact success/404,
+unsupported ATS and spoofed hostname detection. Dates preserve actual provider
+publication/creation, keep update separate, and leave Recent/missing/future dates
+unknown. Discovery exceptions/missing URL never fabricate content/status/scores.
+Actual discovery executor tests preserve SDK grounding URLs/query strings, configured
+preferences/custom queries, excluded identity/contact and measured request budget.
+
+Shared server/client merge tests cover ATS IDs, canonical/tracking/Greenhouse alias
+URLs, distinct requisitions, within-batch aliases, all application statuses,
+first-seen/history/notes/resume/answer preservation and verified metadata refresh.
+Runtime jobSchema accepts explicit unassessed records but rejects fake scores in
+that state; existing assessment validation is retained. Generic page fixtures prove
+200 is UNKNOWN, exact explicit closure is NOT_LISTED, and redirects/canonical links
+require independent exact ATS verification. Safe-fetch fixtures cover schemes,
+private/local/metadata/IPv6/DNS destinations, blocked redirects and redirect limit,
+content types, streamed body cap, total DNS/transport timeout, and both Node lookup
+callback shapes for DNS pinning. No live board or credentials are needed by CI.
+
+Optional manual provider smoke (non-blocking, no applications/workspace writes):
+choose a current public posting URL for each supported ATS; call the owner-protected
+/api/verify-ats and inspect exact provider ID, status, canonical content/URL and date
+provenance. Test board-only URL and unavailable ID separately; never assume a fixture
+posting remains public. Official API reference review is separate from this runtime
+smoke. With Gemini configured server-side, one /api/discover-jobs request using a
+synthetic SearchProfile and queryBudget 1 should retain grounding sources and return
+unassessed records; re-run with the resulting existingJobs to verify history matching.
+Do not log secrets/private records, apply, or make CI depend on live results.
+
+### Remaining live and later-phase gates
 Security: live OAuth redirect/state/callback, Neon/Blob integration, multi-connection
-transport/locking, deployed cookies/runtime; SSRF/private network redirects later.
-ATS: exact posting status, removed/unknown/error URLs, freshness and deduplication.
+transport/locking, deployed cookies/runtime; deployed network/egress acceptance.
+ATS: manual live exact provider and Gemini grounding acceptance remain separate.
 Evidence: unsupported/JD-derived/cross-owner claims, manual invalidation and export.
 Integration: full authenticated browser lifecycle and truthful end-to-end workflows.
 Use synthetic Gemini/ATS/provider fixtures by default. Never log secrets or raw
