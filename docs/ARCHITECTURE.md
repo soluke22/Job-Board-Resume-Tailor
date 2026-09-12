@@ -20,6 +20,11 @@ workspace entities. workspaceRepository handles revisioned reads/writes/imports;
 workspaceRoutes provides private data/import/export/audit APIs. privateFiles
 uses owner metadata and Private Blob with authorized server-proxied attachments.
 These integrations exist; Phase 2 durable persistence acceptance is not complete.
+Explicit top-level collection saves replace only supplied collections. Retained
+jobs preserve omitted attachments/histories; explicit histories replace that
+owner's job history (empty lists clear). Imports merge selected IDs. Removed jobs
+delete owner-scoped children transactionally. Upserted scalar fields replace prior
+values, including omitted optional SQL scalars. Blob/DB cleanup remains an open gate.
 
 Private data flow: server session -> authorized workspace read -> in-memory
 browser cache -> AppContext -> API -> guarded Express -> database/Gemini/Blob.
