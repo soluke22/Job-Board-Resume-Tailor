@@ -1,4 +1,11 @@
 # Codex operating harness
+
+Reconciliation update (2026-09-12): descriptions of pending/uncommitted work and
+5/6 test results below are historical Phase 0 snapshots. All inherited product
+work is preserved in 41a04f8; stale test fixtures corrected in 0828816. Final
+suite passes 6/6. Use npm ci with package-lock.json. See
+[reconciliation record](DEV_RECONCILIATION.md) and active execution plan for
+current state; preserved integrations still require production acceptance.
 ## Audit
 Historical pre-change 2026-09-12 inventory found root router, seven domain docs, seven manually routed
 skills and three generic agent TOMLs; no nested AGENTS/overrides, active plans,
