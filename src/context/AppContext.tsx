@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   CandidateProfile,
   EvidenceItem,
@@ -18,7 +18,7 @@ import {
   RecruiterOutreach
 } from '../types';
 import { storageService } from '../services/storage';
-import { apiService } from '../services/api';
+import { apiService, setBeforePrivateRequest, invalidatePrivateRequests } from '../services/api';
 
 export type AppView =
   | 'dashboard'
@@ -44,7 +44,10 @@ interface AppContextType {
   workspaceMode: WorkspaceMode;
   setWorkspaceMode: (mode: WorkspaceMode) => void;
   authSession: AuthSession;
-  login: (email: string, passwordOrToken?: string) => Promise<boolean>;
+  login: () => Promise<boolean>;
+  workspaceEpoch: number;
+  syncStatus: string;
+  sessionLoading: boolean;
   logout: () => Promise<void>;
 
   // Data Models
@@ -145,8 +148,8 @@ interface AppContextType {
   updateSkillItem: (skill: SkillItem) => void;
 
   // Workspace Sync & Migration
-  importWorkspaceJson: (jsonString: string) => { success: boolean; message: string };
-  exportWorkspaceJson: () => string;
+  importWorkspaceJson: (jsonString: string) => Promise<{ success: boolean; message: string }>;
+  exportWorkspaceJson: () => Promise<string>;
   clearWorkspace: () => void;
   resetAllData: () => void;
 }
@@ -210,49 +213,95 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Auth actions
-  const login = async (email: string, passwordOrToken?: string): Promise<boolean> => {
-    setError(null);
-    try {
-      const res = await apiService.login(email, passwordOrToken);
-      const session: AuthSession = {
-        isAuthenticated: true,
-        userEmail: res.userEmail,
-        userName: res.userName,
-        token: res.token,
-        isOwner: true,
-        mode: 'PRIVATE_WORKSPACE'
-      };
-      setAuthSession(session);
-      storageService.saveAuthSession(session);
-      setWorkspaceModeState('PRIVATE_WORKSPACE');
-      reloadDataForMode('PRIVATE_WORKSPACE');
-      setIsAuthModalOpen(false);
-      return true;
-    } catch (err: any) {
-      setError(err.message || 'Authentication failed');
-      return false;
-    }
-  };
+  const revision = useRef(0);
+  const ready = useRef(false);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const epoch = useRef(0);
+  const saved = useRef('');
+  const scheduled = useRef('');
+  const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
+  const [syncStatus, setSyncStatus] = useState('');
+  const [sessionLoading, setSessionLoading] = useState(true);
 
-  const logout = async (): Promise<void> => {
-    try {
-      if (authSession.token) {
-        await apiService.logout(authSession.token);
-      }
-    } catch {
-      // Non-blocking
-    }
+  const clearPrivateView = () => {
+    ready.current = false;
+    epoch.current++;
+    invalidatePrivateRequests();
     storageService.clearAuthSession();
-    const publicSession: AuthSession = {
-      isAuthenticated: false,
-      userEmail: null,
-      userName: null,
-      isOwner: false,
-      mode: 'PUBLIC_DEMO'
-    };
-    setAuthSession(publicSession);
+    setAuthSession(storageService.getAuthSession());
     setWorkspaceModeState('PUBLIC_DEMO');
     reloadDataForMode('PUBLIC_DEMO');
+    setCurrentView('dashboard');
+    setIsAuthModalOpen(false); setIsQuickGrabOpen(false); setIsAtsGuardsOpen(false);
+    setWorkspaceEpoch(v => v + 1);
+    setSyncStatus('');
+  };
+  const adopt = (result: any) => {
+    storageService.hydratePrivateWorkspace(result.data);
+    revision.current = result.revision;
+    saved.current = scheduled.current = JSON.stringify(storageService.privateSnapshot());
+    reloadDataForMode('PRIVATE_WORKSPACE');
+  };
+  const persistCurrent = (): Promise<void> => {
+    if (storageService.getWorkspaceMode() !== 'PRIVATE_WORKSPACE') return Promise.resolve();
+    if (!ready.current) return Promise.reject(new Error('Private workspace is not ready. Reload before editing.'));
+    const data = storageService.privateSnapshot(), serialized = JSON.stringify(data), started = epoch.current;
+    if (serialized === scheduled.current) return queue.current;
+    scheduled.current = serialized;
+    setSyncStatus('Saving…');
+    queue.current = queue.current.then(async () => {
+      if (started !== epoch.current) return;
+      const result = await apiService.saveWorkspaceData(data, revision.current);
+      if (started !== epoch.current) return;
+      revision.current = result.revision;
+      saved.current = serialized;
+      setSyncStatus('Saved privately');
+    }).catch(err => {
+      if (started === epoch.current) { ready.current = false; setSyncStatus('Not saved — reload required'); setError(err.message); }
+      throw err;
+    });
+    return queue.current;
+  };
+  useEffect(() => {
+    setBeforePrivateRequest(persistCurrent);
+    if (workspaceMode === 'PRIVATE_WORKSPACE' && ready.current) void persistCurrent().catch(() => {});
+  }, [profile, searchProfile, evidence, projects, skills, jobs, masterResume, workspaceMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const started = epoch.current;
+    const restore = async () => {
+      try {
+        const session = await apiService.getSession();
+        if (cancelled || started !== epoch.current || !session.authenticated || !session.isOwner) return;
+        const result = await apiService.getWorkspaceData();
+        if (cancelled || started !== epoch.current) return;
+        const identity: AuthSession = { isAuthenticated: true, isOwner: true, userEmail: session.user.email, userName: session.user.name, mode: 'PRIVATE_WORKSPACE' };
+        storageService.saveAuthSession(identity); setAuthSession(identity);
+        adopt(result); ready.current = true;
+        setWorkspaceModeState('PRIVATE_WORKSPACE');
+        setCurrentView(result.data?.profile?.name ? 'dashboard' : 'candidate-setup');
+        setSyncStatus('Saved privately');
+      } catch (err: any) {
+        if (new URLSearchParams(window.location.search).get('workspace') === 'private') setError(err.message);
+      } finally { if (!cancelled) setSessionLoading(false); }
+    };
+    void restore();
+    const lost = () => { clearPrivateView(); setError('Private access expired. Sign in again.'); };
+    const pagehide = () => { if (storageService.getWorkspaceMode() === 'PRIVATE_WORKSPACE') { document.documentElement.style.visibility = 'hidden'; clearPrivateView(); } };
+    const pageshow = (event: PageTransitionEvent) => { if (event.persisted) window.location.reload(); else document.documentElement.style.visibility = ''; };
+    const otherTab = (event: StorageEvent) => { if (event.key === 'caos_logout_event') clearPrivateView(); };
+    window.addEventListener('workspace-access-lost', lost);
+    window.addEventListener('pagehide', pagehide); window.addEventListener('pageshow', pageshow); window.addEventListener('storage', otherTab);
+    return () => { cancelled = true; window.removeEventListener('workspace-access-lost', lost); window.removeEventListener('pagehide', pagehide); window.removeEventListener('pageshow', pageshow); window.removeEventListener('storage', otherTab); };
+  }, []);
+  const login = async (): Promise<boolean> => { await apiService.login(); return true; };
+  const logout = async (): Promise<void> => {
+    // Invalidate client access immediately; server sign-out revokes the durable session.
+    clearPrivateView();
+    localStorage.setItem('caos_logout_event', String(Date.now()));
+    try { await apiService.logout(); }
+    catch (err: any) { setError('Server sign-out could not be confirmed. Retry sign-out before leaving this device. ' + err.message); setIsAuthModalOpen(true); }
   };
 
   // Profile and data setters with storage persistence
@@ -874,19 +923,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Workspace Import / Export / Reset
-  const importWorkspaceJson = (jsonString: string) => {
-    const result = storageService.importWorkspaceData(jsonString);
-    if (result.success) {
-      reloadDataForMode(workspaceMode);
-    }
-    return result;
+  const importWorkspaceJson = async (jsonString: string) => {
+    if (!authSession.isAuthenticated || workspaceMode !== 'PRIVATE_WORKSPACE') return { success: false, message: 'Owner sign-in required.' };
+    try {
+      await persistCurrent();
+      const started = epoch.current;
+      const result = await apiService.importWorkspace(JSON.parse(jsonString), revision.current);
+      if (started !== epoch.current) throw new Error('Session changed');
+      adopt(result);
+      setWorkspaceEpoch(v => v + 1);
+      return { success: true, message: 'Selected records imported privately and marked for review. Local originals were retained.' };
+    } catch (err: any) { return { success: false, message: err.message }; }
   };
-
-  const exportWorkspaceJson = () => {
-    return storageService.exportPrivateWorkspace();
+  const exportWorkspaceJson = async () => {
+    if (!authSession.isAuthenticated || workspaceMode !== 'PRIVATE_WORKSPACE') throw new Error('Owner sign-in required.');
+    await persistCurrent();
+    return JSON.stringify(await apiService.exportWorkspace(), null, 2);
   };
 
   const clearWorkspace = () => {
+    if (!authSession.isAuthenticated || workspaceMode !== 'PRIVATE_WORKSPACE') return;
     storageService.clearPrivateWorkspace();
     reloadDataForMode('PRIVATE_WORKSPACE');
   };
@@ -908,6 +964,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
+        workspaceEpoch, syncStatus, sessionLoading,
         currentView,
         setCurrentView,
         workspaceMode,

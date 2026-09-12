@@ -1,3 +1,4 @@
+import { storageService } from './storage';
 import {
   CandidateProfile,
   EvidenceItem,
@@ -13,13 +14,38 @@ import {
   GapInterviewQuestion
 } from '../types';
 
+let beforePrivateRequest: () => Promise<void> = async () => {};
+export function setBeforePrivateRequest(callback: () => Promise<void>) { beforePrivateRequest = callback; }
+let generation = 0;
+export function invalidatePrivateRequests() { generation++; }
+async function privateFetch(input: string, init?: RequestInit): Promise<Response> {
+  if (storageService.getWorkspaceMode() !== 'PRIVATE_WORKSPACE' || !storageService.getAuthSession().isAuthenticated) throw new Error('Sign in to the private workspace to use this action. Demo records remain synthetic.');
+  const epoch = generation;
+  await beforePrivateRequest();
+  if (epoch !== generation) throw new Error('Session changed');
+  const response = await fetch(input, { credentials: 'same-origin', ...init });
+  const body = await response.text();
+  if (epoch !== generation) throw new Error('Session changed');
+  if (response.status === 401 || response.status === 403) window.dispatchEvent(new Event('workspace-access-lost'));
+  return new Response(body, { status: response.status, headers: response.headers });
+}
+export async function workspaceRequest(path: string, init?: RequestInit): Promise<any> {
+  const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store', ...init });
+  const data = await response.json();
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) window.dispatchEvent(new Event('workspace-access-lost'));
+    throw new Error(data.error || 'Private workspace service unavailable');
+  }
+  return data;
+}
+const jsonRequest = (data: any) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 export const apiService = {
   async analyzeJob(
     rawDescription: string,
     candidateProfile: CandidateProfile,
     evidenceItems: EvidenceItem[]
   ): Promise<{ parsed: ParsedJob; fit: FitAssessment }> {
-    const res = await fetch('/api/analyze-job', {
+    const res = await privateFetch('/api/analyze-job', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rawDescription, candidateProfile, evidenceItems })
@@ -37,7 +63,7 @@ export const apiService = {
     projects: ProjectItem[],
     skills: SkillItem[]
   ): Promise<{ matches: RequirementMatch[] }> {
-    const res = await fetch('/api/match-evidence', {
+    const res = await privateFetch('/api/match-evidence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ parsedJob, evidenceItems, projects, skills })
@@ -54,7 +80,7 @@ export const apiService = {
     evidenceMatches: RequirementMatch[],
     parsedJob: ParsedJob
   ): Promise<{ questions: GapInterviewQuestion[] }> {
-    const res = await fetch('/api/gap-interview', {
+    const res = await privateFetch('/api/gap-interview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fit, evidenceMatches, parsedJob })
@@ -72,7 +98,7 @@ export const apiService = {
     evidenceMatches: RequirementMatch[],
     sessionAnswers?: Record<string, string>
   ): Promise<{ plan: TailoringPlan }> {
-    const res = await fetch('/api/generate-plan', {
+    const res = await privateFetch('/api/generate-plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ parsedJob, fit, evidenceMatches, sessionAnswers })
@@ -90,7 +116,7 @@ export const apiService = {
     candidateProfile: CandidateProfile,
     masterResume: TailoredResume
   ): Promise<{ resume: TailoredResume }> {
-    const res = await fetch('/api/generate-resume', {
+    const res = await privateFetch('/api/generate-resume', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ parsedJob, tailoringPlan, candidateProfile, masterResume })
@@ -107,7 +133,7 @@ export const apiService = {
     candidateProfile: CandidateProfile,
     tailoredResume: TailoredResume
   ): Promise<{ coverLetter: TailoredCoverLetter }> {
-    const res = await fetch('/api/generate-cover-letter', {
+    const res = await privateFetch('/api/generate-cover-letter', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ parsedJob, candidateProfile, tailoredResume })
@@ -123,7 +149,7 @@ export const apiService = {
     resume: TailoredResume,
     parsedJob: ParsedJob
   ): Promise<{ evaluation: ResumeEvaluation }> {
-    const res = await fetch('/api/evaluate-resume', {
+    const res = await privateFetch('/api/evaluate-resume', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resume, parsedJob })
@@ -141,7 +167,7 @@ export const apiService = {
     currentText: string,
     employerOrProject: string
   ): Promise<{ bulletText: string; whyThisBullet?: string }> {
-    const res = await fetch('/api/regenerate-bullet', {
+    const res = await privateFetch('/api/regenerate-bullet', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targetRequirement, underlyingEvidence, currentText, employerOrProject })
@@ -154,7 +180,7 @@ export const apiService = {
   },
 
   async fetchJobUrl(url: string): Promise<{ text: string; title?: string; url: string }> {
-    const res = await fetch('/api/fetch-job-url', {
+    const res = await privateFetch('/api/fetch-job-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
@@ -172,7 +198,7 @@ export const apiService = {
     queryBudget?: number,
     existingJobs?: any[]
   ): Promise<{ discoveredJobs: any[]; queryBudgetUsed: number; freshnessStats: any }> {
-    const res = await fetch('/api/discover-jobs', {
+    const res = await privateFetch('/api/discover-jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ searchProfile, customQueries, queryBudget, existingJobs })
@@ -190,7 +216,7 @@ export const apiService = {
     board?: string,
     jobId?: string
   ): Promise<any> {
-    const res = await fetch('/api/verify-ats', {
+    const res = await privateFetch('/api/verify-ats', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url, provider, board, jobId })
@@ -207,7 +233,7 @@ export const apiService = {
     candidateEvidence: any[],
     parsedJob: any
   ): Promise<{ proofPack: any }> {
-    const res = await fetch('/api/generate-proof-pack', {
+    const res = await privateFetch('/api/generate-proof-pack', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tailoredResume, candidateEvidence, parsedJob })
@@ -224,7 +250,7 @@ export const apiService = {
     candidateProfile: any,
     tailoredResume?: any
   ): Promise<{ outreach: any }> {
-    const res = await fetch('/api/generate-outreach', {
+    const res = await privateFetch('/api/generate-outreach', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ parsedJob, candidateProfile, tailoredResume })
@@ -241,7 +267,7 @@ export const apiService = {
     parsedJob: any,
     candidateEvidence: any[]
   ): Promise<{ answers: any[] }> {
-    const res = await fetch('/api/generate-answers', {
+    const res = await privateFetch('/api/generate-answers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ questions, parsedJob, candidateEvidence })
@@ -260,7 +286,7 @@ export const apiService = {
     roleTitle: string,
     jobUrl: string
   ): Promise<{ referralMessage: string }> {
-    const res = await fetch('/api/generate-referral', {
+    const res = await privateFetch('/api/generate-referral', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contactName, relationship, company, roleTitle, jobUrl })
@@ -272,61 +298,15 @@ export const apiService = {
     return res.json();
   },
 
-  async login(email: string, passwordOrToken?: string): Promise<any> {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, passwordOrToken })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Authentication failed');
-    }
-    return res.json();
+  async login(): Promise<void> {
+    const data = await workspaceRequest('/api/auth/sign-in/social', jsonRequest({ provider: 'google', callbackURL: window.location.origin + '/?workspace=private' }));
+    if (!data.url) throw new Error('Google sign-in is unavailable');
+    window.location.assign(data.url);
   },
-
-  async logout(token?: string): Promise<void> {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify({ token })
-    });
-  },
-
-  async getSession(token?: string): Promise<any> {
-    const res = await fetch('/api/auth/session', {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
-    return res.json();
-  },
-
-  async getWorkspaceData(token: string): Promise<any> {
-    const res = await fetch('/api/workspace/data', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to load private workspace');
-    }
-    return res.json();
-  },
-
-  async saveWorkspaceData(token: string, data: any): Promise<any> {
-    const res = await fetch('/api/workspace/data', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ data })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to persist private workspace');
-    }
-    return res.json();
-  }
+  async logout(): Promise<void> { await workspaceRequest('/api/auth/sign-out', jsonRequest({})); },
+  async getSession(): Promise<any> { return workspaceRequest('/api/auth/session'); },
+  async getWorkspaceData(): Promise<any> { return workspaceRequest('/api/workspace/data'); },
+  async saveWorkspaceData(data: any, revision: number): Promise<any> { return workspaceRequest('/api/workspace/data', jsonRequest({ data, revision })); },
+  async importWorkspace(data: any, revision: number): Promise<any> { return workspaceRequest('/api/workspace/import', jsonRequest({ data, revision })); },
+  async exportWorkspace(): Promise<any> { return workspaceRequest('/api/workspace/export'); }
 };

@@ -15,7 +15,6 @@ export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => 
   const [title, setTitle] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [rawDescription, setRawDescription] = useState('');
-  const [userProvided, setUserProvided] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingUrl, setIsFetchingUrl] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -33,7 +32,6 @@ export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => 
       const data = await apiService.fetchJobUrl(sourceUrl.trim());
       if (data.text) {
         setRawDescription(data.text);
-        setUserProvided(false);
         if (data.title && !title) {
           setTitle(data.title.slice(0, 100));
         }
@@ -55,7 +53,7 @@ export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => 
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const createdJob = await addJob(rawDescription, sourceUrl, company, title, userProvided);
+      const createdJob = await addJob(rawDescription, sourceUrl, company, title);
       await analyzeJob(createdJob.id);
       onClose();
       // Reset form
@@ -71,7 +69,6 @@ export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => 
   };
 
   const loadSample = (type: 'frontend' | 'design-systems' | 'skip-backend') => {
-    setUserProvided(true);
     if (type === 'frontend') {
       setCompany('Airbnb');
       setTitle('Frontend Engineer, Guest Experience');
@@ -262,7 +259,7 @@ Notice: This position is pure low-level storage engine architecture and contains
               required
               rows={9}
               value={rawDescription}
-              onChange={(e) => { setRawDescription(e.target.value); setUserProvided(true); }}
+              onChange={(e) => setRawDescription(e.target.value)}
               placeholder="Paste the complete job description here..."
               className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
             />
