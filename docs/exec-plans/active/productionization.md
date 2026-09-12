@@ -26,7 +26,9 @@ Phase 4.1 calibration hardening complete locally. Focused Phase 4/4.1/5 29/29,
 full suite 69/69, final release composition, startup smoke 1/1, standalone evidence
 validator, privacy triage (zero findings) and git diff --check pass. Reviewer
 directly rechecked both demonstrated calibration defects and confirmed resolved.
-Coherent dev checkpoint/publication is the remaining step for this task.
+Calibration checkpoint ac28e4f published by normal fast-forward to origin/dev;
+fresh fetch verified clean dev == origin/dev after publication. This documentation
+checkpoint records completion; verify clean/equal fetched refs after its publication.
 Algorithm phase4.1-v2; old assessments/artifacts become stale via existing basis.
 
 Phase 5 conservative deterministic contract complete and published. Focused 11/11 and full
@@ -171,6 +173,9 @@ shared provenance/index types; API/AppContext, editor/evidence/history/export/pr
 views and CSS; Phase 5 tests, auth/storage expectation updates and domain docs.
 
 ## Last Known Good Commit
+Phase 4.1 implementation ac28e4f, published to origin/dev and freshly verified.
+All requested local gates pass; this documentation checkpoint records publication.
+
 Published Phase 4 baseline 8882f72. Locate Phase 5 checkpoint with git log -1 --
 docs/exec-plans/active/productionization.md; publication verified by clean/equal
 freshly fetched refs without a self-hash loop.

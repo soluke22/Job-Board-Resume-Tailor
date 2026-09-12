@@ -79,3 +79,9 @@ retained. Reviewer directly reran original defects and confirmed both resolved.
 Live Gemini semantics/authenticated/deployed/print gates remain externally pending;
 synthetic tests do not claim live-model calibration. Next exact step remains
 Phase 6 — Proof packs + outreach + application answers, separately authorized.
+
+## Git publication
+
+Calibration commit ac28e4f published to origin/dev by normal fast-forward from
+610a00f. Fresh fetch verified clean/equal dev and origin/dev. This documentation
+checkpoint records the result. No main change, PR, AI Studio or Vercel deployment.
