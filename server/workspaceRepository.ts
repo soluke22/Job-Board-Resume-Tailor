@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from './db/client';
 import * as s from './db/schema';
 import { workspaceInput } from './db/workspaceValidation';
+import { assessmentMetadata, isCurrent, fingerprint } from './assessment';
 export { workspaceInput } from './db/workspaceValidation';
 
 export type WorkspaceInput = z.infer<typeof workspaceInput>;
@@ -77,6 +78,10 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       const events = children.get(s.applicationEvents)!.filter(c => c.parentId === row.id).map(c => c.data);
       if (versions.length) job.versionHistory = versions;
       if (events.length) job.statusHistory = events;
+      if (job.fit && job.assessmentStatus !== 'UNASSESSED') {
+        try { if (!isCurrent(job.assessmentMetadata, assessmentMetadata(job as any, output.evidence, output.searchProfile))) job.assessmentStatus = 'STALE'; }
+        catch { job.assessmentStatus = 'STALE'; }
+      }
       return job;
     });
     output.auditLog = (await rows(tx, s.auditEvents, ownerId)).map(r => r.data);
@@ -86,7 +91,7 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
     if (!ownerId) throw new WorkspaceValidationError('Owner identity required');
     return database().transaction(tx => snapshot(tx, ownerId), { isolationLevel: 'repeatable read', accessMode: 'read only' });
   }
-  async function save(ownerId: string, raw: unknown, revision: number, importing = false) {
+  async function save(ownerId: string, raw: unknown, revision: number, importing = false, assessedJobId?: string) {
     if (!ownerId) throw new WorkspaceValidationError('Owner identity required');
     const parsed = workspaceInput.safeParse(raw);
     if (!parsed.success || !Number.isSafeInteger(revision) || revision < 0) throw new WorkspaceValidationError('Invalid workspace or revision');
@@ -124,8 +129,14 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
         } else await upsert(tx, table, ownerId, key, normalize(input[key]!));
       }
       if (input.jobs) {
+        const previous = await snapshot(tx, ownerId);
         for (const source of input.jobs) {
           const job = normalize({ ...source });
+          if (job.assessmentStatus === 'ASSESSED' && job.id !== assessedJobId) {
+            const old = previous.jobs.find((j:any) => j.id === job.id);
+            const assessmentFields = (j:any) => j && Object.fromEntries(['fit','parsed','requirements','evidenceMatches','assessmentMetadata','assessmentFacts','qualificationFit','evidenceCoverage','applicationPriority','priorityReason','primaryRoleFamily','roleModifiers','hardRequirements','preferredRequirements','technologies','responsibilities','hiringSignals','hardBlockers','softGaps'].map(k=>[k,j[k]]));
+            if (importing || !old || old.assessmentStatus !== 'ASSESSED' || fingerprint(assessmentFields(old)) !== fingerprint(assessmentFields(job))) job.assessmentStatus = 'STALE';
+          }
           const id = job.id as string;
           for (const [key, table] of Object.entries(attachments)) {
             if (key in job && job[key] != null) {
@@ -166,6 +177,6 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       return snapshot(tx, ownerId);
     });
   }
-  return { read, save, import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
+  return { read, save, saveAssessment: (ownerId: string, input: unknown, revision: number, jobId:string) => save(ownerId,input,revision,false,jobId), import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
 }
 export const workspaceRepository = createWorkspaceRepository();

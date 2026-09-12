@@ -49,9 +49,10 @@ export const JobAnalysisView: React.FC = () => {
     );
   }
 
-  const { parsed, fit, evidenceMatches, sessionQuestions, tailoringPlan } = activeJob;
+  const { parsed, evidenceMatches, sessionQuestions, tailoringPlan } = activeJob;
+  const fit = activeJob.assessmentStatus === 'STALE' ? undefined : activeJob.fit;
   const verdict = fit?.verdict || 'Borderline';
-  const canTailor = fit?.canTailor ?? true;
+  const canTailor = fit?.canTailor ?? false;
 
   const handleGapAnswerChange = (qId: string, value: string) => {
     setGapAnswers((prev) => ({ ...prev, [qId]: value }));
@@ -73,6 +74,8 @@ export const JobAnalysisView: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {activeJob.assessmentStatus==='STALE' && <p className="text-amber-600">Previous assessment is stale. Reassess to see current scores and recommendation.</p>}
+      {fit?.recommendation && <div className="text-sm space-y-2"><p><strong>{fit.recommendation}</strong> · {fit.applicationPriority}</p><p>{fit.verdictReason}</p><p>Why it fits: {fit.whyFits?.join('; ') || 'No approved support'}</p><p>Why it does not: {fit.whyNot?.join('; ') || 'No extracted gap'}</p><p>Unknown constraints: {fit.unknownConstraints?.join('; ') || 'None'}</p></div>}
       {/* Back Button & Title Bar */}
       <div className="flex items-center justify-between">
         <button
@@ -148,19 +151,19 @@ export const JobAnalysisView: React.FC = () => {
           <div className="flex items-center space-x-4 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/60 shrink-0">
             <div className="text-center px-2">
               <span className="text-[10px] uppercase font-semibold text-slate-500 block">
-                Initial Fit
+                Qualification Fit
               </span>
               <span className="text-xl font-bold text-slate-800 dark:text-slate-200">
-                {fit?.initialFitScore ?? '—'} <span className="text-xs font-normal text-slate-500">/ 10</span>
+                {fit?.qualificationFit ?? '—'} <span className="text-xs font-normal text-slate-500">/ 10</span>
               </span>
             </div>
             <div className="w-px h-8 bg-slate-200 dark:bg-slate-700" />
             <div className="text-center px-2">
               <span className="text-[10px] uppercase font-semibold text-emerald-600 dark:text-emerald-400 block">
-                Best Truthful Fit
+                Evidence Coverage
               </span>
               <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-                {fit?.tailoredFitScore ?? '—'} <span className="text-xs font-normal text-emerald-700/60">/ 10</span>
+                {fit?.evidenceCoverage ?? '—'} <span className="text-xs font-normal text-emerald-700/60">/ 10</span>
               </span>
             </div>
             <div className="w-px h-8 bg-slate-200 dark:bg-slate-700" />
@@ -184,7 +187,7 @@ export const JobAnalysisView: React.FC = () => {
         </div>
 
         {/* STRICT GUARDRAIL BANNER IF SKIP */}
-        {!canTailor ? (
+        {!fit ? <p className="text-sm text-slate-500">Assessment required before an application decision or tailoring plan.</p> : !canTailor ? (
           <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-900 dark:text-rose-200 space-y-2">
             <div className="flex items-center space-x-2">
               <XCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />

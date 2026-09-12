@@ -284,7 +284,7 @@ export const storageService = {
           : 0;
 
       // By Fit Band
-      const fitBand = j.qualificationFit === undefined ? 'UNASSESSED' : j.qualificationFit >= 9 ? 'APPLY FIRST (9.0+)' : j.qualificationFit >= 8 ? 'STRONG (8.0-8.9)' : 'CALIBRATED STRETCH';
+      const fitBand = j.assessmentStatus === 'STALE' ? 'STALE' : j.qualificationFit === undefined ? 'UNASSESSED' : j.applicationPriority;
       if (!conversionByFitBand[fitBand]) {
         conversionByFitBand[fitBand] = { total: 0, interviews: 0, rate: 0 };
       }

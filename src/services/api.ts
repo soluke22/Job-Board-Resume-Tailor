@@ -68,41 +68,14 @@ export async function workspaceRequest(path: string, init?: RequestInit): Promis
 }
 const jsonRequest = (data: any) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 export const apiService = {
-  async analyzeJob(
-    rawDescription: string,
-    candidateProfile: CandidateProfile,
-    evidenceItems: EvidenceItem[]
-  ): Promise<{ parsed: ParsedJob; fit: FitAssessment }> {
-    const res = await privateFetch('/api/analyze-job', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rawDescription, candidateProfile, evidenceItems })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to analyze job');
-    }
+  async analyzeJob(jobId: string): Promise<{ job: import('../types').JobRecord }> {
+    const res = await privateFetch('/api/analyze-job', jsonRequest({jobId}));
+    if (!res.ok) { const err=await res.json().catch(()=>({})); throw new Error(err.error || 'Assessment failed'); }
     return res.json();
   },
-
-  async matchEvidence(
-    parsedJob: ParsedJob,
-    evidenceItems: EvidenceItem[],
-    projects: ProjectItem[],
-    skills: SkillItem[]
-  ): Promise<{ matches: RequirementMatch[] }> {
-    const res = await privateFetch('/api/match-evidence', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parsedJob, evidenceItems, projects, skills })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to match evidence');
-    }
-    return res.json();
+  async matchEvidence(jobId: string): Promise<{ job: import('../types').JobRecord }> {
+    return this.analyzeJob(jobId);
   },
-
   async getGapInterviewQuestions(
     fit: FitAssessment,
     evidenceMatches: RequirementMatch[],

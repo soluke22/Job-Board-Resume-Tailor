@@ -1,3 +1,4 @@
+import { currentFit } from '../utils/assessmentView';
 import React, { useState } from 'react';
 import {
   PlusCircle,
@@ -51,14 +52,13 @@ export const DashboardView: React.FC = () => {
 
   // Sort jobs by fit score
   const sortedOpportunities = [...jobs].sort((a, b) => {
-    const scoreA = a.fit?.tailoredFitScore || 0;
-    const scoreB = b.fit?.tailoredFitScore || 0;
-    return scoreB - scoreA;
+    const priority = (j: typeof a) => !currentFit(j) ? 0 : currentFit(j)?.verdict === 'Skip' ? 0 : currentFit(j)?.applicationPriority === 'APPLY FIRST' ? 3 : currentFit(j)?.applicationPriority === 'STRONG WITH GAP' ? 2 : 1;
+    return priority(b) - priority(a) || (currentFit(b)?.qualificationFit || 0) - (currentFit(a)?.qualificationFit || 0);
   });
 
-  const applyCount = jobs.filter((j) => j.fit?.verdict === 'Apply').length;
-  const borderlineCount = jobs.filter((j) => j.fit?.verdict === 'Borderline').length;
-  const skipCount = jobs.filter((j) => j.fit?.verdict === 'Skip').length;
+  const applyCount = jobs.filter((j) => currentFit(j)?.verdict === 'Apply').length;
+  const borderlineCount = jobs.filter((j) => currentFit(j)?.verdict === 'Borderline').length;
+  const skipCount = jobs.filter((j) => currentFit(j)?.verdict === 'Skip').length;
 
   const displayName = profile.name || 'Candidate';
 
@@ -453,8 +453,8 @@ export const DashboardView: React.FC = () => {
 
           <div className="space-y-3">
             {jobs.map((job) => {
-              const verdict = job.fit?.verdict || 'Borderline';
-              const canTailor = job.fit?.canTailor ?? true;
+              const verdict = currentFit(job)?.verdict || 'Borderline';
+              const canTailor = currentFit(job)?.canTailor ?? false;
               return (
                 <div
                   key={job.id}
@@ -470,7 +470,7 @@ export const DashboardView: React.FC = () => {
                           {job.parsed.classifiedFamily}
                         </span>
                       )}
-                      {job.fit && (
+                      {currentFit(job) && (
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider flex items-center space-x-1 ${
                             verdict === 'Apply'
@@ -493,11 +493,12 @@ export const DashboardView: React.FC = () => {
                     </p>
 
                     <div className="flex items-center space-x-4 text-xs text-slate-500">
-                      {job.fit && (
+                      {job.assessmentStatus==='STALE' && <span>Previous assessment stale; reassess</span>}
+                      {currentFit(job) && (
                         <span>
                           Fit Match:{' '}
                           <strong className="text-slate-800 dark:text-slate-200 font-semibold">
-                            {job.fit.tailoredFitScore} / 10
+                            {currentFit(job).qualificationFit} / 10
                           </strong>
                         </span>
                       )}
@@ -515,14 +516,14 @@ export const DashboardView: React.FC = () => {
                       )}
                     </div>
 
-                    {job.fit?.strongestMatch && verdict === 'Apply' && (
+                    {currentFit(job)?.strongestMatch && verdict === 'Apply' && (
                       <p className="text-xs text-emerald-700 dark:text-emerald-400/90 pt-1 line-clamp-1">
-                        Strongest Match: {job.fit.strongestMatch}
+                        Strongest Match: {currentFit(job).strongestMatch}
                       </p>
                     )}
-                    {job.fit?.biggestActualGap && verdict === 'Skip' && (
+                    {currentFit(job)?.biggestActualGap && verdict === 'Skip' && (
                       <p className="text-xs text-rose-600 dark:text-rose-400 pt-1 line-clamp-1">
-                        Unmet Requirement: {job.fit.biggestActualGap}
+                        Unmet Requirement: {currentFit(job).biggestActualGap}
                       </p>
                     )}
                   </div>
@@ -568,7 +569,7 @@ export const DashboardView: React.FC = () => {
             </h2>
             <div className="space-y-2.5">
               {sortedOpportunities
-                .filter((j) => (j.fit?.tailoredFitScore || 0) >= 7.0)
+                .filter((j) => currentFit(j) && currentFit(j)?.verdict !== 'Skip')
                 .slice(0, 3)
                 .map((job) => (
                   <div
@@ -581,7 +582,7 @@ export const DashboardView: React.FC = () => {
                         {job.company}
                       </span>
                       <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        {job.fit?.tailoredFitScore} / 10
+                        {currentFit(job)?.qualificationFit} / 10
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 truncate">{job.title}</p>

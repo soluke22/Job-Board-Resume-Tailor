@@ -2,7 +2,7 @@ import { Router, type RequestHandler } from 'express';
 import { requireWorkspaceOwner } from './auth';
 import { workspaceRepository, WorkspaceConflict, WorkspaceValidationError } from './workspaceRepository';
 
-export function createWorkspaceRouter(repository = workspaceRepository, guard: RequestHandler = requireWorkspaceOwner) {
+export function createWorkspaceRouter(repository: Pick<typeof workspaceRepository, 'read' | 'save' | 'import'> = workspaceRepository, guard: RequestHandler = requireWorkspaceOwner) {
   const router = Router();
   router.use(guard);
   router.use((_req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); });

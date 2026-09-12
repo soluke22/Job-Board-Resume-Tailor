@@ -1,9 +1,10 @@
 # Job search pipeline
 
-## Current State — Phase 3
+## Current State — Phase 4
 Search discovery -> source provenance -> provider detection -> exact posting
 verification -> canonical JD -> status/dates/freshness -> history-safe dedupe ->
-unassessed record. Qualification, evidence retrieval and ranking are Phase 4.
+unassessed record -> source-backed requirements -> approved owner evidence retrieval
+-> validated semantic matching -> deterministic qualification/coverage/priority.
 
 ### Discovery source is not canonical source
 server/discovery.ts builds the prompt from allowlisted configured SearchProfile
@@ -85,8 +86,8 @@ not an independent historical-provider database; deleted jobs cannot be matched.
 New discovery and pasted records explicitly use assessmentStatus UNASSESSED and
 applicationPriority UNASSESSED, with no numeric fit/coverage or family default.
 Runtime persistence rejects scores attached to UNASSESSED records. Existing
-assessments/history are preserved, not re-ranked. Existing manually invoked analysis
-remains inherited and is not certified as evidence-grounded Phase 4.
+assessments/history are preserved. Legacy private assessments are marked STALE,
+not certified until reassessed through the Phase 4 contract.
 Classification is not fit. Removed discoveries are not returned as new active leads;
 unlisted/unknown/unsupported records retain visible uncertainty, not active claims.
 
@@ -109,12 +110,110 @@ mapped IPv4 is blocked. Fixed provider APIs reject redirects, use an 8-second
 signal and streamed 4 MiB JSON cap. An unavailable/bounded fetch does not fabricate
 content or status. Fetch-job-url page text explicitly remains UNKNOWN.
 
+## Phase 4 assessment protocol
+/api/analyze-job and compatibility /api/match-evidence accept only a persisted
+jobId. The authenticated owner repository supplies JD, enabled verified evidence
+and SearchProfile. Caller profile/evidence/project/skill fields are rejected.
+AVAILABLE canonical description is preferred. Explicit jdSource user-provided is
+allowed and labeled honestly; discovery snippets and generic URL fetches alone
+return INSUFFICIENT_JD. A user editing/pasting description explicitly supplies it.
+
+Shared strict Zod contracts live in src/types/assessment.ts. Gemini 3.8 Flash
+extracts exact short excerpts for job facts and hard/preferred/responsibility
+requirements. Exact substring checks reject invented excerpts. Stable IDs hash
+kind and excerpt; source start/end offsets are retained. The model classifies
+the canonical five families/modifiers but never supplies final scores.
+Every extracted requirement must be matched exactly once. Unknown, duplicate or
+omitted requirement coverage fails; unknown/ineligible evidence IDs fail; support
+IDs deduplicate. Non-Missing needs supplied support; Missing has none. Strong
+requires direct substantial support; Moderate meaningful partial/adjacent support;
+Weak limited indirect support; Missing no approved support. Semantic correctness
+and completeness of JD extraction still need live/manual acceptance: exact spans
+prove source presence, not perfect interpretation or complete extraction.
+
+Retrieval tokenizes requirement/evidence language, technologies, responsibilities
+and supported verbs. Exact overlap contributes 3, a small documented adjacency
+dictionary contributes 1. Positive relevance only; per-requirement relevance ranks
+and round-robin selection bound the bank to 32, stable ID tie-breaks make bank
+order irrelevant. Domain language is available in evidence prose. No project/skill
+free text becomes independent support. This lightweight dictionary is deliberately
+limited and may miss synonyms; no vector database or first-N selection is used.
+
+### Deterministic algorithm phase4-v1
+For each present requirement group, average match coefficients. Weights are hard
+0.80, preferred 0.15, responsibilities 0.05, renormalized over present groups.
+qualificationFit = round(10 * weighted average, 1 decimal), with Strong 1,
+Moderate 0.70, Weak 0.25, Missing 0. Evidence coverage uses Strong 1, Moderate
+0.50, Weak 0.10, Missing 0 and the same groups. If the respective hard-group
+average is below 0.50, cap that score at 5.9. Seniority/years/domain influence
+qualification through actual extracted requirements and demonstrated support,
+never invented candidate years or title-to-years mappings. No family coefficient.
+
+Constraint fit stays categorical, separate from qualification. Persisted policy
+can block explicit excluded/unsupported employment types, mandatory relocation,
+required clearance, remote-only conflicts, explicit required onsite location
+outside configured hybrid locations, interpretable days-per-week maximum,
+annual USD authoritative maximum below minimum salary, explicit company or
+literal configured title exclusions. Negated/optional onsite and negated clearance
+are handled conservatively. Ambiguous frequency/location remains unknown.
+Known AI/algorithm/multiple-takehome preferences, absence of preferred takehome
+when explicitly stated, below-target salary, role-family/modifier/seniority
+preferences affect strategy only. Unknown process/salary does not fabricate a
+mismatch. Salary comparisons require comparable annual USD facts; no currency
+conversion or hourly extrapolation. Constraint language parsing is bounded and
+conservative, not a universal policy reasoner.
+
+SKIP when a real constraint blocker exists, exact posting NOT_LISTED, or
+qualificationFit < 5. APPLY FIRST when fit >= 8.5, coverage >= 7.5 and no
+preference/status/freshness concerns. Otherwise STRONG WITH GAP for fit >= 7,
+CALIBRATED STRETCH for fit >= 5. STRONG WITH GAP replaces legacy STRONG for
+new assessments; historical strings remain compatibility types only.
+Recommendation SKIP agrees with SKIP; APPLY when fit >= 7 with no concerns;
+otherwise SELECTIVE_APPLY. Unknown/unlisted posting or OLD publication adds a
+strategic concern, never a qualification penalty. A 7.0 can recommend APPLY,
+and 10.0 can SKIP due to personal constraints. Fit explanations derive from
+validated matches; gaps/constraint/preferences derive the negative explanation.
+
+### Freshness, persistence and legacy compatibility
+Persisted metadata includes source, JD SHA-256, sorted eligible semantic-evidence
+fingerprint, SearchProfile plus posting-status/publication/effective-freshness/
+compensation fingerprint, algorithm version and timestamp. Repository reads mark
+changed/legacy results STALE; history is retained. Canonical refresh invalidates
+immediately; client evidence/profile edits conservatively mark scores stale.
+Current triage hides stale scores, without deleting history. Unchanged certified
+metadata reuses persisted assessment and invokes no Gemini; process-local cache
+and candidate title heuristics were removed. Ordinary saves cannot certify changed
+assessment or derived display fields; only the assessment service does so under
+the original workspace revision. In-flight conflicts return 409; client never
+overwrites local edits with an assessment reload and requires explicit reload.
+
+Deprecated initialFitScore/tailoredFitScore both derive from qualificationFit;
+they no longer estimate improvement from tailoring. UI shows qualification and
+coverage. Legacy verdict/canTailor derive from recommendation without an 8.0
+gate. Automatic gap-interview generation was removed from assessment; existing
+interview/provenance behavior is deferred to Phase 5 and is not certified here.
+
+### Model boundary and live status
+Two bounded semantic requests maximum: extraction, then matching when relevant
+eligible evidence exists. Strict structured JSON schema, separate systemInstruction,
+MEDIUM thinking and 30-second SDK request timeout; no fake fallback or retry.
+Scores/priorities are absent from model schemas, so injected output fields fail.
+Candidate contact/identity metadata is excluded, free-text evidence is redacted
+against the persisted profile, and evidence IDs remain unchanged.
+No GEMINI_API_KEY configured during acceptance: deterministic/mocked contracts
+verified, live semantic acceptance pending external configuration.
+SDK syntax reviewed against [official SDK config](https://googleapis.github.io/js-genai/release_docs/interfaces/types.GenerateContentConfig.html),
+[structured outputs](https://ai.google.dev/gemini-api/docs/structured-output),
+[model](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash) and
+[Zod JSON Schema](https://zod.dev/json-schema). Zod dialect metadata is removed;
+actual schema/service acceptance still needs the bounded synthetic live smoke.
+
+JD != evidence; classification != fit; fit != application priority;
+preference != blocker; adjacency != direct experience;
+model semantic judgment != final arithmetic.
+
 ## Target State — later phases
-After discovery acceptance: deterministic supported blockers -> qualification ->
-approved owner evidence retrieval -> evidence coverage -> application priority ->
-screened tailoring. Inherited blocker heuristics/cache remain in searchEngine.ts
-but are no longer called by discovery; Phase 4 must audit them against evidence
-and configured constraints rather than preserve candidate-specific assumptions.
+Phase 5 handles resume provenance, tailoring and manual validation after screening.
 
 ## Validation
 Synthetic contracts and manual smoke instructions: [TESTING.md](TESTING.md).

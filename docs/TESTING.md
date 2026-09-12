@@ -5,6 +5,10 @@ Use npm ci with package-lock.json. Historical bun.lock is not the install source
 The committed node:test suite runs through tsx; PGlite tests workspace contracts.
 
 - npm test: complete deterministic suite.
+- node --import tsx --test tests/phase-4-assessment.test.ts: Phase 4 source,
+  eligibility, provenance, retrieval, ID/adjacency validation, deterministic
+  arithmetic/constraints, invalidation/cache, injection and real repository/handler
+  certification. Mocked semantic responses do not certify live Gemini behavior.
 - node --import tsx --test tests/auth-security.test.ts tests/phase-1-auth.test.ts tests/phase-1-client.test.ts: focused Phase 1 acceptance.
 - npm run typecheck: TypeScript (lint is an alias).
 - npm run build: Vite client and esbuild server; existing chunk warning is tracked.

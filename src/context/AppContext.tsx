@@ -85,7 +85,8 @@ interface AppContextType {
     rawDescription: string,
     sourceUrl?: string,
     company?: string,
-    title?: string
+    title?: string,
+    userProvided?: boolean
   ) => Promise<JobRecord>;
   deleteJob: (id: string) => void;
   updateJob: (job: JobRecord) => void;
@@ -347,11 +348,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSearchProfile = (newSearchProfile: SearchProfile) => {
+    if (JSON.stringify(newSearchProfile) !== JSON.stringify(searchProfile)) setJobs(jobs.map(j=>j.fit?{...j,assessmentStatus:'STALE'}:j));
     setSearchProfileState(newSearchProfile);
     storageService.saveSearchProfile(newSearchProfile, workspaceMode);
   };
 
   const setEvidence = (newEvidence: EvidenceItem[]) => {
+    if (JSON.stringify(newEvidence) !== JSON.stringify(evidence)) setJobs(jobs.map(j=>j.fit?{...j,assessmentStatus:'STALE'}:j));
     setEvidenceState(newEvidence);
     storageService.saveEvidence(newEvidence, workspaceMode);
   };
@@ -440,7 +443,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     rawDescription: string,
     sourceUrl?: string,
     company?: string,
-    title?: string
+    title?: string,
+    userProvided = true
   ): Promise<JobRecord> => {
     const effectiveUrl = sourceUrl || '';
     const newJob: JobRecord = {
@@ -452,6 +456,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       applyUrl: effectiveUrl,
       sourceUrl,
       rawDescription,
+      jdSource: userProvided ? 'user-provided' : undefined,
       description: rawDescription,
       location: '',
       remoteStatus: 'unknown',
@@ -496,6 +501,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateJob = (updatedJob: JobRecord) => {
+    const previous = jobs.find(j=>j.id===updatedJob.id);
+    if (previous?.fit && ['description','rawDescription','jdSource','canonicalContentStatus','verificationStatus','publishedAt','freshnessBand','compensation'].some(k=>JSON.stringify(previous[k as keyof JobRecord])!==JSON.stringify(updatedJob[k as keyof JobRecord]))) updatedJob = {...updatedJob,assessmentStatus:'STALE'};
     const updated = jobs.map((j) => (j.id === updatedJob.id ? updatedJob : j));
     setJobs(updated);
   };
@@ -535,28 +542,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAnalyzing(true);
     setError(null);
     try {
-      const textToAnalyze = target.description || target.rawDescription;
-      const { parsed, fit } = await apiService.analyzeJob(textToAnalyze, profile, evidence);
-      const updated: JobRecord = {
-        ...target,
-        company: parsed.company || target.company,
-        title: parsed.roleTitle || target.title,
-        parsed,
-        fit,
-        status: 'Fit Checked',
-        qualificationFit: fit.qualificationFit,
-        evidenceCoverage: fit.evidenceCoverage,
-        assessmentStatus: 'ASSESSED',
-        applicationPriority: fit.applicationPriority,
-        primaryRoleFamily: parsed.roleFamily || target.primaryRoleFamily,
-        hardRequirements: parsed.hardRequirements || target.hardRequirements,
-        preferredRequirements: parsed.preferredRequirements || target.preferredRequirements,
-        technologies: parsed.technologies || target.technologies
-      };
-      updateJob(updated);
-
-      // Automatically initiate evidence match
-      await matchEvidence(jobId);
+      const startedSnapshot = JSON.stringify(storageService.privateSnapshot());
+      await apiService.analyzeJob(jobId);
+      // Server persisted the assessment; reload its revision before the next local save.
+      const result = await apiService.getWorkspaceData();
+      if (startedSnapshot !== JSON.stringify(storageService.privateSnapshot())) {
+        ready.current = false;
+        throw new Error('Local edits occurred during assessment. Reload required before saving; local edits have not been overwritten.');
+      }
+      adopt(result);
+      setActiveJobId(jobId);
     } catch (err: any) {
       console.error('Job analysis failed:', err);
       setError(err.message || 'Job analysis failed');
@@ -565,35 +560,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const matchEvidence = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target || !target.parsed) return;
-
-    setIsAnalyzing(true);
-    try {
-      const { matches } = await apiService.matchEvidence(target.parsed, evidence, projects, skills);
-      const updated: JobRecord = {
-        ...target,
-        evidenceMatches: matches
-      };
-      updateJob(updated);
-
-      // Check if gap interview is recommended
-      if (target.fit && (target.fit.verdict === 'Borderline' || (target.fit.blockers && target.fit.blockers.length > 0))) {
-        const { questions } = await apiService.getGapInterviewQuestions(target.fit, matches, target.parsed);
-        updateJob({
-          ...updated,
-          gapQuestions: questions,
-          status: 'Gap Interview Recommended'
-        });
-      }
-    } catch (err: any) {
-      console.error('Evidence matching failed:', err);
-      setError(err.message || 'Evidence matching failed');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
+  const matchEvidence = analyzeJob;
 
   const submitGapAnswers = async (
     jobId: string,
@@ -648,6 +615,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const generatePlan = async (jobId: string) => {
     const target = jobs.find((j) => j.id === jobId);
     if (!target || !target.parsed || !target.fit || !target.evidenceMatches) return;
+    if (target.assessmentStatus === 'STALE') { setError('Reassess before planning.'); return; }
 
     setIsGenerating(true);
     setError(null);
