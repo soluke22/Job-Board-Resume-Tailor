@@ -18,9 +18,12 @@ manual invalidation/revalidation, safe regeneration, version history and final e
 No Phase 6. Parent owns writes; one narrow read-only security-reviewer.
 
 ## Current Status
-Phase 5 conservative deterministic contract implemented. Focused 11/11 and full
+Phase 5 conservative deterministic contract complete and published. Focused 11/11 and full
 63/63 tests pass; initial release composition passes typecheck/build/harness/tests
-and strict required-build privacy scan, zero findings. Final validation complete; publication pending checkpoint. Live Gemini acceptance pending external configuration; no key exists
+and strict required-build privacy scan, zero findings. Final validation complete; implementation c00c5e2 published to origin/dev by normal
+fast-forward. This documentation checkpoint records completion; verify clean/equal
+fetched refs after publication. Phase 5 deterministic contract passes; live gates
+remain pending. Live Gemini acceptance pending external configuration; no key exists
 in process and only .env.example is present. No private records sent to a live model.
 This is complete-statement certification; general semantic paraphrases require
 reviewed atomic evidence before certification. Authenticated/deployed browser and
