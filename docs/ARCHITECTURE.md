@@ -1,43 +1,65 @@
 # Architecture
 
-Reconciliation update (2026-09-12): descriptions of pending/uncommitted work and
-5/6 test results below are historical Phase 0 snapshots. All inherited product
-work is preserved in 41a04f8; stale test fixtures corrected in 0828816. Final
-suite passes 6/6. Use npm ci with package-lock.json. See
-[reconciliation record](DEV_RECONCILIATION.md) and active execution plan for
-current state; preserved integrations still require production acceptance.
-Baseline inspected 2026-09-11. “Current” describes code; “target” describes required future behavior.
+## Current State — committed dev implementation
+React 19/Vite renders through src/main.tsx and src/App.tsx. AppContext coordinates
+candidate setup, discovery, evidence, tailoring and application workflows.
+Express/Gemini remains the application server; server/local.ts serves Vite in
+development and dist/client in production. api/index.ts is the Vercel adapter.
+Build emits dist/client and dist/server.mjs; Next.js remains conditional.
 
-## Current State — committed baseline
-React 19 renders through `src/main.tsx` and `src/App.tsx`. AppContext coordinates candidate setup, discovery, analysis, evidence matching, gap interviews, tailoring, evaluation, and application tracking. Components and views present those workflows.
+Better Auth in server/auth.ts installs before JSON middleware and implements
+Google OAuth, verified configured owner authorization and database sessions.
+Workspace routes inherit an owner router; private files use direct owner guards;
+remaining /api operations inherit the server owner boundary. Health is public.
+Cookie sessions are HttpOnly/Lax, Secure over HTTPS, one day with hourly renewal,
+without cookie caching. Missing configuration or session/storage outages deny
+private access. See [PRIVACY_BOUNDARY.md](PRIVACY_BOUNDARY.md) for precise rules.
 
-`src/services/storage.ts` persists workspace records and auth metadata in localStorage with separate demo/private key prefixes. It imports both synthetic demo data and private defaults into the browser graph. `src/services/api.ts` sends JSON to Express routes in `server.ts`.
+server/db contains Neon/Drizzle schemas and migrations for auth and owner-scoped
+workspace entities. workspaceRepository handles revisioned reads/writes/imports;
+workspaceRoutes provides private data/import/export/audit APIs. privateFiles
+uses owner metadata and Private Blob with authorized server-proxied attachments.
+These integrations exist; Phase 2 durable persistence acceptance is not complete.
 
-Express serves Vite middleware in development and dist assets in production, listening on port 3000. The server owns Gemini calls, prompt construction, URL fetching and ATS requests. Most AI routes accept candidate context supplied by the client; server-side ownership and evidence validation are incomplete. JSON fence stripping/parsing is not semantic validation.
-
-Data flow: browser records -> AppContext -> API client -> Express -> Gemini or ATS -> JSON response -> browser state/localStorage. Private workspace and audit endpoints separately store data in process memory; there is no implemented database synchronization. Sessions and analysis cache also live in memory.
+Private data flow: server session -> authorized workspace read -> in-memory
+browser cache -> AppContext -> API -> guarded Express -> database/Gemini/Blob.
+Workspace changes synchronize through revisioned APIs. src/services/storage.ts
+keeps private data/auth UI metadata in memory; public demo uses separate synthetic
+fixtures and public localStorage keys. legacyImport previews explicit local
+imports for owner confirmation. Empty private state uses blank setup defaults.
+Refresh rehydrates from server. Session loss, expiry, logout or unavailable private
+services clear private UI/cache; stale responses are rejected by generation.
+Public demo rendering remains independent of auth/database configuration.
 
 ## AI and ATS boundaries
-Gemini is initialized server-side using GEMINI_API_KEY. Discovery uses Google Search through Gemini. Analysis, matches, plans, resumes, letters, evaluations, proof packs and outreach are generated through API routes.
-AI output must remain untrusted until validated; prompts alone do not enforce truth.
-ATS adapter details and discovery gaps belong in [JOB_SEARCH_PIPELINE.md](JOB_SEARCH_PIPELINE.md).
-Claim contracts and validation gaps belong in [EVIDENCE_MODEL.md](EVIDENCE_MODEL.md).
+Gemini initializes server-side from GEMINI_API_KEY. Discovery uses search
+through Gemini; analysis, evidence matches, plans, resumes, letters, evaluations,
+proof packs and outreach run through owner-protected API routes. AI outputs remain
+untrusted; route authorization does not establish semantic candidate provenance.
+JSON parsing and redaction are not sufficient evidence validation.
+Job discovery/ATS acceptance remains in [JOB_SEARCH_PIPELINE.md](JOB_SEARCH_PIPELINE.md).
+Evidence contracts and gaps belong in [EVIDENCE_MODEL.md](EVIDENCE_MODEL.md).
+Analysis cache remains process-local and is separate from workspace persistence.
 
-## Target State
-Keep public synthetic demonstration isolated from authenticated candidate workflows. Server operations derive identity from verified sessions, authorize every record/file operation, retrieve approved owner evidence, validate generated claims, and persist records durably.
-Move route orchestration out of the monolithic server into auth, workspace, discovery, evidence and tailoring modules as migration scope requires; those modules are not present in the committed baseline.
-The desired Vercel deployment uses durable Postgres and private file storage. Next.js remains conditional, not an implemented or selected migration. See [DEPLOYMENT.md](DEPLOYMENT.md) for boundaries and outstanding decisions.
-Client state becomes a view/cache of authorized server records, not an authentication or persistence authority. Model and ATS calls stay server-side. Database failure, invalid sessions and missing evidence yield explicit errors or empty authorized state, never synthetic replacements.
+## Acceptance versus target
+Phase 1 audits authentication and public/private isolation. Deterministic tests
+exercise production options, hooks, cookies, route denial and client request/cache
+behavior. Live Google OAuth acceptance pending external configuration.
+Live Neon/Blob durability, restart, deployment and full authenticated browser
+acceptance remain external/persistence gates; do not infer them from builds.
 
-## Related contracts
-[PRODUCT_INVARIANTS.md](PRODUCT_INVARIANTS.md) defines product behavior.
-[PRIVACY_BOUNDARY.md](PRIVACY_BOUNDARY.md) owns security requirements and known violations.
+Future phases retrieve approved owner evidence, enforce generated claims, complete
+ATS truthfulness and durable storage acceptance, and validate Vercel runtime.
+Server operations must derive identity from verified sessions and authorize every
+record/file. Client state is a view/cache, never authentication or storage authority.
+Private failures must remain explicit, never synthetic replacements.
+Release audit precedes dev-to-main PR, merged-main AI Studio verification, then
+final Vercel production. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## Migration Notes — pending working tree
-On 2026-09-12 inherited uncommitted work adds server/auth.ts (Better Auth),
-server/db (Neon/Drizzle), workspaceRepository/workspaceRoutes, privateFiles
-(Private Blob), privacy redaction, server/local.ts and api/index.ts.
-The working-tree build outputs dist/client and dist/server.mjs; Vercel config
-routes API calls to the server adapter. storage.ts keeps private cache in memory
-and legacyImport handles old browser data. These changes are pending review,
-not completed phases. Consult Git status and active plan before relying on them.
+## Related contracts and history
+[PRODUCT_INVARIANTS.md](PRODUCT_INVARIANTS.md) owns product behavior;
+[PRIVACY_BOUNDARY.md](PRIVACY_BOUNDARY.md) owns security rules;
+[active execution plan](exec-plans/active/productionization.md) owns current gates.
+The old process-token/localStorage/no-database architecture describes the
+pre-reconciliation baseline. Integrations committed in 41a04f8 are current code,
+not pending working-tree changes or proof of completed persistence acceptance.

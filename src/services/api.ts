@@ -18,22 +18,50 @@ let beforePrivateRequest: () => Promise<void> = async () => {};
 export function setBeforePrivateRequest(callback: () => Promise<void>) { beforePrivateRequest = callback; }
 let generation = 0;
 export function invalidatePrivateRequests() { generation++; }
+function accessLost(response: Response) {
+  if (storageService.getAuthSession().isAuthenticated && (response.status === 401 || response.status === 403 || response.status === 503)) window.dispatchEvent(new Event('workspace-access-lost'));
+}
+async function fetchPrivateResponse(input: string, init?: RequestInit): Promise<Response> {
+  const epoch = generation;
+  try { return await fetch(input, { credentials: 'same-origin', cache: 'no-store', ...init }); }
+  catch (error) {
+    if (epoch === generation && storageService.getAuthSession().isAuthenticated) window.dispatchEvent(new Event('workspace-access-lost'));
+    throw error;
+  }
+}
+async function readPrivateBody(response: Response, epoch: number, json: boolean): Promise<any> {
+  try { return await (json ? response.json() : response.text()); }
+  catch (error) {
+    if (epoch === generation && storageService.getAuthSession().isAuthenticated) window.dispatchEvent(new Event('workspace-access-lost'));
+    throw error;
+  }
+}
 async function privateFetch(input: string, init?: RequestInit): Promise<Response> {
   if (storageService.getWorkspaceMode() !== 'PRIVATE_WORKSPACE' || !storageService.getAuthSession().isAuthenticated) throw new Error('Sign in to the private workspace to use this action. Demo records remain synthetic.');
   const epoch = generation;
   await beforePrivateRequest();
   if (epoch !== generation) throw new Error('Session changed');
-  const response = await fetch(input, { credentials: 'same-origin', ...init });
-  const body = await response.text();
+  const response = await fetchPrivateResponse(input, init);
+  const body = await readPrivateBody(response, epoch, false);
   if (epoch !== generation) throw new Error('Session changed');
-  if (response.status === 401 || response.status === 403) window.dispatchEvent(new Event('workspace-access-lost'));
-  return new Response(body, { status: response.status, headers: response.headers });
+  accessLost(response);
+  if (epoch !== generation) throw new Error('Private access is unavailable. Sign in again.');
+  const result = new Response(body, { status: response.status, headers: response.headers });
+  const parse = result.json.bind(result);
+  result.json = async () => {
+    const data = await parse();
+    if (epoch !== generation) throw new Error('Session changed');
+    return data;
+  };
+  return result;
 }
 export async function workspaceRequest(path: string, init?: RequestInit): Promise<any> {
-  const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store', ...init });
-  const data = await response.json();
+  const epoch = generation;
+  const response = await fetchPrivateResponse(path, init);
+  const data = await readPrivateBody(response, epoch, true);
+  if (epoch !== generation) throw new Error('Session changed');
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) window.dispatchEvent(new Event('workspace-access-lost'));
+    accessLost(response);
     throw new Error(data.error || 'Private workspace service unavailable');
   }
   return data;
@@ -310,3 +338,11 @@ export const apiService = {
   async importWorkspace(data: any, revision: number): Promise<any> { return workspaceRequest('/api/workspace/import', jsonRequest({ data, revision })); },
   async exportWorkspace(): Promise<any> { return workspaceRequest('/api/workspace/export'); }
 };
+
+export async function signOutPrivateWorkspace(clearClient: () => void): Promise<void> {
+  clearClient();
+  // Cross-tab notification is best effort; browser storage cannot prevent
+  // durable server revocation or its retry.
+  try { localStorage.setItem('caos_logout_event', String(Date.now())); } catch {}
+  await apiService.logout();
+}
