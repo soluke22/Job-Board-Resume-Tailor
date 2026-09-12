@@ -123,3 +123,41 @@ Integration: full authenticated browser lifecycle and truthful end-to-end workfl
 Use synthetic Gemini/ATS/provider fixtures by default. Never log secrets or raw
 private workspace records. Build/static scanning cannot certify complete privacy.
 Results and reviewer findings belong in the active plan and phase acceptance matrices.
+
+## Phase 5 resume provenance coverage
+Focused: node --import tsx --test tests/phase-5-resume.test.ts (11 grouped tests).
+Fixtures prove eligible/unknown/disabled/unverified/rejected/review/owner-isolated
+IDs, duplicate normalization, exact statement support and negative-context handling;
+unsupported metrics/technologies/leadership/ownership/years/impact/JD claims;
+employer/title/period/project boundaries; multiple experiences in chosen order;
+deterministic identity; strict generated schema and model-invented ID/injection
+rejection; manual edit invalidation, punctuation rewrite revalidation and restore;
+toggle support/empty-work fence; stale full evidence/master/profile/assessment basis.
+Real PGlite owner route/repository fixtures prove generation, invalid regeneration
+preservation, forged-validation downgrade, manual-before-validation checkpoints,
+server final export rejection/selection, immutable history through saves/imports,
+retention and import round-trip shape. Earlier auth gate inventories all new routes
+and makes actual unauthorized HTTP requests. No live model or private data required.
+
+Manual authenticated browser acceptance (external configuration gate): assess a
+synthetic JD against approved synthetic records spanning two employers and a project;
+plan/generate and inspect linked IDs, preserved names/titles/periods, summary/skills
+status and history. Edit a bullet to add an unsupported percentage/technology/lead
+verb; verify immediate manual-edit-unvalidated, blocked final export and failed
+revalidation. Restore supported text and validate; disable all work and verify
+export remains blocked. Disable supporting evidence or change JD/SearchProfile;
+reassess and confirm the prior artifact stays STALE until newly generated.
+Regenerate with synthetic injected model output; verify prior valid artifact remains.
+Every final format and app print/PDF requires the same server READY check and exact
+visible-content comparison. Inspect print preview: identity header selectable,
+conventional sections, no hidden truncation; page count is measured only by preview,
+not the character heuristic. Native Ctrl+P is labeled draft. Cover letters display
+uncertified draft independently. Confirm final export history records chosen text/IDs.
+
+Phase 5 deterministic provenance contract: verified locally.
+Live Gemini resume-generation acceptance: pending external configuration.
+GEMINI_API_KEY absent; only .env.example present. With a safe server key, run one
+bounded synthetic-only structured generation request. Do not send real private
+career data merely to test connectivity. Whole-statement certification intentionally
+withholds arbitrary paraphrases; add separately reviewed concise evidence to support
+alternate wording. Startup smoke: node --import tsx --test tests/phase-2-runtime.smoke.ts.

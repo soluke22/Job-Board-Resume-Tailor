@@ -5,6 +5,7 @@ import { getDb } from './db/client';
 import * as s from './db/schema';
 import { workspaceInput } from './db/workspaceValidation';
 import { assessmentMetadata, isCurrent, fingerprint } from './assessment';
+import { inspectResume, factualClaims } from './resumeProvenance';
 export { workspaceInput } from './db/workspaceValidation';
 
 export type WorkspaceInput = z.infer<typeof workspaceInput>;
@@ -85,13 +86,17 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       return job;
     });
     output.auditLog = (await rows(tx, s.auditEvents, ownerId)).map(r => r.data);
+    for (const job of output.jobs) if (job.tailoredResume) {
+      job.tailoredResume = inspectResume(job.tailoredResume, output as any, job);
+      if (job.tailoredResume.readiness !== 'READY') delete job.evaluation;
+    }
     return output;
   }
   async function read(ownerId: string) {
     if (!ownerId) throw new WorkspaceValidationError('Owner identity required');
     return database().transaction(tx => snapshot(tx, ownerId), { isolationLevel: 'repeatable read', accessMode: 'read only' });
   }
-  async function save(ownerId: string, raw: unknown, revision: number, importing = false, assessedJobId?: string) {
+  async function save(ownerId: string, raw: unknown, revision: number, importing = false, assessedJobId?: string, resumeJobId?: string) {
     if (!ownerId) throw new WorkspaceValidationError('Owner identity required');
     const parsed = workspaceInput.safeParse(raw);
     if (!parsed.success || !Number.isSafeInteger(revision) || revision < 0) throw new WorkspaceValidationError('Invalid workspace or revision');
@@ -109,7 +114,8 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
         // Preserve ATS verificationStatus: it is not candidate claim approval.
         // Candidate bullets and nested records cannot inherit approved provenance.
         if ('provenanceStatus' in record || ('section' in record && 'underlyingEvidence' in record)) record.provenanceStatus = 'requires-review';
-        if ('id' in record || 'versionId' in record || 'requiresUserReview' in record || 'importProvenance' in record) {
+        const jdRequirement='kind' in record && 'excerpt' in record && 'start' in record && 'end' in record;
+        if (!jdRequirement && ('id' in record || 'versionId' in record || 'requiresUserReview' in record || 'importProvenance' in record)) {
           record.requiresUserReview = true; record.importProvenance = provenance;
         }
         return record;
@@ -132,12 +138,40 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
         const previous = await snapshot(tx, ownerId);
         for (const source of input.jobs) {
           const job = normalize({ ...source });
+          if (job.tailoredResume && job.id !== resumeJobId) {
+            const old=previous.jobs.find((j:any)=>j.id===job.id)?.tailoredResume;
+            const resume=job.tailoredResume as any;
+            const facts=factualClaims(resume);
+            resume.basis=old?.id===resume.id ? old.basis : undefined;
+            resume.claimLedger=(resume.claimLedger || []).map((claim:any)=>{
+              const original=old?.id===resume.id && old.claimLedger?.find((c:any)=>c.claimId===claim.claimId);
+              const fact=facts.find(f=>f.claimId===claim.claimId);
+              if(!importing && original && fact && fact.text===original.text && fact.scopeId===original.scopeId && fact.claimType===original.claimType && fingerprint(claim.supportingEvidenceIds)===fingerprint(original.supportingEvidenceIds) && fingerprint(claim.targetRequirementIds)===fingerprint(original.targetRequirementIds))return original;
+              return {...claim,text:fact?.text || claim.text,textHash:fingerprint(fact?.text || claim.text),sourceKind:'manual',generationMode:'manual',validationStatus:'manual-edit-unvalidated',validatedTextHash:undefined,validatedAt:undefined,issues:['Exact current text requires server validation']};
+            });
+            resume.readiness='NEEDS_VALIDATION';delete job.evaluation;
+          }
           if (job.assessmentStatus === 'ASSESSED' && job.id !== assessedJobId) {
             const old = previous.jobs.find((j:any) => j.id === job.id);
             const assessmentFields = (j:any) => j && Object.fromEntries(['fit','parsed','requirements','evidenceMatches','assessmentMetadata','assessmentFacts','qualificationFit','evidenceCoverage','applicationPriority','priorityReason','primaryRoleFamily','roleModifiers','hardRequirements','preferredRequirements','technologies','responsibilities','hiringSignals','hardBlockers','softGaps'].map(k=>[k,j[k]]));
             if (importing || !old || old.assessmentStatus !== 'ASSESSED' || fingerprint(assessmentFields(old)) !== fingerprint(assessmentFields(job))) job.assessmentStatus = 'STALE';
           }
           const id = job.id as string;
+          const oldVersions=previous.jobs.find((j:any)=>j.id===id)?.versionHistory || [];
+          const protectedVersions=oldVersions.filter((v:any)=>v.resume?.basis?.tailoringAlgorithmVersion);
+          if(protectedVersions.length) {
+            const supplied=(job.versionHistory || []) as any[];
+            for(const original of protectedVersions) {
+              const changed=supplied.find(v=>v.versionId===original.versionId);
+              if(!importing && changed && fingerprint(changed)!==fingerprint(original))throw new WorkspaceValidationError('Certified resume history is immutable');
+            }
+            job.versionHistory=[...protectedVersions,...supplied.filter(v=>!protectedVersions.some((old:any)=>old.versionId===v.versionId))];
+          }
+          if(job.id!==resumeJobId && Array.isArray(job.versionHistory))job.versionHistory=job.versionHistory.map((v:any)=>{
+            if(protectedVersions.some((old:any)=>old.versionId===v.versionId))return v;
+            if(!v.resume?.claimLedger)return v;
+            return {...v,resume:{...v.resume,basis:undefined,readiness:'DRAFT',claimLedger:v.resume.claimLedger.map((c:any)=>({...c,validationStatus:'manual-edit-unvalidated',validatedTextHash:undefined,validatedAt:undefined}))}};
+          });
           for (const [key, table] of Object.entries(attachments)) {
             if (key in job && job[key] != null) {
               if (typeof job[key] !== 'object' || Array.isArray(job[key])) throw new WorkspaceValidationError('Invalid job attachment');
@@ -153,6 +187,7 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
               if (!Array.isArray(job[key])) throw new WorkspaceValidationError('Invalid job history');
               for (const [index, item] of (job[key] as Record<string, unknown>[]).entries()) {
                 if (!item || typeof item !== 'object') throw new WorkspaceValidationError('Invalid history entry');
+                if(key==='versionHistory' && protectedVersions.some((v:any)=>v.versionId===item.versionId))continue;
                 await upsert(tx, table, ownerId, `${id}:${key}:${String(item.versionId ?? index)}`, normalize(item), id);
               }
               if (!importing) {
@@ -177,6 +212,6 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       return snapshot(tx, ownerId);
     });
   }
-  return { read, save, saveAssessment: (ownerId: string, input: unknown, revision: number, jobId:string) => save(ownerId,input,revision,false,jobId), import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
+  return { read, save, saveAssessment: (ownerId: string, input: unknown, revision: number, jobId:string) => save(ownerId,input,revision,false,jobId), saveResume:(ownerId:string,input:unknown,revision:number,jobId:string)=>save(ownerId,input,revision,false,undefined,jobId), import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
 }
 export const workspaceRepository = createWorkspaceRepository();

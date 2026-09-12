@@ -175,7 +175,8 @@ test('actual installed route inventory protects all application, workspace and p
   const { app } = await import('../server');
   const routes = app._router.stack.filter((layer: any) => layer.route).flatMap((layer: any) => Object.keys(layer.route.methods).map(method => ({ method, path: layer.route.path })));
   const privateRoutes = routes.filter((route: any) => route.path.startsWith('/api/') && !route.path.startsWith('/api/auth/') && route.path !== '/api/health');
-  assert.equal(privateRoutes.length, 20); // 14 application APIs + 6 file methods including guarded reconciliation
+  assert.equal(privateRoutes.length, 22); // 16 application APIs including validation/export + 6 guarded file methods
+  assert.ok(privateRoutes.some((route:any)=>route.path==='/api/validate-resume'));
   await serve(app, async url => {
     for (const route of [...privateRoutes, { method: 'post', path: '/api/workspace/data' }, ...['data', 'import', 'export', 'audit-log'].map(path => ({ method: path === 'import' ? 'post' : 'get', path: '/api/workspace/' + path }))]) {
       const response = await fetch(url + route.path.replace(':id', 'synthetic'), { method: route.method.toUpperCase(), headers: { Origin: config.BETTER_AUTH_URL } });

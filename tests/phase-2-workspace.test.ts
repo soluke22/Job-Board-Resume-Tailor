@@ -31,7 +31,10 @@ test('explicit collection/history/application replacement and owner deletion rol
     const attachmentKeys = ['fit', 'tailoringPlan', 'tailoredResume', 'proofPack', 'outreachDrafts', 'recruiterOutreach', 'referralContact'];
     const baseJob = Object.fromEntries(Object.entries(job).filter(([key]) => !attachmentKeys.includes(key)));
     const pruned = await repo.save('owner-a', { jobs: [{ ...baseJob, versionHistory: [job.versionHistory[1]], statusHistory: [job.statusHistory[0]], appliedDate: undefined, applicationAnswers: undefined }] }, 1);
-    for (const key of attachmentKeys) assert.deepEqual(pruned.jobs[0][key], job[key], 'omitted attachments preserve existing owner/job state');
+    for (const key of attachmentKeys.filter(key=>key!=='tailoredResume')) assert.deepEqual(pruned.jobs[0][key], job[key], 'omitted attachments preserve existing owner/job state');
+    const {claimLedger,readiness,readinessIssues,...preservedResume}=pruned.jobs[0].tailoredResume;
+    assert.deepEqual(preservedResume,resume,'legacy resume text and identity survive; new readiness metadata does not certify it');
+    assert.equal(readiness,'STALE');
     assert.deepEqual(pruned.jobs[0].versionHistory.map(v => v.versionId), ['v2']);
     assert.equal(pruned.jobs[0].statusHistory.length, 1);
     assert.equal(pruned.jobs[0].appliedDate, undefined);

@@ -19,6 +19,7 @@ export const CoverLetterPaper: React.FC<CoverLetterPaperProps> = ({
       }}
     >
       {/* Sender Header */}
+      <p className="font-bold text-amber-800">UNCERTIFIED COVER LETTER DRAFT</p>
       <header className="border-b border-slate-300 pb-4 space-y-1">
         <h1 className="text-xl font-bold tracking-tight text-slate-950 uppercase">
           {profile.name}

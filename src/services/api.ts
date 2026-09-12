@@ -93,42 +93,12 @@ export const apiService = {
     return res.json();
   },
 
-  async generatePlan(
-    parsedJob: ParsedJob,
-    fit: FitAssessment,
-    evidenceMatches: RequirementMatch[],
-    sessionAnswers?: Record<string, string>
-  ): Promise<{ plan: TailoringPlan }> {
-    const res = await privateFetch('/api/generate-plan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parsedJob, fit, evidenceMatches, sessionAnswers })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to generate tailoring plan');
-    }
+  async resumeOperation(operation: 'plan' | 'generate' | 'evaluate' | 'validate' | 'regenerate' | 'export', jobId: string, claimId?: string): Promise<any> {
+    const paths={plan:'generate-plan',generate:'generate-resume',evaluate:'evaluate-resume',validate:'validate-resume',regenerate:'regenerate-bullet',export:'export-resume'};
+    const res=await privateFetch(`/api/${paths[operation]}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jobId,...(claimId?{claimId}:{})})});
+    if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error || 'Resume operation failed');}
     return res.json();
   },
-
-  async generateResume(
-    parsedJob: ParsedJob,
-    tailoringPlan: TailoringPlan,
-    candidateProfile: CandidateProfile,
-    masterResume: TailoredResume
-  ): Promise<{ resume: TailoredResume }> {
-    const res = await privateFetch('/api/generate-resume', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parsedJob, tailoringPlan, candidateProfile, masterResume })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to generate resume');
-    }
-    return res.json();
-  },
-
   async generateCoverLetter(
     parsedJob: ParsedJob,
     candidateProfile: CandidateProfile,
@@ -142,40 +112,6 @@ export const apiService = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to generate cover letter');
-    }
-    return res.json();
-  },
-
-  async evaluateResume(
-    resume: TailoredResume,
-    parsedJob: ParsedJob
-  ): Promise<{ evaluation: ResumeEvaluation }> {
-    const res = await privateFetch('/api/evaluate-resume', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resume, parsedJob })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to evaluate resume');
-    }
-    return res.json();
-  },
-
-  async regenerateBullet(
-    targetRequirement: string,
-    underlyingEvidence: string,
-    currentText: string,
-    employerOrProject: string
-  ): Promise<{ bulletText: string; whyThisBullet?: string }> {
-    const res = await privateFetch('/api/regenerate-bullet', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetRequirement, underlyingEvidence, currentText, employerOrProject })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to regenerate bullet');
     }
     return res.json();
   },

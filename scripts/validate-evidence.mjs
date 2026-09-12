@@ -12,7 +12,7 @@ export function validateEvidence(input) {
  const plural = new Set(['evidenceIds','supportingEvidenceIds']);
  function check(id) {
   const e = ids.get(id);
-  if(typeof id !== 'string' || !e || e.verificationStatus !== 'verified' || e.enabled === false ||
+  if(typeof id !== 'string' || !e || e.verificationStatus !== 'verified' || e.enabled !== true || e.requiresUserReview ||
     (input.ownerId !== undefined && e.ownerId !== input.ownerId)) errors.push('Unresolved or unapproved evidence reference');
  }
  function visit(v) {

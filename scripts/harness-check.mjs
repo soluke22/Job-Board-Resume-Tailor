@@ -35,7 +35,7 @@ for(const name of (await readdir('docs')).filter(n=>n.endsWith('.md')).map(n=>'d
 const good = {evidence:[{id:'e1',verificationStatus:'verified',enabled:true,ownerId:'a'}],ownerId:'a',records:[{supportingEvidenceId:'e1'}]};
 assert(validateEvidence(good));
 for(const id of ['missing',null]) assert.throws(()=>validateEvidence({...good,records:[{evidenceIds:[id]}]}));
-for(const changed of [{enabled:false},{verificationStatus:'rejected'},{ownerId:'b'}]) assert.throws(()=>validateEvidence({...good,evidence:[{...good.evidence[0],...changed}]}));
+for(const changed of [{enabled:false},{enabled:undefined},{requiresUserReview:true},{verificationStatus:'rejected'},{ownerId:'b'}]) assert.throws(()=>validateEvidence({...good,evidence:[{...good.evidence[0],...changed}]}));
 assert.throws(()=>validateEvidence({...good,evidence:[...good.evidence,...good.evidence]}));
 const scratch = await mkdtemp(resolve(tmpdir(), 'careeros-harness-'));
 try {

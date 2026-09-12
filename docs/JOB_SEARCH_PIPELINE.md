@@ -212,8 +212,21 @@ JD != evidence; classification != fit; fit != application priority;
 preference != blocker; adjacency != direct experience;
 model semantic judgment != final arithmetic.
 
-## Target State — later phases
-Phase 5 handles resume provenance, tailoring and manual validation after screening.
+## Resume tailoring — Phase 5
+Tailoring requires current persisted Phase 4 assessment fingerprints and matched
+eligible owner evidence. SKIP/hard blockers are excluded; calibrated stretches
+remain eligible without an 8.0 score gate. Deterministic plans use requirement and
+evidence IDs for keep/omit decisions, project selection and supported skill labels.
+Master content supplies presentation/identity, never independent truth. Structured
+Gemini output may select/reorder complete approved evidence statements, with scope,
+IDs and exact text validated server-side before readiness. No free JD skill backfill.
+
+Manual edits invalidate exact-text approval; explicit checkpoints/revalidation and
+persisted-envelope regeneration preserve history. Artifact readiness and shared
+final export respond to changed JD/evidence/profile/master basis. Print page fit is
+an estimate requiring browser preview. See [EVIDENCE_MODEL.md](EVIDENCE_MODEL.md)
+for the conservative complete-statement validation contract and live limitations.
+Phase 6 proof packs/outreach/application answers are not certified by this phase.
 
 ## Validation
 Synthetic contracts and manual smoke instructions: [TESTING.md](TESTING.md).
