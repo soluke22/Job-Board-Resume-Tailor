@@ -259,6 +259,13 @@ shared provenance/index types; API/AppContext, editor/evidence/history/export/pr
 views and CSS; Phase 5 tests, auth/storage expectation updates and domain docs.
 
 ## Last Known Good Commit
+Phase 8 implementation 743091ea149abe155759d904fa2f861b4d939a20, published by normal
+fast-forward; fresh fetch verified clean dev == origin/dev at that checkpoint.
+Fresh committed-source archive (no .env, node_modules or untracked files) independently
+passed Node 24 npm ci, typecheck, full 105/105 tests, build and runtime client scan.
+Phase 8 remains PARTIAL for stated platform gates; docs-only publication checkpoint
+follows without embedding its own hash. Earlier Phase 7 publication below is history.
+
 Phase 7 implementation 46f5fa2d5c2f18d0f92229682136005fa40fbc56, published to
 origin/dev by normal fast-forward and freshly verified clean/equal refs.
 All local completion gates pass; authenticated/deployed/live Neon and earlier
@@ -502,3 +509,14 @@ plan's four Windows-encoded em dashes normalized to UTF-8 without content loss.
 No main/PR/Studio/production/Phase 9/resource mutation. Scoped commit/push follows.
 Resolve the stated Phase 8 platform acceptance first; next separately authorized
 phase: **Phase 9 — Security/privacy/release audit.**
+
+## Phase 8 publication and clean-source reproduction (2026-09-13)
+
+Implementation 743091e published normally from bec000b; fresh fetch verified clean
+dev == origin/dev == 743091ea149abe155759d904fa2f861b4d939a20. Fresh Git archive
+in a temporary checkout independently ran Node 24.19.0 npm ci, typecheck, all
+105/105 tests, build and runtime scan with no .env/untracked files/global Bun.
+Same hashed assets and client total 706107 bytes reproduced; six moderate npm
+advisories and >500 kB warning unchanged. No actual Vercel CLI/live runtime/provider
+acceptance inferred. Final docs-only checkpoint records reproduction/publication;
+harness/diff checks and normal dev push follow. No main/PR/Studio/production/Phase 9.
