@@ -1,0 +1,31 @@
+{
+  "scope": "Exact historical blob/path dispositions; never a current-source contact allowlist",
+  "confirmedAt": "2026-09-13",
+  "confirmation": "Owner confirmed one shared real, current professional/job-search email deliberately published on resumes. It is not a secret or private-workspace-only data. No rotation or history rewrite required for this value.",
+  "markers": [
+    {
+      "id": "historical-marker-1",
+      "object": "49e933f530046cfa01c42f2cb44bdc373f57c884",
+      "path": "server.ts",
+      "classification": "B",
+      "disposition": "INTENDED PUBLIC DATA",
+      "ownerConfirmed": true
+    },
+    {
+      "id": "historical-marker-2",
+      "object": "702c6bddb5f46b3a99c41dad2bfb0a7725ac8dfd",
+      "path": "src/components/AuthModal.tsx",
+      "classification": "B",
+      "disposition": "INTENDED PUBLIC DATA",
+      "ownerConfirmed": true
+    },
+    {
+      "id": "historical-marker-3",
+      "object": "533c45eca4f0d9d90320e2cb515f5a24a0b62d90",
+      "path": "src/data/privateSeedTemplate.ts",
+      "classification": "B",
+      "disposition": "INTENDED PUBLIC DATA",
+      "ownerConfirmed": true
+    }
+  ]
+}
