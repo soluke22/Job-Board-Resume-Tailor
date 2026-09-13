@@ -94,21 +94,40 @@ atomic. Exported owner JSON contains private PII and is not encrypted.
 Provider usage is durable owner/category/hour/day data without prompts/content.
 Each Gemini invocation (including proof batches) requires atomic reservation:
 60/hour and 200/day. External fetch/discovery and private Blob read/mutation
-operations allow120/hour and 500/day per category. DB outage/limit denial fails
+operations allow 120/hour and 500/day per category. DB outage/limit denial fails
 closed; failed calls retain usage; limits bound counts, not dollars/tokens.
 Fixed-window boundary bursts are possible; provider billing caps/alerts remain
 later operational acceptance. All Gemini requests use 30-second timeouts.
 
-Unused legacy gap generation returns410; it cannot send arbitrary client evidence.
+Unused legacy gap generation returns 410; it cannot send arbitrary client evidence.
 Assessment/resume/regeneration exclude detected sensitive candidate context before
 Gemini; a sensitive edited claim is rejected even with a safe evidence envelope.
-Core assessment version phase 4.1-v3 makes prior cached bases stale without changing
+Core assessment version phase4.1-v3 makes prior cached bases stale without changing
 scoring coefficients. Shared lexical privacy triage is conservative, not exhaustive
 semantic classification; ordinary concurrency/medical-software/booking domain
 phrases have tested exceptions. Owner should supply concise, non-sensitive evidence.
 
-Current strict source/client triage is zero findings. Reachable Git history still
-has personal-contact markers in former auth defaults/private seed; authenticity
-and exposure disposition are UNVERIFIED. No private literal is repeated in audit
-artifacts. Release cannot claim history free of real PII; see Phase 9 matrix.
-Historical remediation/rotation is not automatic, and main remains untouched.
+Current strict source/client triage is zero findings. Phase 9 initially left
+former auth/seed history contact provenance unverified; Phase 9.1 resolves it
+through explicit owner confirmation as INTENDED PUBLIC DATA. No historical
+value is repeated in audit artifacts. This is a narrow accepted disposition,
+not a claim that all history is free of personal data. No rotation or rewrite
+required for this value; main remains untouched.
+
+## Owner-confirmed intentional public professional contact (Phase 9.1)
+
+An owner may explicitly confirm deliberate publication of professional contact
+information. This is INTENDED PUBLIC DATA for the specifically reviewed value;
+public Git visibility, seed placement and an email domain do not establish intent.
+The owner confirmed the shared historical email in the three former auth/seed
+blobs was real/current professional/job-search contact deliberately published on
+resumes, not synthetic, secret or private-workspace-only data. No rotation or
+history rewrite is required for this value. See Phase 9.1 disposition/trace in
+phase-9-acceptance.md; no value is repeated in repository audit artifacts.
+
+This resolves the prior historical-contact uncertainty. Current release defaults
+remain blank, auth allowlist remains server-only and private career workspace
+records remain private. This narrow accepted historical disposition never permits
+other contact publication or reintroducing hardcoded auth/seed data. Reproducible
+privacy:history keeps accepted findings visible, defaults unknown records to
+NEEDS_USER_CONFIRMATION and independently rejects current marker propagation.

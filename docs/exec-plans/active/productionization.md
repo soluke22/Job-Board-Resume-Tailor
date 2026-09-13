@@ -10,14 +10,30 @@ Authorized coherent Phase 9 checkpoints and normal fast-forward origin/dev push.
 No Phase 10/main/PR/Studio/Vercel deployment/remote migration.
 
 ## Current Phase / Scope and Acceptance
-Phase 9 — Security/privacy/release audit.
+Phase 9.1 — historical marker provenance/disposition follow-up.
+Baseline clean dev == freshly fetched origin/dev == df4edc9. Narrow scope: trace
+three historical blobs safely, establish exposure, obtain owner classification,
+record disposition and verify current builds. No repeated full security audit.
+Acceptance: no raw historical values printed/persisted; exact trace and owner
+confirmation; no current marker occurrences; relevant scans/full release green;
+normal dev checkpoint/push. No Phase 10/main/Studio/Vercel/history rewrite.
 [Phase 9 matrix](phase-9-acceptance.md) records threat model, controls, findings,
 adversarial evidence, dependencies and release checklist. Parent owns writes;
 requested GPT-5.6 Sol High reviewer read-only.
 
 ## Current Status
-**PARTIAL — deterministic code/security audit completed; historical contact/seed
-provenance and exposure disposition UNVERIFIED. Phase 10 readiness: NO.**
+**PASS — Phase 9.1 resolves the sole remaining historical provenance/disposition
+question. Phase 9 PASS; Phase 10 code readiness YES, not begun.**
+Owner explicitly confirms the one shared real/current professional/job-search
+email was deliberately published on resumes, not synthetic, a credential or
+private-workspace-only data. All three marker blobs are classification B /
+INTENDED PUBLIC DATA. No rotation or history rewrite required for this value.
+First containing commit 18bde7f; last dev containing snapshot b12fd5b; removed
+in 41a04f8. Public origin/main and origin/dev contain introduction ancestry;
+main tip still retains intentional public contact. No other fetched branches/tags.
+Reproducible safe scan: 27 commits/395 text blobs, three marker blobs, one value,
+five occurrences/three paths; no current dev/client/server-build occurrences.
+Final Phase 9.1 release validation/publication recorded below.
 Concrete moderate gaps remediated: legacy gap client payload, unbounded provider
 volume, deeply nested persistent metadata and sensitive candidate/edited-claim
 model leakage. No demonstrated auth/CSRF/IDOR/SSRF/file bypass remains in bounded
@@ -30,9 +46,9 @@ and synthetic evidence validators pass. Final publication recorded below.
 Dependency audit: baseline 6 moderate ->4 moderate, zero high/critical. qs6.16
 override fixes runtime chain; four old Drizzle/esbuild loader-chain entries are
 explicitly accepted because vulnerable serve API is not invoked. npm ci/tree pass.
-History triage 341 text blobs found contact-marker objects in former seed/auth
-files reachable through main. Current zero findings does not certify historical
-PII; no values copied, no main/history rewrite/rotation. Resolve before Phase 10.
+Initial history triage found three former seed/auth marker objects. Phase 9.1
+resolves their provenance through owner confirmation and safe commit trace; no
+values copied, no main/history rewrite/rotation. Intent applies only to this value.
 Actual Vercel/Google OAuth/browser/Neon/Private Blob/Gemini remain
 PENDING_EXTERNAL_CONFIG, carried from Phase 8 deferral and not Phase 9 defects.
 
@@ -71,8 +87,8 @@ both evidence validators, built startup smoke and diff check pass. Publication
 recorded in the checkpoint below; plan encoding normalized from four legacy dash bytes.
 
 ## Next Exact Step
-Resolve historical contact/seed provenance and exposure disposition before release.
-Next phase after that prerequisite and separate authorization:
+Historical contact/seed disposition resolved by owner in Phase 9.1.
+Next phase after separate authorization:
 **Phase 10 — dev → main pull request and merge readiness.**
 Do not begin Phase 10 in this task. Phase 8 external gates remain deferred; no
 main/PR/Studio/Vercel deployment/remote resource action authorized here.
@@ -573,7 +589,7 @@ after history disposition and new authorization; not begun.
 Implementation/audit ad08f97dd818cfda7a68a4358bdb0d8a549ce62c published normally
 from b98a2a8. Fresh fetch verified clean dev == origin/dev == ad08f97; main and
 origin/main remain18bde7f. Final staged current-source privacy/runtime scan and
-startup smoke passed. All113/113 tests and complete release composition passed;
+startup smoke passed. All 113/113 tests and complete release composition passed;
 four accepted moderate tooling-chain audit entries remain. Historical contact/
 seed provenance remains UNVERIFIED; Phase9 PARTIAL, Phase10 readiness NO.
 This docs-only publication record is checked and normally pushed next; its own
@@ -581,3 +597,29 @@ hash is verified in final report rather than embedded. No main/PR/Studio/Vercel
 resource action/remote migration/Phase10. Next exact phase after history
 privacy disposition and separate authorization: Phase10 — dev → main pull
 request and merge readiness.
+
+## Phase 9.1 completed provenance/disposition (2026-09-13)
+Baseline df4edc9 recovered clean and equal to fresh origin/dev. Trace covers 27
+commits/all 395 reachable textual blobs, including 5 legacy Windows-encoded text
+objects; no binary media. Three flagged blobs are one email, five occurrences in
+server owner defaults/legacy identity, browser login default and candidate/resume
+seed. First18bde7f (Sep 11 initialization), last containing dev snapshot b12fd5b
+(Sep 12 harness), cleared from dev in 41a04f8. Introduction predates privacy-boundary
+1a620d6 and harness. Published origin/main/dev expose its ancestry; no other
+fetched remote branches/tags. Main unchanged and still contains intended public
+contact at its introducing tip. No additional historical propagation found.
+Owner confirms real/current professional/job-search email deliberately published
+on resumes, not synthetic, credential or private-workspace-only. All markers B /
+INTENDED PUBLIC DATA. No rotation/history rewrite required for this value.
+Exact blob/path confirmation registry contains no values/digests. New read-only
+privacy:history emits neutral IDs/metadata, skips reserved fictional domains,
+retains accepted findings and independently denies current reintroduction.
+Current dev/defaults/tests/docs/client/server build marker occurrences zero;
+strict privacy and runtime client scan pass. Relevant scanner regression 1/1;
+full Node24 release composition passes 114/114, typecheck/build/harness/strict
+privacy zero/runtime check. Final staged scan/diff and normal dev publication
+follow; final SHA reported after fresh equality/clean verification.
+Phase 9.1 PASS; Phase 9 final PASS; Phase 10 code readiness YES, not begun.
+Live Vercel/OAuth/browser/Neon/Blob/Gemini PENDING_EXTERNAL_CONFIG unchanged.
+No raw historical values printed/persisted; no main/PR/Studio/Vercel/remote
+migration/rotation/history rewrite. Stop after checkpoint publication.

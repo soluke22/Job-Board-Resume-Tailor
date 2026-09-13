@@ -16,7 +16,8 @@
     "harness:check": "node scripts/harness-check.mjs",
     "privacy:scan": "node scripts/privacy-scan.mjs",
     "runtime:check": "node scripts/runtime-check.mjs",
-    "release:check": "node scripts/release-check.mjs"
+    "release:check": "node scripts/release-check.mjs",
+    "privacy:history": "node scripts/history-privacy-scan.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

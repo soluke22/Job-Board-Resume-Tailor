@@ -5,7 +5,7 @@ Scope: actual security boundaries and main-to-dev release diff; parent owns fixe
 No Phase 10, main writes, PR, Studio, Vercel deployment or remote migrations.
 Phase 8 deferred platform acceptance is not a Phase 9 defect.
 
-Status: PARTIAL — deterministic code audit completed; historical contact provenance/disposition remains UNVERIFIED. Phase 10 readiness: NO. Phase 8 external gates are separate deferred acceptance, not defects.
+Status: PASS — Phase 9.1 owner-confirmed historical disposition resolves the sole remaining Phase 9 blocker. Phase 10 code readiness: YES; separate authorization required. Phase 8 external gates remain deferred and are not defects.
 
 ## Threat model
 
@@ -27,7 +27,7 @@ Boundaries: browser to Express; Google to Better Auth; Express to Neon, private 
 | cookies | HttpOnly/Lax/host-only; Secure for HTTPS; one day/hour renewal | Forged cookie and external callbacks | Phase 1 installed Better Auth options/cookie tests | PASS | Deployed browser acceptance external | Full suite |
 | public/private isolation | Blank private state; distinct synthetic demo; private memory only | Switch/logout/expiry/restore failure and delayed responses | Phase 1 client transport/storage lifecycle tests; AppContext review | PASS | Rendered authenticated browser remains external | Full suite |
 | cache behavior | private/no-store, Pragma no-cache, Vary Cookie on private/auth APIs | Errors before parser guard, exports/downloads/generation | Phase 1/2/8 HTTP and new Phase 9 malformed JSON test | PASS | Moved private response headers before global parser | Full suite |
-| secrets | Server-only environment; ignored local files; scanner paths/rules only | Current source/build and reachable historical blobs | Current strict scan zero; 341 historical text blobs: three personal-contact markers, no tested strong key markers | UNVERIFIED | Confirm historical contact/seed provenance and release disposition; no rewrite/rotation authorized | Owner disposition needed |
+| secrets | Server-only environment; ignored local files; value-safe scans | Current/build leakage and historical provenance | Phase 9.1 reproducible scan: three email-marker blobs, one value; owner confirms intentionally public professional contact; current hits zero | PASS | INTENDED PUBLIC DATA; no credential rotation/history rewrite for this value; defaults stay blank | History/current/release checks |
 | browser bundle leakage | Vite client imports exclude server; environment marker/value runtime scan | Fresh bundle and source maps | Fresh runtime:check; three hashed client files; no source maps emitted | PASS | runtime:check added to release composition | Full release |
 | database ownership | Every private select/update/delete/upsert qualifies server owner; transactional revision fences | Same-ID cross-owner, rollback and stale revisions | Phase 2/4/5/6/7 SQL/handler tests and repository query review | PASS | Provider counters owner-keyed; no workspace contents in counters | Full suite |
 | file ownership | Owner metadata lookup; generated UUID/private path; no permanent URL/path response | Foreign file download/delete/list; path/base64/type tricks | Phase 2 files + auth-security + Phase 8 streaming tests | PASS | Downloads and mutations consume durable budget | Full suite |
@@ -59,7 +59,7 @@ Boundaries: browser to Express; Google to Better Auth; Express to Neon, private 
 | F3 MODERATE | Owner/import writes nested loose metadata; baseline depth3000 (~33 KB) persisted then fingerprint threw RangeError, disabling generation | Iterative guard before schemas/transactions; depth64, 100000 nodes, prototype-shaped keys denied; JSON uploads also checked. Phase 9 tests preserve prior snapshot atomically | Resolved for new writes. Existing malformed legacy records require explicit reviewed repair; no destructive cleanup |
 | F4 MODERATE | Approved evidence may contain medical/private context; edited claim with safe evidence envelope sent bipolar disclosure before final422 | Candidate-context exclusion before assessment/resume/regeneration model calls, including claim text; identifiers redacted; Phase 9 payload spy and Phase 5 edited-claim regression | Resolved demonstrated paths. Lexical triage is conservative and not semantic DLP. Race-condition and medical-software/booking domain exceptions preserve demonstrated ordinary work. Owner should provide concise evidence without sensitive disclosures |
 | F5 LOW | Malformed JSON errors happened before owner guard/no-store; static hosting bypasses Express headers | Private headers before parser; Vercel nosniff/no-referrer/frame deny rules; Phase 9 malformed HTTP regression | Local cache fix verified; deployed static headers remain external. SPA enforcing CSP deferred until rendered deployment compatibility can be tested; React19 escaping/URL sanitation and no raw HTML mitigate demonstrated frontend injection surfaces |
-| F6 INFO / UNVERIFIED | Reachable Git history contains personal-contact literals in former private seed and auth defaults | Safe history triage of 341 text blobs identifies three object/path markers; no contents copied into report. Current source/build zero findings | NOT dispositioned as synthetic. Release cannot claim history free of real PII. Authenticity/provenance and exposure/remediation decision required before Phase 10. No history rewrite, main edit or automatic rotation |
+| F6 INFO / RESOLVED | Reachable history contains one professional email in three blobs | Phase 9.1 owner confirmation plus exact commit-tree/value propagation trace | Classification B; INTENDED PUBLIC DATA. Real/current and deliberately published on resumes; not synthetic, credential or private-workspace-only. No rotation/history rewrite required for this value; current defaults remain blank |
 
 Reviewer: requested GPT-5.6 Sol High read-only security-reviewer. Baseline gap,
 metadata persistence/fingerprint, repeated provider use and later edited-claim
@@ -139,7 +139,7 @@ Compared main18bde7f to baseline devb98a2a8 without merging: 139 changed files,
 Drizzle snapshots. Largest tracked file is package-lock (~153KB); no unexpected
 large binaries/build/private artifacts. New dependencies and all auth/workspace/
 file/external-call boundaries reviewed; legacy bearer/query/email auth removed.
-Initial schema creates owner-qualified tables;0001 adds optional scalars;0002 adds
+Initial schema creates owner-qualified tables; 0001 adds optional scalars; 0002 adds
 upload intents; new0003 adds only provider_usage + owner FK/composite key.
 No destructive SQL/drop/owner weakening. New budget data is not exported as career
 workspace data. Existing application snapshots/history remain immutable under
@@ -154,7 +154,7 @@ Never delete/recreate production records as recovery. Live Neon multiple connect
 transport/locks and remote migration acceptance remain external.
 
 Recovery: unavailable DB denies private/provider reservations with explicit retry;
-logout failure clears local view and requires server retry;409 preserves local
+logout failure clears local view and requires server retry; 409 preserves local
 edits until explicit reload; Blob intents/tombstones survive and reconcile protects
 saved metadata; partial stream destroys transport without appended JSON. Retain
 historical data; no automatic audit/history purge or tombstone deletion policy added.
@@ -169,7 +169,7 @@ tests; no Studio/PR/main merge/Vercel deployment/remote migration performed.
 
 ## Phase 10 release-candidate checklist
 
-- Resolve historical contact/seed provenance and release exposure disposition; current zero findings does not certify history.
+- Historical contact provenance/disposition completed in Phase 9.1: INTENDED PUBLIC DATA. Maintain current default/bundle absence; do not infer intent for other contacts.
 - Confirm current dev equals fresh origin/dev and tree is clean; review final main-to-dev diff.
 - Require no unresolved critical/high demonstrated defect and explicit moderate/advisory dispositions.
 - Require Node24 npm ci/tree, complete release composition, migrations and startup smoke; rerun registry advisory audit near PR.
@@ -182,26 +182,109 @@ Node24.19.0/npm11.12.1. npm ci with lifecycle scripts succeeded after targeted l
 update; npm ls --all succeeded. npm normalized existing optional bundled Tailwind
 WASM child metadata in the lock; no Tailwind or other parent package version changed.
 Full release:check passes typecheck, fresh build, harness,113/113 tests, strict
-required-build privacy zero and runtime:check. Phase 9 contributes7 adversarial
-tests; Phase 5 adds sensitive-edited-claim rejection; Phase 2 extends upgrade to0003.
-Focused Phase 2/5/9 before final scanner fixture24/24; final full suite includes it.
+required-build privacy zero and runtime:check. Phase 9 contributes 7 adversarial
+tests; Phase 5 adds sensitive-edited-claim rejection; Phase 2 extends upgrade to 0003.
+Focused Phase 2/5/9 before final scanner fixture 24/24; final full suite includes it.
 Startup smoke1/1, migration fresh/upgrade preservation and db:generate no drift,
 both synthetic evidence validators and diff whitespace checks pass. Client3 files,
 706087 bytes; JS639.39kB existing chunk warning. No source maps emitted.
 
 Green current-source gates support deterministic code readiness only. Overall
-Phase 9 remains PARTIAL and Phase 10 readiness NO because historical contact/seed
-provenance/exposure is unresolved. Phase 8 deferred live gates are not this blocker.
+Phase 9 is PASS after Phase 9.1 owner confirmation; Phase 10 code readiness YES.
+Phase 8 live gates remain deferred and separate.
 Next phase: **Phase 10 — dev → main pull request and merge readiness.**
-Resolve the historical privacy prerequisite and obtain separate Phase 10
+Historical privacy prerequisite is resolved. Obtain separate Phase 10
 authorization first; do not open a PR or merge in this task.
 
 Safe historical marker locations (blob IDs, not secret values):
-server.ts blob49e933f lines28/612; AuthModal.tsx blob702c6bd line18;
-privateSeedTemplate.ts blob533c45e lines17/113. These are historical blobs, not
+server.ts blob 49e933f lines 28/612; AuthModal.tsx blob 702c6bd line18;
+privateSeedTemplate.ts blob 533c45e lines 17/113. These are historical blobs, not
 current source line references. Confirm provenance before claiming synthetic data.
 
 Publication: implementation/audit ad08f97 published by normal fast-forward;
 fresh fetch verified clean dev == origin/dev at that commit, main unchanged.
 Documentation publication checkpoint follows without embedding its own hash.
-Overall PARTIAL / Phase10 NO remains; historical privacy disposition unresolved.
+Historical Phase 9 checkpoint was PARTIAL / Phase 10 NO; superseded by Phase 9.1 below.
+
+## Phase 9.1 — historical marker provenance and accepted disposition
+
+Baseline: clean dev == freshly fetched origin/dev == df4edc9, public repository
+visibility verified through GitHub CLI on 2026-09-13. Scope only the three former
+marker objects, their propagation/ref exposure and current-source/build absence;
+no repeated Phase 9 audit or Phase 10 work. Historical values stayed in scanner
+memory. No raw email/phone/address/name tied to contact or secret printed/persisted.
+
+**Phase 9.1 PASS. Phase 9 final PASS. Phase 10 code readiness YES; not started.**
+Owner confirmation 2026-09-13 is authoritative evidence of deliberate publication:
+the one shared email-like value is real/current professional/job-search contact,
+deliberately published on resumes, not synthetic, secret or private-workspace-only.
+Owner explicitly directs INTENDED PUBLIC DATA; no credential rotation or Git
+history rewrite required for this value. This resolves the former F6 uncertainty;
+older PARTIAL/UNVERIFIED statements in historical Phase 9 audit notes are superseded.
+
+| Marker | Type / occurrences | Blob / historical location | First containing commit | Last containing dev snapshot | Introduction / propagation | Classification / evidence | Disposition / exposure |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| historical-marker-1 | Email identifier; 2 occurrences |49e933f530046cfa01c42f2cb44bdc373f57c884; server.ts lines 28/612 |18bde7f451e4e5f39e303f82a0507a30233cd35e; 2026-09-11 09: 59 EDT |b12fd5b5fa4bc42d1889633d77237e5a8c31411c; 2026-09-12 09: 07 EDT | Server owner default and legacy identity check; same value in candidate/resume seed and login default | B: intentionally public professional contact, confirmed by owner | INTENDED PUBLIC DATA; public-history exposure YES |
+| historical-marker-2 | Email identifier; 1 occurrence |702c6bddb5f46b3a99c41dad2bfb0a7725ac8dfd; src/components/AuthModal.tsx line18 |18bde7f451e4e5f39e303f82a0507a30233cd35e |b12fd5b5fa4bc42d1889633d77237e5a8c31411c | Browser login default; same value as markers 1/3 | B, same owner confirmation | INTENDED PUBLIC DATA; public-history exposure YES |
+| historical-marker-3 | Email identifier; 2 occurrences |533c45eca4f0d9d90320e2cb515f5a24a0b62d90; src/data/privateSeedTemplate.ts lines 17/113 |18bde7f451e4e5f39e303f82a0507a30233cd35e |b12fd5b5fa4bc42d1889633d77237e5a8c31411c | Candidate/resume contact seed; seed label alone did not establish synthetic provenance | B, same owner confirmation | INTENDED PUBLIC DATA; public-history exposure YES |
+
+Three flagged objects are one unique email value, five occurrences, three paths.
+Introduction commit message: feat: initialize resume tailoring application.
+Other containing commits: 1a620d67a97142d468f3cace5ed90a308aa5a811
+(Implement Phase 1) and b12fd5b (build codex productionization harness).
+Removed from dev in 41a04f884f6caf2154d828d12f66831130d0a5f3
+(checkpoint inherited private workspace application work). Introduction predates
+the first privacy-boundary commit 1a620d6 and productionization harness b12fd5b.
+No additional propagation into committed tests/docs/demo/export/build artifacts
+found across reachable snapshots. No committed screenshots/binary media found;
+All reachable blob objects decode as text; no committed rendered private artifacts.
+Exact byte propagation also checked across all 395 reachable blob objects;
+reproducible textual triage covers all 395 and reserved non-routable example/test
+email matches are skipped. No historical OCR, deleted remote refs/forks/caches,
+dangling objects or comprehensive DLP coverage claimed.
+
+Reachable published refs for each introduction: origin/main, origin/dev, origin/HEAD
+(main alias), plus local main/dev. No other fetched remote branches or tags.
+Last containing dev snapshot b12fd5b is ancestor of origin/dev only; main remains
+at introducing18bde7f with intentional public contact in its current tree. Deleting
+it from dev did not remove exposure from history. Owner confirmation establishes
+intent; repository visibility/seed location alone could not establish it.
+
+Credential review: these occurrences populate email identity/contact fields and
+comparisons, not passwords, API/OAuth/DB/Blob/Gemini keys, bearer/session tokens
+or private keys. Owner explicitly confirms not a credential. New triage finds
+no other strong secret-shaped records within its documented rules; unknown
+formats remain outside bounded coverage. No secret exposure/rotation indicated.
+
+Reproducible command: npm run privacy:history -- --strict --require-build. Script outputs
+neutral marker IDs/value groups and path/blob/first-last commit/ref metadata only.
+SHA 256 is used internally for equality; guessable contact hashes/masks are not
+published. Exact blob/path owner-confirmed dispositions are stored in
+phase-9-history-dispositions.json. Findings remain visible; this is not an email
+allowlist for current source or new historical objects. New/unreviewed findings
+remain E / NEEDS_USER_CONFIRMATION. Reserved example/invalid/test domains are
+skipped, never arbitrary personal provider domains or merely demo-labeled records.
+Current occurrence fails even when its historical blob is accepted.
+
+Current dev tracked files/defaults/tests/docs, dist/client and dist/server.mjs:
+zero exact marker occurrences. Current privacy/secret and client runtime scans
+also pass. Blank private defaults and explicit synthetic demo remain intact;
+professional-public disposition does not authorize new auth/seed hardcoding or
+runtime private workspace disclosure. No contact value or digest added to docs/tests.
+
+Remediation required for these markers: NONE. Maintain current blank/server-only
+architecture; no rotation/history rewrite/force push/tag deletion/main edit.
+Live Vercel/Google OAuth/browser/Neon/Blob/Gemini remain PENDING_EXTERNAL_CONFIG,
+carried forward separately from Phase 9 code/release readiness. No Phase 10 begun.
+Final validation/publication recorded in the active plan and task report.
+
+### Phase 9.1 final relevant validation
+
+Node24.19.0 release:check exit 0:114/114 tests, typecheck/build/harness,
+strict required-build privacy zero and runtime client scan. Scanner-specific
+synthetic introduction/clear/disposition/current-reintroduction regression 1/1
+passes; raw values never appear in output. Legacy text fallback and generic
+failure handling checked in final scanner; strict accepted-history scan passes
+with three B findings and zero current hits. Source/client/server default-marker
+absence remains verified. Staged checks/publication are verified before final
+report. No dependency update or new broad security/provider audit performed.
