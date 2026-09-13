@@ -1,3 +1,4 @@
+import { computeOutcomeAnalytics } from '../utils/outcomeAnalytics';
 import {
   CandidateProfile,
   EvidenceItem,
@@ -18,8 +19,7 @@ import {
   DEMO_SKILLS,
   DEMO_MASTER_RESUME,
   DEMO_JOBS,
-  DEMO_SEARCH_PROFILE,
-  DEMO_OUTCOME_ANALYTICS
+  DEMO_SEARCH_PROFILE
 } from '../data/syntheticDemoData';
 import {
   DEFAULT_PRIVATE_PROFILE,
@@ -224,92 +224,7 @@ export const storageService = {
 
   // Analytics
   getAnalytics(mode?: WorkspaceMode): OutcomeAnalytics {
-    const currentMode = mode || this.getWorkspaceMode();
-    if (currentMode === 'PUBLIC_DEMO') {
-      return DEMO_OUTCOME_ANALYTICS;
-    }
-
-    // Compute dynamically from private jobs
-    const jobs = this.getJobs('PRIVATE_WORKSPACE');
-    const applied = jobs.filter((j) =>
-      ['APPLIED', 'RECRUITER_SCREEN', 'HIRING_MANAGER', 'TECHNICAL', 'FINAL_ONSITE', 'OFFER', 'REJECTED'].includes(
-        j.applicationStatus
-      )
-    );
-    const screens = jobs.filter((j) =>
-      ['RECRUITER_SCREEN', 'HIRING_MANAGER', 'TECHNICAL', 'FINAL_ONSITE', 'OFFER'].includes(j.applicationStatus)
-    );
-    const technical = jobs.filter((j) =>
-      ['TECHNICAL', 'FINAL_ONSITE', 'OFFER'].includes(j.applicationStatus)
-    );
-    const finals = jobs.filter((j) =>
-      ['FINAL_ONSITE', 'OFFER'].includes(j.applicationStatus)
-    );
-    const offers = jobs.filter((j) => j.applicationStatus === 'OFFER');
-    const rejections = jobs.filter((j) => j.applicationStatus === 'REJECTED');
-
-    const conversionByFamily: Record<string, { total: number; interviews: number; rate: number }> = {};
-    const conversionByModifier: Record<string, { total: number; interviews: number; rate: number }> = {};
-    const conversionByChannel: Record<string, { total: number; interviews: number; rate: number }> = {};
-    const conversionByFitBand: Record<string, { total: number; interviews: number; rate: number }> = {};
-    const conversionByFreshness: Record<string, { total: number; interviews: number; rate: number }> = {};
-
-    applied.forEach((j) => {
-      const family = j.primaryRoleFamily || 'unclassified';
-      const hasInterview = ['RECRUITER_SCREEN', 'HIRING_MANAGER', 'TECHNICAL', 'FINAL_ONSITE', 'OFFER'].includes(
-        j.applicationStatus
-      );
-
-      // By Family
-      if (!conversionByFamily[family]) {
-        conversionByFamily[family] = { total: 0, interviews: 0, rate: 0 };
-      }
-      conversionByFamily[family].total += 1;
-      if (hasInterview) conversionByFamily[family].interviews += 1;
-      conversionByFamily[family].rate =
-        conversionByFamily[family].total > 0
-          ? Number((conversionByFamily[family].interviews / conversionByFamily[family].total).toFixed(2))
-          : 0;
-
-      // By Channel
-      const channel = j.sourceChannel || 'Direct';
-      if (!conversionByChannel[channel]) {
-        conversionByChannel[channel] = { total: 0, interviews: 0, rate: 0 };
-      }
-      conversionByChannel[channel].total += 1;
-      if (hasInterview) conversionByChannel[channel].interviews += 1;
-      conversionByChannel[channel].rate =
-        conversionByChannel[channel].total > 0
-          ? Number((conversionByChannel[channel].interviews / conversionByChannel[channel].total).toFixed(2))
-          : 0;
-
-      // By Fit Band
-      const fitBand = j.assessmentStatus === 'STALE' ? 'STALE' : j.qualificationFit === undefined ? 'UNASSESSED' : j.applicationPriority;
-      if (!conversionByFitBand[fitBand]) {
-        conversionByFitBand[fitBand] = { total: 0, interviews: 0, rate: 0 };
-      }
-      conversionByFitBand[fitBand].total += 1;
-      if (hasInterview) conversionByFitBand[fitBand].interviews += 1;
-      conversionByFitBand[fitBand].rate =
-        conversionByFitBand[fitBand].total > 0
-          ? Number((conversionByFitBand[fitBand].interviews / conversionByFitBand[fitBand].total).toFixed(2))
-          : 0;
-    });
-
-    return {
-      totalApplications: applied.length,
-      totalScreens: screens.length,
-      totalTechnicalInterviews: technical.length,
-      totalFinalInterviews: finals.length,
-      totalOffers: offers.length,
-      totalRejections: rejections.length,
-      conversionByFamily,
-      conversionByModifier,
-      conversionByChannel,
-      conversionByFitBand,
-      conversionByFreshness,
-      smallSampleWarning: applied.length < 15
-    };
+    return computeOutcomeAnalytics(this.getJobs(mode || this.getWorkspaceMode()));
   },
 
   // Audit Logging

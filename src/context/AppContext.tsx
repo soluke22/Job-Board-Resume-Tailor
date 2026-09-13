@@ -1,3 +1,4 @@
+import { effectiveEvents, normalizeHistory, transitionRequestSchema, type TransitionRequest } from '../types/application';
 import type { ApplicationQuestion } from '../types/artifacts';
 import { invalidateJobArtifacts, invalidateEditedArtifacts } from '../utils/artifactReadiness';
 import { invalidateEditedResume } from '../utils/resumeReadiness';
@@ -97,8 +98,9 @@ interface AppContextType {
     jobId: string,
     status: ApplicationStatus,
     notes?: string,
-    rejectionReason?: string
-  ) => void;
+    rejectionReason?: string,
+    metadata?: Partial<TransitionRequest>
+  ) => Promise<void>;
 
   // Tailoring Workflow
   analyzeJob: (jobId: string) => Promise<void>;
@@ -522,31 +524,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setJobs(updated);
   };
 
-  const logOutcome = (
-    jobId: string,
-    status: ApplicationStatus,
-    notes?: string,
-    rejectionReason?: string
-  ) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target) return;
-
-    const historyEntry = {
-      status,
-      timestamp: new Date().toISOString(),
-      notes
-    };
-
-    const updated: JobRecord = {
-      ...target,
-      applicationStatus: status,
-      appliedDate: status === 'APPLIED' ? new Date().toISOString().split('T')[0] : target.appliedDate,
-      rejectionReason: rejectionReason || target.rejectionReason,
-      statusHistory: [...(target.statusHistory || []), historyEntry]
-    };
-
-    updateJob(updated);
-    storageService.addAuditLog('OUTCOME_LOGGED', jobId, `Updated status to ${status}${notes ? `: ${notes}` : ''}`);
+  const outcomeBusy = useRef(false);
+  const logOutcome = async (jobId: string, status: ApplicationStatus, notes?: string, rejectionReason?: string, metadata: Partial<TransitionRequest> = {}) => {
+    if(outcomeBusy.current)throw new Error('An application update is already in progress');
+    outcomeBusy.current=true;
+    const startedEpoch=epoch.current;
+    try {
+      if(workspaceMode==='PUBLIC_DEMO') {
+        const target=jobs.find(j=>j.id===jobId);if(!target)return;
+        const request=transitionRequestSchema.parse({...metadata,jobId,targetStatus:status,requestId:metadata.requestId || crypto.randomUUID(),...(notes?.trim()?{note:notes.trim()}:{}),...(rejectionReason?.trim()?{reasonText:rejectionReason.trim()}:{})});
+        const history=normalizeHistory(target.statusHistory).events.map((ev,i)=>({...ev,id:ev.id || `legacy-${i}`}));
+        if(history.some(ev=>ev.requestId===request.requestId))return;
+        if(target.applicationStatus===status && !request.note && !request.supersedesEventId && !request.correctLegacyState)return;
+        if(history.length>=5000)throw new Error('Application history limit reached');
+        if(request.supersedesEventId && (!request.correctionReason || !effectiveEvents(history).some(ev=>ev.id===request.supersedesEventId)))throw new Error('Select an effective event and supply a correction reason');
+        const timestamp=request.timestamp?new Date(request.timestamp).toISOString():new Date().toISOString();
+        const {jobId:_jobId,targetStatus:_targetStatus,correctLegacyState:_legacy,...facts}=request;
+        const events=[...history,{...facts,id:crypto.randomUUID(),from:target.applicationStatus,to:status,timestamp,kind:request.supersedesEventId || request.correctLegacyState?'correction' as const:target.applicationStatus===status?'note' as const:'transition' as const}];
+        const semantic=effectiveEvents(events).slice().sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
+        setJobs(jobs.map(j=>j.id===jobId?{...j,applicationStatus:semantic.at(-1)?.to || status,statusHistory:events,appliedDate:semantic.find(ev=>ev.to==='APPLIED')?.timestamp}:j));
+        return;
+      }
+      await persistCurrent();
+      if(startedEpoch!==epoch.current)return;
+      const before=JSON.stringify(storageService.privateSnapshot());
+      const result=await apiService.transitionApplication({...metadata,jobId,targetStatus:status,requestId:metadata.requestId || crypto.randomUUID(),
+        ...(notes?.trim()?{note:notes}:{}),...(rejectionReason?.trim()?{reasonText:rejectionReason}:{})});
+      if(startedEpoch!==epoch.current)return;
+      if(before!==JSON.stringify(storageService.privateSnapshot())) {
+        ready.current=false;setSyncStatus('Application saved — reload required');
+        throw new Error('Application saved privately. Local edits were preserved; reload to reconcile before saving.');
+      }
+      adopt(result);setSyncStatus('Saved privately');
+    } catch(err:any) {if(startedEpoch===epoch.current)setError(err.message || 'Application update failed');throw err;}
+    finally {outcomeBusy.current=false;}
   };
 
   // Tailoring Workflow

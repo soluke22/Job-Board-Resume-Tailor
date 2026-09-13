@@ -1,8 +1,9 @@
+import { computeOutcomeAnalytics } from '../src/utils/outcomeAnalytics';
 import { Router, type RequestHandler } from 'express';
 import { requireWorkspaceOwner } from './auth';
 import { workspaceRepository, WorkspaceConflict, WorkspaceValidationError } from './workspaceRepository';
 
-export function createWorkspaceRouter(repository: Pick<typeof workspaceRepository, 'read' | 'save' | 'import'> = workspaceRepository, guard: RequestHandler = requireWorkspaceOwner) {
+export function createWorkspaceRouter(repository: Pick<typeof workspaceRepository, 'read' | 'save' | 'import'> & Partial<Pick<typeof workspaceRepository, 'transition'>> = workspaceRepository, guard: RequestHandler = requireWorkspaceOwner) {
   const router = Router();
   router.use(guard);
   router.use((_req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); });
@@ -15,8 +16,22 @@ export function createWorkspaceRouter(repository: Pick<typeof workspaceRepositor
       res.status(status).json({ error: status === 503 ? 'Private storage unavailable' : (error as Error).message });
     }
   };
+  router.post('/application-transition', respond((req, owner) => {
+    if (!repository.transition) throw new WorkspaceValidationError('Application transitions unavailable');
+    return repository.transition(owner, req.body);
+  }));
+  router.get('/analytics', async (_req, res) => {
+    try { res.json(computeOutcomeAnalytics((await repository.read(res.locals.ownerId)).jobs)); }
+    catch { res.status(503).json({error:'Private storage unavailable'}); }
+  });
   router.get('/data', respond((_req, owner) => repository.read(owner)));
-  router.post('/data', respond((req, owner) => repository.save(owner, req.body?.data, req.body?.revision)));
+  router.post('/data', respond(async (req, owner) => {
+    const current=await repository.read(owner);
+    for(const job of req.body?.data?.jobs || []) if(!current.jobs.some((j:any)=>j.id===job.id) &&
+      (job.statusHistory?.length || job.applicationSnapshot || job.appliedDate || !['DISCOVERED','SHORTLISTED','TAILORED'].includes(job.applicationStatus)))
+      throw new WorkspaceValidationError('New application history requires explicit owner import or a server transition');
+    return repository.save(owner, req.body?.data, req.body?.revision);
+  }));
   router.post('/import', respond((req, owner) => repository.import(owner, req.body?.data, req.body?.revision)));
   router.get('/export', respond((_req, owner) => repository.read(owner)));
   router.get('/audit-log', async (_req, res) => {

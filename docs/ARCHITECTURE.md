@@ -22,8 +22,10 @@ uses owner metadata and Private Blob with authorized server-proxied attachments.
 Phase 2 local persistence contracts are covered by synthetic Postgres-compatible
 restart/rollback/isolation/fault tests; live Neon/Blob remain separate gates.
 Explicit top-level collection saves replace only supplied collections. Retained
-jobs preserve omitted attachments/histories; explicit histories replace that
-owner's legacy job history (empty lists clear). Phase 5 certified resume versions
+jobs preserve omitted attachments/histories; explicit legacy resume histories replace
+that owner's resume history (empty lists clear). Application lifecycle fields and
+history now preserve the stored originals through ordinary saves/imports of matching
+job IDs; changes use the owner-scoped atomic Phase 7 transition operation. Phase 5 certified resume versions
 are immutable and retained through saves/imports until job removal. Imports merge selected IDs. Removed jobs
 delete owner-scoped children transactionally. Upserted scalar fields replace prior
 values, including omitted optional SQL scalars. Ambiguous parent IDs reject atomically.
@@ -94,3 +96,14 @@ final Vercel production. See [DEPLOYMENT.md](DEPLOYMENT.md).
 The old process-token/localStorage/no-database architecture describes the
 pre-reconciliation baseline. Integrations committed in 41a04f8 are current code,
 not pending working-tree changes or proof of completed persistence acceptance.
+
+## Phase 7 lifecycle authority
+server/applicationLifecycle.ts validates transitions and application snapshots;
+src/types/application.ts is the runtime/TS contract and legacy normalizer.
+workspaceRepository.transition serializes on the owner workspace row and atomically
+commits application/event/audit/revision. JSON-backed application/events require no
+SQL migration. Correction chains preserve original records, and effective timestamps
+reconcile current state. src/utils/outcomeAnalytics.ts is deterministic and shared by
+private server analytics and views; no analytics DB or model request is introduced.
+Historical snapshots remain separate from current source-sensitive assessments.
+See JOB_SEARCH_PIPELINE.md for counting, provenance, limits and correction semantics.

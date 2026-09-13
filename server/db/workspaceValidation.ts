@@ -1,3 +1,4 @@
+import { applicationStatusSchema, applicationEventSchema, applicationSnapshotSchema, normalizeApplicationJob } from '../../src/types/application';
 import { artifactProvenanceSchema, artifactStateSchema, questionCategorySchema } from '../../src/types/artifacts';
 import { z } from 'zod';
 import { claimSchema, resumeBasisSchema } from '../../src/types/provenance';
@@ -73,7 +74,7 @@ const evaluation = object({ isReady: flag, overallStatus: z.enum(['PASS', 'WARN'
   metricCoverage: object({ totalBullets: number, metricsCount: number.optional(), withMetrics: number.optional(), ratioString: text.optional() }),
   flags: list(object({ id, type: text, code: text.optional(), severity: z.enum(['critical', 'warning', 'info']), target: text,
     targetId: text.optional(), message: text, suggestedFix: text.optional(), isSafeToAutoFix: flag })) });
-export const jobSchema = object({ id, atsProvider: text, atsBoard: text.optional(), atsJobId: text.optional(), company: text, title: text,
+const canonicalJobSchema = object({ id, atsProvider: text, atsBoard: text.optional(), atsJobId: text.optional(), company: text, title: text,
   canonicalUrl: text, applyUrl: text, sourceUrl: text.optional(), discoveryUrl: text.optional(), description: text, location: text,
   discoveryTitle: text.optional(), discoveryCompany: text.optional(), discoverySummary: text.optional(),
   discoverySourceUrls: strings.optional(), discoveryAliases: strings.optional(),
@@ -86,7 +87,7 @@ export const jobSchema = object({ id, atsProvider: text, atsBoard: text.optional
   verificationStatus: text, isCurrentlyListed: flag, freshnessBand: text.optional(), sourceChannel: text, searchQuery: text.optional(),
   primaryRoleFamily: text.optional(), roleModifiers: strings, seniority: text, hardRequirements: strings, preferredRequirements: strings,
   technologies: strings, responsibilities: strings, hiringSignals: strings, hardBlockers: strings, softGaps: strings,
-  qualificationFit: number.optional(), evidenceCoverage: number.optional(), applicationPriority: text, priorityReason: text, applicationStatus: text,
+  qualificationFit: number.optional(), evidenceCoverage: number.optional(), applicationPriority: text, priorityReason: text, applicationStatus: applicationStatusSchema,
   duplicateOf: text.optional(), notes: text.optional(), rawDescription: text.optional(), dateAdded: text.optional(), status: text.optional(), stage: text.optional(),
   channel: text.optional(), appliedDate: text.optional(), rejectionReason: text.optional(), parsed: parsed.optional(), fit: fit.optional(),
   evidenceMatches: list(match).optional(), sessionQuestions: list(question).optional(), gapQuestions: list(question).optional(), sessionAnswers: z.record(z.string(), text).optional(),
@@ -94,7 +95,7 @@ export const jobSchema = object({ id, atsProvider: text, atsBoard: text.optional
   versionHistory: list(object({ versionId: id, timestamp: text, note: text, resume: resumeSchema })).refine(records => new Set(records.map(r => r.versionId)).size === records.length, 'Duplicate version ids').optional(),
   proofPack: proof.optional(), outreachDrafts: outreach.optional(), recruiterOutreach: outreach.optional(), referralContact: contact.optional(),
   applicationAnswers: list(object({ ...artifactReview,category:questionCategorySchema.optional(),inputStatus:text.optional(),characterLimit:number.int().positive().optional(),wordLimit:number.int().positive().optional(),id, question: text, answer: text, evidenceIds: strings, rationale: text.optional() })).optional(),
-  statusHistory: list(object({ from: text, to: text, timestamp: text, note: text.optional() })).optional(), ...review }).superRefine((job, context) => {
+  statusHistory: list(applicationEventSchema).optional(), applicationSnapshot: applicationSnapshotSchema.optional(), historyQuarantine: list(z.unknown()).optional(), ...review }).superRefine((job, context) => {
     if (job.assessmentStatus === 'UNASSESSED') {
       if (job.qualificationFit !== undefined || job.evidenceCoverage !== undefined || job.fit !== undefined || job.applicationPriority !== 'UNASSESSED')
         context.addIssue({code: 'custom', message: 'Unassessed jobs cannot contain fit scores or assessed priority.'});
@@ -102,6 +103,7 @@ export const jobSchema = object({ id, atsProvider: text, atsBoard: text.optional
       context.addIssue({code: 'custom', message: 'Missing assessment fields require explicit UNASSESSED state.'});
     }
   });
+export const jobSchema = z.preprocess(normalizeApplicationJob, canonicalJobSchema);
 const unique = <T extends z.ZodType<{ id: string }>>(schema: T) => list(schema).refine(records => new Set(records.map(r => r.id)).size === records.length, 'Duplicate record ids');
 export const workspaceInput = z.object({ profile: profileSchema.nullable().optional(), searchProfile: searchProfileSchema.nullable().optional(), masterResume: resumeSchema.nullable().optional(),
   evidence: unique(evidenceSchema).optional(), projects: unique(projectSchema).optional(), skills: unique(skillSchema).optional(), jobs: unique(jobSchema).optional(),

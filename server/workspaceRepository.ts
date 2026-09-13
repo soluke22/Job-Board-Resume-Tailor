@@ -1,3 +1,5 @@
+import { normalizeApplicationJob, transitionRequestSchema } from '../src/types/application';
+import { transitionApplication, ApplicationTransitionError } from './applicationLifecycle';
 import { inspectArtifact, preserveArtifact } from './artifactProvenance';
 import { and, eq, notInArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -22,7 +24,7 @@ const attachments = {
   proofPack: s.proofRecords, outreachDrafts: s.outreachRecords, recruiterOutreach: s.outreachRecords,
   referralContact: s.contacts,
 };
-const applicationKeys = ['applicationStatus', 'appliedDate', 'rejectionReason', 'stage', 'channel', 'applicationAnswers'];
+const applicationKeys = ['applicationStatus', 'appliedDate', 'rejectionReason', 'stage', 'channel', 'applicationAnswers', 'applicationSnapshot'];
 const scalarFields = new Map<EntityTable, string[]>([
   [s.candidateProfiles, ['name', 'email', 'phone', 'location', 'title', 'masterSummary']],
   [s.evidenceItems, ['rawEvidence', 'sourceType', 'sourceLocation', 'verificationStatus']],
@@ -77,14 +79,14 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       }
       Object.assign(job, children.get(s.applications)!.find(c => c.id === row.id)?.data ?? {});
       const versions = children.get(s.resumeVersions)!.filter(c => c.parentId === row.id).map(c => c.data);
-      const events = children.get(s.applicationEvents)!.filter(c => c.parentId === row.id).map(c => c.data);
+      const events = children.get(s.applicationEvents)!.filter(c => c.parentId === row.id).sort((a,b)=>Number(a.id.split(':').at(-1))-Number(b.id.split(':').at(-1))).map(c => c.data);
       if (versions.length) job.versionHistory = versions;
       if (events.length) job.statusHistory = events;
       if (job.fit && job.assessmentStatus !== 'UNASSESSED') {
         try { if (!isCurrent(job.assessmentMetadata, assessmentMetadata(job as any, output.evidence, output.searchProfile))) job.assessmentStatus = 'STALE'; }
         catch { job.assessmentStatus = 'STALE'; }
       }
-      return job;
+      return normalizeApplicationJob(job);
     });
     output.auditLog = (await rows(tx, s.auditEvents, ownerId)).map(r => r.data);
     for (const job of output.jobs) if (job.tailoredResume) {
@@ -143,6 +145,10 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
         const previous = await snapshot(tx, ownerId);
         for (const source of input.jobs) {
           const job = normalize({ ...source });
+          // Lifecycle history is owner-reported observation, not candidate claim
+          // certification. Recursive evidence review tags must not corrupt it.
+          for(const key of ['statusHistory','applicationSnapshot','historyQuarantine'])
+            if(source[key]!==undefined)job[key]=source[key];
           if (job.tailoredResume && job.id !== resumeJobId) {
             const old=previous.jobs.find((j:any)=>j.id===job.id)?.tailoredResume;
             const resume=job.tailoredResume as any;
@@ -166,6 +172,13 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
             if(job[key] && !(job.id===artifactJobId && key===artifactKey))job[key]=preserveArtifact(job[key],importing?undefined:previousJob?.[key]);
           }
           if(Array.isArray(job.applicationAnswers) && !(job.id===artifactJobId && artifactKey==='applicationAnswers'))job.applicationAnswers=job.applicationAnswers.map((a:any)=>preserveArtifact(a,importing?undefined:previousJob?.applicationAnswers?.find((old:any)=>old.id===a.id)));
+          if (previousJob) {
+            for (const key of ['applicationStatus','statusHistory','appliedDate','applicationSnapshot','rejectionReason','historyQuarantine']) {
+              if (previousJob[key] !== undefined) job[key]=previousJob[key]; else delete job[key];
+            }
+          } else if (!importing) {
+            delete job.applicationSnapshot;
+          }
           const id = job.id as string;
           const oldVersions=previous.jobs.find((j:any)=>j.id===id)?.versionHistory || [];
           const protectedVersions=oldVersions.filter((v:any)=>v.resume?.basis?.tailoringAlgorithmVersion);
@@ -198,7 +211,7 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
               for (const [index, item] of (job[key] as Record<string, unknown>[]).entries()) {
                 if (!item || typeof item !== 'object') throw new WorkspaceValidationError('Invalid history entry');
                 if(key==='versionHistory' && protectedVersions.some((v:any)=>v.versionId===item.versionId))continue;
-                await upsert(tx, table, ownerId, `${id}:${key}:${String(item.versionId ?? index)}`, normalize(item), id);
+                await upsert(tx, table, ownerId, `${id}:${key}:${String(item.versionId ?? index)}`, key==='statusHistory' ? item : normalize(item), id);
               }
               if (!importing) {
                 const historyIds = (job[key] as Record<string, unknown>[]).map((item, index) => `${id}:${key}:${String(item.versionId ?? index)}`);
@@ -222,6 +235,37 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       return snapshot(tx, ownerId);
     });
   }
-  return { read, save, saveArtifact:(ownerId:string,input:unknown,revision:number,jobId:string,key:string)=>save(ownerId,input,revision,false,undefined,undefined,jobId,key), saveAssessment: (ownerId: string, input: unknown, revision: number, jobId:string) => save(ownerId,input,revision,false,jobId), saveResume:(ownerId:string,input:unknown,revision:number,jobId:string)=>save(ownerId,input,revision,false,undefined,jobId), import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
+  async function transition(ownerId: string, raw: unknown) {
+    if (!ownerId) throw new WorkspaceValidationError('Owner identity required');
+    const parsed=transitionRequestSchema.safeParse(raw);
+    if (!parsed.success) throw new WorkspaceValidationError('Invalid application transition request');
+    return database().transaction(async tx=>{
+      await tx.insert(s.workspaces).values({ownerId}).onConflictDoNothing();
+      await tx.select().from(s.workspaces).where(eq(s.workspaces.ownerId,ownerId)).for('update');
+      const workspace=await snapshot(tx,ownerId);
+      const job=workspace.jobs.find((j:any)=>j.id===parsed.data.jobId);
+      if (!job) throw new WorkspaceValidationError('Job not found in owner workspace');
+      let updated;
+      try { updated=transitionApplication(job,parsed.data); }
+      catch(error) { if(error instanceof ApplicationTransitionError)throw new WorkspaceValidationError(error.message); throw error; }
+      if (!updated) return workspace;
+      const application:Record<string,unknown>={};
+      for(const key of applicationKeys)if(updated[key]!==undefined)application[key]=updated[key];
+      await upsert(tx,s.applications,ownerId,job.id,application,job.id);
+      for(const [index,event] of updated.statusHistory.entries())
+        await upsert(tx,s.applicationEvents,ownerId,`${job.id}:statusHistory:${index}`,event,job.id);
+      const historyIds=updated.statusHistory.map((_event:any,index:number)=>`${job.id}:statusHistory:${index}`);
+      await tx.delete(s.applicationEvents).where(and(eq(s.applicationEvents.ownerId,ownerId),eq(s.applicationEvents.parentId,job.id),notInArray(s.applicationEvents.id,historyIds)));
+      if(updated.historyQuarantine?.length) {
+        const [stored]=await tx.select().from(s.jobs).where(and(eq(s.jobs.ownerId,ownerId),eq(s.jobs.id,job.id)));
+        await upsert(tx,s.jobs,ownerId,job.id,{...decode(s.jobs,stored).data,historyQuarantine:updated.historyQuarantine});
+      }
+      const auditId=randomUUID();
+      await upsert(tx,s.auditEvents,ownerId,auditId,{id:auditId,eventType:'APPLICATION_STATUS_CHANGED',actorId:ownerId,recordId:job.id,timestamp:new Date().toISOString(),summary:`Application ${updated.statusHistory.at(-1).kind}: ${job.applicationStatus} to ${updated.applicationStatus}`});
+      await tx.update(s.workspaces).set({revision:sql`${s.workspaces.revision} + 1`,updatedAt:new Date()}).where(eq(s.workspaces.ownerId,ownerId));
+      return snapshot(tx,ownerId);
+    });
+  }
+  return { read, save, transition, saveArtifact:(ownerId:string,input:unknown,revision:number,jobId:string,key:string)=>save(ownerId,input,revision,false,undefined,undefined,jobId,key), saveAssessment: (ownerId: string, input: unknown, revision: number, jobId:string) => save(ownerId,input,revision,false,jobId), saveResume:(ownerId:string,input:unknown,revision:number,jobId:string)=>save(ownerId,input,revision,false,undefined,jobId), import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
 }
 export const workspaceRepository = createWorkspaceRepository();

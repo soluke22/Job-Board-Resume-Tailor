@@ -11,7 +11,7 @@ import { DEFAULT_PRIVATE_PROFILE, DEFAULT_BLANK_MASTER_RESUME } from '../src/dat
 import { persistenceDb, syntheticJob, syntheticEvidence } from './helpers/persistence';
 import { createWorkspaceRouter } from '../server/workspaceRoutes';
 
-test('explicit collection/history/application replacement and owner deletion roll back atomically', async () => {
+test('collection/resume replacement, immutable application history and owner deletion roll back atomically', async () => {
   const { pg, db } = await persistenceDb();
   const repo = createWorkspaceRepository(() => db as any);
   const project = { id: 'same-id', name: 'Synthetic project', purpose: '', period: '', technologies: [], solomonContribution: '', leadershipEvidence: '', implementationEvidence: '', outcomes: [], supportedMetrics: [], roleFamilyRelevance: [], bullets: [], enabled: true };
@@ -40,8 +40,8 @@ test('explicit collection/history/application replacement and owner deletion rol
     assert.deepEqual(preservedResume,resume,'legacy resume text and identity survive; new readiness metadata does not certify it');
     assert.equal(readiness,'STALE');
     assert.deepEqual(pruned.jobs[0].versionHistory.map(v => v.versionId), ['v2']);
-    assert.equal(pruned.jobs[0].statusHistory.length, 1);
-    assert.equal(pruned.jobs[0].appliedDate, undefined);
+    assert.deepEqual(pruned.jobs[0].statusHistory, job.statusHistory, 'ordinary save cannot erase observed lifecycle');
+    assert.equal(pruned.jobs[0].appliedDate, job.appliedDate, 'ordinary save cannot erase submission date');
     assert.equal(pruned.jobs[0].applicationAnswers, undefined);
     assert.equal((await repo.read('owner-b')).jobs[0].versionHistory.length, 2);
     const before = await repo.read('owner-a');

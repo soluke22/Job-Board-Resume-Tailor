@@ -208,3 +208,34 @@ GEMINI_API_KEY absent; only .env.example. Strict JSON schema/Zod, MEDIUM thinkin
 key permits synthetic-only smoke; authenticated/deployed browser acceptance remains
 an external gate. Whole-statement certification withholds general paraphrases and
 STAR component assignment; manual artifact edits need fresh generation.
+
+## Phase 7 outcome tracking coverage
+Focused: node --import tsx --test tests/phase-7-outcomes.test.ts.
+Synthetic scenarios cover historical screens/deeper stages then rejection, withdrawal,
+offer and archive; skipped stages; zero/one application; duplicate events; explicit
+legacy submission only; malformed/overflow quarantine; retries/no-ops/notes;
+terminal/backward denial and append-only correction chains, including backdated
+corrections preserving later rejection; legacy current-state correction/confirmation
+without current-score backfill; application snapshots stable under current
+reassessment, strong-fit rejection with unknown reason and no score mutation;
+family/modifier/channel/source/fit-version/freshness/ATS cohorts and sample thresholds;
+valid timestamp-pair medians and weekly event windows. Real PGlite transactions cover
+owner isolation, concurrent duplicate transitions, immutable save/import lifecycle,
+audit rollback and disk restart/new-owner backup round-trip. Real HTTP handlers deny
+browser-supplied new lifecycle history and replacement transition fields, and expose
+no-store owner analytics. Existing route inventory/session denial tests cover the new
+routes. Prior legacy-history replacement assertions now require application history
+preservation; collection/resume replacement, deletion and transaction rollback remain.
+
+No SQL migration; npm run db:generate checks for schema drift and existing migration
+upgrade tests remain. Run Phase 4/4.1/5/6 regressions, complete npm test, release:check,
+standalone privacy/evidence validators, built startup smoke and git diff --check.
+Manual authenticated browser gate (external configuration): use synthetic data,
+mark APPLIED with date/channel/note, progress to screen/hiring manager/rejection,
+archive and verify history/cohorts persist after reload. Repeat save/retry and inspect
+one audit event. Correct an old mistaken stage and a mistaken correction; later
+terminal state must remain. Reassess and confirm original fit snapshot/cohort persists.
+Check stale resume/proof/outreach badges. Private empty data remains zero; demo is
+labeled synthetic. No real employer rejection theories or private records in fixtures.
+Live authenticated/deployed browser and Neon multi-connection transport remain
+external gates; PGlite is serialized and cannot establish live locking behavior.
