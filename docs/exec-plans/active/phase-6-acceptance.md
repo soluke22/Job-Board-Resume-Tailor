@@ -71,4 +71,6 @@ standalone synthetic evidence ID validator, release:check (including strict requ
 build privacy zero), startup smoke 1/1 and git diff --check pass. Chunk warning
 546.37 kB remains. Source changes include ATS refresh; artifact edits immediately
 invalidate local copy as well as server hashes. No prior Phase 5 export gate weakened.
-Scoped commit and normal dev publication follow this validated checkpoint.
+Implementation checkpoint 7031b58 published by normal fast-forward; fresh fetch
+verified clean dev == origin/dev. Documentation checkpoint records publication;
+final report verifies its own pushed refs. No Phase 7 begun.

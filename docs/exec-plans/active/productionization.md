@@ -30,7 +30,10 @@ Reviewer directly rechecked two demonstrated sensitive-data defects: resolved;
 no remaining demonstrated defect in the bounded review. All private test data is
 synthetic. GEMINI_API_KEY absent; live proof/outreach/answer acceptance pending
 external configuration. Authenticated/deployed browser and earlier live gates remain.
-Implementation validated locally; scoped commit and normal dev publication next.
+Phase 6 checkpoint 7031b58 published by normal fast-forward to origin/dev; fresh
+fetch verified clean dev == origin/dev at 7031b58bf8922d3c7edd7ccd26dca849318fb3f2.
+This documentation checkpoint records publication; final task report verifies its
+own publication without embedding a self-hash.
 
 Previous Phase 4.1/5 publication evidence (historical):
 
@@ -189,12 +192,11 @@ shared provenance/index types; API/AppContext, editor/evidence/history/export/pr
 views and CSS; Phase 5 tests, auth/storage expectation updates and domain docs.
 
 ## Last Known Good Commit
-Phase 4.1 implementation ac28e4f, published to origin/dev and freshly verified.
-All requested local gates pass; this documentation checkpoint records publication.
-
-Published Phase 4 baseline 8882f72. Locate Phase 5 checkpoint with git log -1 --
-docs/exec-plans/active/productionization.md; publication verified by clean/equal
-freshly fetched refs without a self-hash loop.
+Phase 6 implementation 7031b58bf8922d3c7edd7ccd26dca849318fb3f2, published to
+origin/dev by normal fast-forward and freshly verified clean/equal refs. All local
+completion gates pass; live Gemini/browser gates remain explicit. This documentation
+checkpoint records implementation publication; final report verifies its publication.
+Recovery baseline b0be6da (Phase 4.1 ac28e4f; Phase 5 c00c5e2/610a00f) remains intact.
 
 ## Next Exact Step
 Phase 7 — Application tracking + outcome analytics.
@@ -299,3 +301,12 @@ STAR atomic component assignment awaits explicit reviewed evidence contracts; le
 classification/retrieval is not exhaustive; motivation/override/manual drafts have no
 attestation promotion; authenticated/deployed browser/live provider/model gates remain.
 Phase 7 — Application tracking + outcome analytics is next, not begun.
+
+
+## Phase 6 publication checkpoint (2026-09-13)
+7031b58 published normally; freshly fetched dev == origin/dev ==
+7031b58bf8922d3c7edd7ccd26dca849318fb3f2, clean tree before this documentation update.
+Final source release composition: full npm test 83/83, typecheck/build/harness,
+strict required-build privacy zero. Startup smoke 1/1, standalone privacy/evidence
+validator and diff checks pass. Docs-only checkpoint validated with harness/diff
+checks and published next. No main/PR/Studio/deployment/external action/Phase 7.
