@@ -5,30 +5,31 @@ Truthful discovery and evidence-grounded career workflows with durable owner-onl
 private storage and a separate synthetic demo. GitHub is canonical.
 
 ## Current Branch
-Phase 10 dev release candidate; baseline freshly fetched clean dev/origin/dev
-24a5737537d92c7c51b5df2939a3352bcaead082. Main unchanged at
-18bde7f451e4e5f39e303f82a0507a30233cd35e. Normal scoped dev checkpoint/push.
+dev; audited candidate 2d73941c126a313f35788b8b64f097ed5c3a3d8a merged into main
+through PR #1 using the normal merge commit strategy. Documentation checkpoint
+continues through dev; no additional main changes.
 
 ## Current Phase / Scope and Acceptance
-Phase 10 — dev -> main pull request and merge readiness.
-[Phase 10 acceptance](phase-10-acceptance.md) records categorized release delta,
-checks, dependencies/migrations, privacy, clean reproduction and PR status.
-No merge/main mutation, Phase11, Vercel deployment or remote migration authorized.
+Phase 10 — complete, PASS. Owner explicitly authorized PR #1 dev -> main merge.
+Phase 11 is ready but has not begun.
 
 ## Current Status
-PASS — deterministic release checks 114/114, typecheck/build/harness/strict privacy
-zero/runtime, migration drift/fresh/upgrade, evidence validators/startup pass.
-Baseline exact-SHA clean Git archive reproduces install/typecheck/114 tests/build.
-Phase10 removes two EOF blanks and adds acceptance/plan records only.
-PR #1: https://github.com/soluke22/Job-Board-Resume-Tailor/pull/1 (main <- dev).
-READY_TO_MERGE after final published-head mergeability/check verification.
-Phase9 accepted history/contact/security/dependency dispositions remain valid;
-four moderate Drizzle/esbuild tooling entries, zero high/critical; unchanged lock.
-Assessment phase4.1-v3 retains accepted Phase9 cache invalidation/calibration.
-Provider gates deferred; code merge readiness is not production readiness.
-Next exact step: owner review/authorize merge. After merged canonical main exists,
-Phase11 Google AI Studio merged-main compatibility verification; not begun here.
-Historical Phase9/Phase8 entries below retain their original checkpoint context.
+PR #1: https://github.com/soluke22/Job-Board-Resume-Tailor/pull/1 — MERGED.
+Final fetched origin/main: 0f0acdd51238cf7e9a692291bb5c2e58e2e0d818.
+Pre-merge fetched main 18bde7f451e4e5f39e303f82a0507a30233cd35e and dev
+2d73941c126a313f35788b8b64f097ed5c3a3d8a matched the authorized tips;
+GitHub base main/head dev, CLEAN/MERGEABLE, clean local candidate with no later
+commits or unexpected file changes. Main-side 0 / dev-side 27 commits.
+Merge parents are exactly those two tips; audited dev is an ancestor of merged
+main, merged tree equals candidate, and only the merge commit exists outside
+those parents' histories. PR reports MERGED; dev retained at audited tip before
+this documentation-only checkpoint. No squash/rebase/force-push/tag/deletion.
+Phase 10 deterministic release validation remains the accepted 114/114 and
+clean-source reproduction recorded in the Phase 10 acceptance matrix.
+Deferred Vercel, Google OAuth live browser, Neon, Private Blob and Gemini gates
+remain PENDING_EXTERNAL_CONFIG. No Studio, deployment or remote migration run.
+Next exact step: **Phase 11 — Google AI Studio merged-main compatibility verification.**
+Historical entries below retain their original checkpoint context.
 
 ## Historical Phase 8 accepted/deferred status
 
@@ -65,9 +66,8 @@ both evidence validators, built startup smoke and diff check pass. Publication
 recorded in the checkpoint below; plan encoding normalized from four legacy dash bytes.
 
 ## Next Exact Step
-Owner review/authorize merge of dev -> main PR #1.
-After canonical merged main exists: Phase 11 Google AI Studio merged-main
-compatibility verification. No Studio/deployment/remote migrations in Phase10.
+**Phase 11 — Google AI Studio merged-main compatibility verification.**
+Not begun in this turn. Deferred external gates remain unchanged.
 
 ## Historical Phase 7 Branch
 dev; Phase 7 began clean at freshly fetched dev == origin/dev ==
