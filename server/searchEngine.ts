@@ -1,4 +1,4 @@
-import type { FreshnessBand } from '../src/types';
+import type { FreshnessBand } from '../src/types/index.js';
 
 export function calculateFreshnessBand(
   publishedAt?: string,

@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { extractionSchema, semanticMatchesSchema, type Extraction, type Requirement, type AssessmentMetadata } from '../src/types/assessment';
-import type { EvidenceItem, JobRecord, SearchProfile, FitAssessment, ParsedJob, RequirementMatch } from '../src/types';
-import { redactAiPayload, isSensitiveCandidateText } from './privacy';
-import { calculateFreshnessBand } from './searchEngine';
+import { extractionSchema, semanticMatchesSchema, type Extraction, type Requirement, type AssessmentMetadata } from '../src/types/assessment.js';
+import type { EvidenceItem, JobRecord, SearchProfile, FitAssessment, ParsedJob, RequirementMatch } from '../src/types/index.js';
+import { redactAiPayload, isSensitiveCandidateText } from './privacy.js';
+import { calculateFreshnessBand } from './searchEngine.js';
 
 export const ALGORITHM_VERSION = 'phase4.1-v3';
 export class AssessmentError extends Error {}

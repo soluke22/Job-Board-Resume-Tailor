@@ -1,7 +1,7 @@
-import { JobRecord, SearchProfile } from '../src/types';
-import { detectAtsProvider, verifyPostingAts, JobVerificationResult } from './atsAdapters';
-import { calculateFreshnessBand } from './searchEngine';
-import { normalizedJobUrl, mergeDiscoveredJobs } from '../src/utils/jobIdentity';
+import { JobRecord, SearchProfile } from '../src/types/index.js';
+import { detectAtsProvider, verifyPostingAts, JobVerificationResult } from './atsAdapters.js';
+import { calculateFreshnessBand } from './searchEngine.js';
+import { normalizedJobUrl, mergeDiscoveredJobs } from '../src/utils/jobIdentity.js';
 import { randomUUID } from 'node:crypto';
 
 export function validateDiscoveryInput(profile: SearchProfile, budget: number, customQueries: unknown) {

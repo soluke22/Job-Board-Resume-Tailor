@@ -1,5 +1,5 @@
-import { AtsProvider, AtsVerificationStatus } from '../src/types';
-import { safeFetchText } from './safeFetch';
+import { AtsProvider, AtsVerificationStatus } from '../src/types/index.js';
+import { safeFetchText } from './safeFetch.js';
 export interface JobVerificationResult {
   status: AtsVerificationStatus; isListed: boolean; lastVerifiedAt: string;
   canonicalUrl?: string; applyUrl?: string; compensation?: any; rawDetails?: any; notes?: string;

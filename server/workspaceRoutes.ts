@@ -1,7 +1,7 @@
-import { computeOutcomeAnalytics } from '../src/utils/outcomeAnalytics';
+import { computeOutcomeAnalytics } from '../src/utils/outcomeAnalytics.js';
 import { Router, type RequestHandler } from 'express';
-import { requireWorkspaceOwner } from './auth';
-import { workspaceRepository, WorkspaceConflict, WorkspaceValidationError } from './workspaceRepository';
+import { requireWorkspaceOwner } from './auth.js';
+import { workspaceRepository, WorkspaceConflict, WorkspaceValidationError } from './workspaceRepository.js';
 
 export function createWorkspaceRouter(repository: Pick<typeof workspaceRepository, 'read' | 'save' | 'import'> & Partial<Pick<typeof workspaceRepository, 'transition'>> = workspaceRepository, guard: RequestHandler = requireWorkspaceOwner) {
   const router = Router();

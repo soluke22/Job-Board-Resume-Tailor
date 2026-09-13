@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import type { Request, Response } from 'express';
-import { workspaceRepository, WorkspaceConflict } from './workspaceRepository';
-import { ArtifactError, generateProof, generateMessage, generateAnswers, questionSchema } from './artifactProvenance';
-import { ResumeError } from './resumeProvenance';
-import type { StructuredModel } from './assessment';
+import { workspaceRepository, WorkspaceConflict } from './workspaceRepository.js';
+import { ArtifactError, generateProof, generateMessage, generateAnswers, questionSchema } from './artifactProvenance.js';
+import { ResumeError } from './resumeProvenance.js';
+import type { StructuredModel } from './assessment.js';
 
 const requestSchema=z.object({jobId:z.string().min(1).max(200),questions:z.array(z.union([z.string().min(1).max(2000),questionSchema])).min(1).max(20).optional(),
   contactName:z.string().max(100).optional(),relationship:z.string().max(200).optional(),overrideReason:z.string().min(1).max(1000).optional()}).strict();

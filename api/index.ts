@@ -1,6 +1,6 @@
-import app from '../server';
+import app from '../server.js';
 import type { Request, Response } from 'express';
-import { withRequestDatabase } from '../server/db/client';
+import { withRequestDatabase } from '../server/db/client.js';
 
 // This seam exercises the actual adapter under synthetic providers, not a second
 // routing authority. Vercel must supply the original request URL (live gate).

@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { eligibleEvidence, fingerprint, retrieveEvidence, type StructuredModel } from './assessment';
-import { currentJob, inspectResume, factualClaims, evidenceSentences, type ResumeWorkspace } from './resumeProvenance';
-import { redactAiPayload, isSensitiveText } from './privacy';
-export { isSensitiveText } from './privacy';
-import type { JobRecord, EvidenceItem } from '../src/types';
-import type { ArtifactProvenance, QuestionCategory } from '../src/types/artifacts';
+import { eligibleEvidence, fingerprint, retrieveEvidence, type StructuredModel } from './assessment.js';
+import { currentJob, inspectResume, factualClaims, evidenceSentences, type ResumeWorkspace } from './resumeProvenance.js';
+import { redactAiPayload, isSensitiveText } from './privacy.js';
+export { isSensitiveText } from './privacy.js';
+import type { JobRecord, EvidenceItem } from '../src/types/index.js';
+import type { ArtifactProvenance, QuestionCategory } from '../src/types/artifacts.js';
 
 export const ARTIFACT_VERSION = 'phase6-extractive-v1';
 export class ArtifactError extends Error {}
