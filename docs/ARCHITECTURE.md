@@ -74,6 +74,18 @@ ordinary saves/imports cannot forge approval. Profile/manual question routing by
 Gemini; model context excludes private contact/history and unrelated evidence metadata.
 
 ## Acceptance versus target
+Phase 8 pins npm/package-lock and Node 24.x, with Vite static `dist/client` plus
+one request-local `api/index.ts` Node Express Function. Response finish/close/error,
+request abort and a 290s deadline settle once and close the lazy Neon boundary;
+late continuations cannot reopen it. Concurrent synthetic adapter tests isolate
+owners/data/errors and DB objects, including streamed disconnects. Blob SDK 2.8.0
+already resolves provider-managed OIDC plus BLOB_STORE_ID implicitly; static tokens
+are the outside-Vercel fallback. Static canonical auth origin is retained; ephemeral
+previews stay public, private staging needs a separate stable origin/resources.
+Actual Vercel rewrite path preservation, generated Function output/bundle size and
+large-response acceptance remain unresolved external runtime gates (Phase 8 PARTIAL).
+See [Phase 8 acceptance](exec-plans/active/phase-8-acceptance.md) and deployment runbook.
+
 Phase 1 audits authentication and public/private isolation. Deterministic tests
 exercise production options, hooks, cookies, route denial and client request/cache
 behavior. Live Google OAuth acceptance pending external configuration.

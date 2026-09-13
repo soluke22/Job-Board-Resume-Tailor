@@ -5,20 +5,65 @@ Truthful discovery and evidence-grounded career workflows with durable owner-onl
 private storage and a separate synthetic demo. GitHub is canonical.
 
 ## Current Branch
+dev; Phase 8 began clean at freshly fetched dev == origin/dev ==
+bec000ba171c2eb40342e518727af058fda6f880 (Phase 7 documentation publication).
+Authorized coherent Phase 8 commits and normal fast-forward dev push only.
+No main, PR, Studio, production deployment, remote migration or Phase 9.
+
+## Current Phase / Scope and Acceptance
+Phase 8 â€” Vercel-compatible architecture completion + runtime acceptance.
+[Phase 8 matrix](phase-8-acceptance.md) records pre-edit scope and final contracts.
+Retain Vite/Express; parent owns writes; requested read-only docs researcher verifies
+official provider contracts. No framework migration or prior business-contract redesign.
+
+## Current Status
+Phase 8 PARTIAL: local implementation/configuration/runtime acceptance passes;
+actual Vercel rewrite path preservation, generated single-Function output/route table/
+bundle size and largest JSON response behavior remain unresolved platform gates
+before Phase 9. No demonstrated architecture incompatibility or live success claimed.
+Node 24.19.0 certification; Node 24.x deployment pin; npm/package-lock only; obsolete
+Bun lock removed and recoverable from Git. Explicit npm ci/build/output settings.
+SPA fallback excludes bare/nested API and assets; adapter forwards supplied path and
+method unchanged. Finish/close/error/abort/290s deadline clean listeners/settle once;
+DB close is bounded at 5s and closed boundaries cannot reopen. Concurrent synthetic
+owners/data/errors/artifacts and request DB isolation pass, as do stream errors and
+disconnect cleanup. Raw Better Auth library provider logging disabled after test
+output exposed synthetic DB error objects; generic application failures retained.
+Installed Blob 2.8.0 implicit OIDC+store resolution/precedence/static local fallback
+passes synthetic SDK tests; no credential options/refresh snapshot are introduced.
+Static canonical auth and exact Origin stay intact; ordinary preview is public demo,
+private stable staging requires separate origin/Google callback/DB/store/secrets.
+Function/Neon region pair, remote migrations, private preview isolation and live
+cookies/OAuth/Neon/Blob/Gemini remain external configuration gates. Runbook/environment
+matrix and scoped runtime build scanner are documented. Six moderate npm install
+advisories and existing 639.41 kB client chunk warning are recorded, not silently fixed.
+Final tests: focused 10/10, full 105/105; release composition passes typecheck/build/
+harness/full tests/strict required-build privacy zero findings. Final synthetic env
+sentinel build/runtime client scan passes (3 files/706107 bytes). Migration drift,
+both evidence validators, built startup smoke and diff check pass. Publication
+recorded in the checkpoint below; plan encoding normalized from four legacy dash bytes.
+
+## Next Exact Step
+Resolve Phase 8 actual Vercel routing/output/maximum JSON response gates using an
+explicitly authorized linked nonproduction project; run the documented preview
+matrix without production resources. Then, only on separate continuation:
+**Phase 9 â€” Security/privacy/release audit.** Do not begin it in this task.
+
+## Historical Phase 7 Branch
 dev; Phase 7 began clean at freshly fetched dev == origin/dev ==
 e751f05e230239cd772b74372702493a770dac8f (published Phase 6).
 User authorizes coherent Phase 7 commits and normal fast-forward origin/dev push.
 No main, PR, Studio, deployment, external messages/submission or Phase 8.
 
-## Current Phase / Scope and Acceptance
-Phase 7 — Application tracking + outcome analytics, deterministic contracts complete.
+## Historical Phase 7 Scope and Acceptance
+Phase 7 â€” Application tracking + outcome analytics, deterministic contracts complete.
 Acceptance: [Phase 7 matrix](phase-7-acceptance.md). Parent owns writes: shared
 runtime/TS lifecycle history, atomic owner transitions/audit, immutable application
 snapshot, legacy normalization/quarantine, correction/idempotence, deterministic
 observed funnel/cohorts and truthful UI. Phase 4.1 scoring stays unchanged.
 Phase 4.1 [calibration](phase-4-1-calibration.md), Phase 5/6 acceptance remain intact.
 
-## Current Status
+## Historical Phase 7 Published Status
 Phase 7 deterministic contracts complete and published at 46f5fa2. Focused 12/12; full npm test
 95/95 and release:check (typecheck/build/harness/strict build privacy) pass.
 Standalone privacy zero findings, both synthetic evidence validators, built startup
@@ -57,6 +102,13 @@ reviewed atomic evidence before certification. Authenticated/deployed browser an
 actual print pagination remain live gates, not fabricated success.
 
 ## Architecture Decisions
+Phase 8: Node 24.x/npm; Vite static client plus one api/index.ts Node Function;
+300s platform budget, 290s response deadline and 5s bounded DB cleanup. Request-local
+Neon WebSocket Pool/Drizzle keeps interactive transactions; auth keyed to request DB.
+Provider-managed implicit OIDC Blob preferred deployed; isolated static local token
+retained. No globally trusted proxy/Host or wildcard preview auth. Exact origin and
+environment/resource isolation stay fail-closed. Actual rewrite contract unverified.
+
 React/Vite + Express/Gemini, Better Auth owner sessions, Neon/Drizzle revisioned
 owner workspace, private Blob/recovery intents and isolated synthetic demo retained.
 Phase 5 adds strict reusable claim/basis types and a server provenance service.
@@ -124,6 +176,11 @@ blocks final export. Complete local gates pass; live semantic/rendering proofs
 remain explicit external gates. Truth precedes relevance/readability/page fit.
 
 ## Tests Passed
+Phase 8 focused 10/10 on Node 24.19.0; final complete gates recorded in the Phase 8
+validation checkpoint below. Initial release suite 102/102 passed before the additional
+bounded-close/SDK/auth-logger tests. Runtime build scan passes (3 files/706080 bytes),
+db:generate no drift, both evidence validators and built startup smoke 1/1 pass.
+
 Phase 4.1: calibration 5/5, Phase 4 12/12, Phase 5 12/12; complete 69/69.
 Final release:check passes typecheck/build/harness/full tests/strict required-build
 privacy zero findings. Standalone privacy scan/evidence validator, startup smoke
@@ -175,12 +232,23 @@ Certified versions persist until explicit job removal; no retention policy redes
 Legacy gap interviews/cover letters/Phase 6 artifacts remain uncertified.
 
 ## External Configuration Needed
+Phase 8: explicitly authorized linked nonproduction Vercel project, generated build/
+routes/Function size and original path proof; maximum JSON response acceptance;
+stable private staging origin/registered Google callback, isolated Neon branch and
+PRIVATE Blob OIDC store access; Function/Neon region pair. No production secrets
+copied to previews and no remote migrations/deployment performed.
+
 Server-only OWNER_EMAIL, Google ID/secret/callback, BETTER_AUTH_SECRET/URL,
 Neon DATABASE_URL/schema, private BLOB_READ_WRITE_TOKEN and GEMINI_API_KEY.
 Only synthetic candidate evidence authorized for a live Gemini smoke.
 No secrets/private data logged or remote resources created.
 
 ## Files / Modules Currently Involved
+Phase 8: api/index.ts, server/db/client.ts, server/auth.ts, server.ts runtime errors,
+vercel.json, package.json/package-lock, obsolete bun.lock deletion, .env.example,
+scripts/runtime-check.mjs, tests/phase-8-runtime.test.ts, deployment/architecture/
+testing/router docs, Phase 8 matrix and this plan. Prior business services unchanged.
+
 Phase 4.1: server/assessment.ts, src/types/assessment.ts, focused Phase 4/4.1/5
 tests and synthetic evidence fixture; calibration/acceptance/pipeline/evidence/testing
 docs and this plan. No Phase 5 generation/readiness implementation changes.
@@ -198,8 +266,8 @@ provider/model gates remain external. Phase 6 e751f05 baseline remains intact.
 This documentation checkpoint records implementation publication; final report
 verifies publication of this checkpoint without embedding its own hash.
 
-## Next Exact Step
-Phase 8 — Vercel-compatible architecture completion/live runtime acceptance.
+## Historical Phase 7 Next Step
+Phase 8 â€” Vercel-compatible architecture completion/live runtime acceptance.
 Begin only on a new explicit continuation. This task stops after Phase 7 publication.
 Live authenticated/deployed browser and earlier provider/model gates remain external.
 Release audit precedes dev/main PR, merged-main Studio verification and final
@@ -300,7 +368,7 @@ Limits: whole-statement support is conservative, not semantic paraphrase certifi
 STAR atomic component assignment awaits explicit reviewed evidence contracts; lexical
 classification/retrieval is not exhaustive; motivation/override/manual drafts have no
 attestation promotion; authenticated/deployed browser/live provider/model gates remain.
-Phase 7 — Application tracking + outcome analytics is next, not begun.
+Phase 7 â€” Application tracking + outcome analytics is next, not begun.
 
 
 ## Phase 6 publication checkpoint (2026-09-13)
@@ -395,5 +463,42 @@ both synthetic evidence validators, db:generate no drift and staged diff check p
 Boundary reviewer directly confirmed all four demonstrated defects resolved; no
 remaining demonstrated defect in the bounded review. Docs-only checkpoint follows
 with harness/diff validation. No main/PR/Studio/deployment/Phase 8. Next exact step
-is Phase 8 — Vercel-compatible architecture completion/live runtime acceptance,
+is Phase 8 â€” Vercel-compatible architecture completion/live runtime acceptance,
 separately authorized. All previous live limitations remain explicit.
+
+## Phase 8 validation checkpoint (2026-09-13)
+
+PARTIAL. Local Node 24.19.0/npm/Vite/Express adapter contract verified. Focused
+10/10 and final full 105/105; release:check passes typecheck/build/harness/tests/
+strict required-build privacy zero. Standalone final privacy/harness pass. Sentinel
+server-env build/client scan passes: dist/client/index.html and two hashed assets,
+3 files/706107 bytes; JS warning 639.41 kB unchanged. Local shell 182.8 kB is NOT
+a Vercel Function bundle measurement. db:generate no drift; existing migration
+upgrade/transaction/restart tests pass; both evidence ID validators pass; final
+built startup smoke 1/1 and git diff --check pass. No prior acceptance gate weakened.
+
+Adapter cleanup is once-only and bounded (290s transport deadline, 5s Pool close);
+deadline/stream failures destroy transport, not append JSON. Remote abort/Pool
+cleanup timeout does not prove cancellation. Closed request DB boundaries fence
+late work; concurrent synthetic owner/data/error/artifact/DB tests and installed
+Blob OIDC/static-fallback resolver checks pass. Auth static origin/cookies/exact
+Origin stay intact; raw library provider logging disabled. Durable data remains
+Neon/Private Blob; no career data persisted to Function filesystem.
+
+| Live gate | Status | Evidence |
+| --- | --- | --- |
+| Vercel build contract | PENDING_EXTERNAL_CONFIG | Local build/config/adapter passes; no CLI/link; generated Function/routes/size pending |
+| Vercel preview runtime | PENDING_EXTERNAL_CONFIG | Exact incoming rewrite paths and largest JSON responses unresolved; no preview deployed |
+| Google OAuth | PENDING_EXTERNAL_CONFIG | Synthetic production hooks/cookies pass; live callback/browser pending |
+| Neon live persistence | PENDING_EXTERNAL_CONFIG | Local transactions/upgrade/restart and Pool isolation pass; live transport/locking pending |
+| Private Blob live persistence | PENDING_EXTERNAL_CONFIG | SDK 2.8 OIDC resolution/current-read/stream faults pass locally; live grant/CDN pending |
+| Gemini live generation | PENDING_EXTERNAL_CONFIG | Prior structured synthetic contracts retained; no live request |
+
+Function/Neon region pair, staging-specific Preview secrets/resources, authorized
+nonproduction migration, private browser cookies and actual Vercel generated config
+remain external gates. npm ci succeeded with authorized cache/network access after
+sandbox cache failures; six moderate advisories remain for Phase 9. Historical
+plan's four Windows-encoded em dashes normalized to UTF-8 without content loss.
+No main/PR/Studio/production/Phase 9/resource mutation. Scoped commit/push follows.
+Resolve the stated Phase 8 platform acceptance first; next separately authorized
+phase: **Phase 9 â€” Security/privacy/release audit.**

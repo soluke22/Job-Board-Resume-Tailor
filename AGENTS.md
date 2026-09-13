@@ -42,7 +42,7 @@ Parent plus at most two helpers; no recursive swarm or overlapping writers.
 See AGENT_HARNESS for configuration support and escalation rules.
 
 ## Validation and checkpoints
-- Install: npm ci (package-lock.json); old bun.lock is historical.
+- Install: npm ci (package-lock.json), Node 24.x; obsolete Bun lock removed in Phase 8.
 - Type check: npm run typecheck (lint remains an alias).
 - Build: npm run build.
 - Harness integrity: npm run harness:check.

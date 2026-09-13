@@ -1,7 +1,7 @@
 # Testing
 
 ## Current state and commands
-Use npm ci with package-lock.json. Historical bun.lock is not the install source.
+Use Node 24.x and npm ci with package-lock.json. Obsolete bun.lock was removed in Phase 8.
 The committed node:test suite runs through tsx; PGlite tests workspace contracts.
 
 - npm test: complete deterministic suite.
@@ -239,3 +239,25 @@ Check stale resume/proof/outreach badges. Private empty data remains zero; demo 
 labeled synthetic. No real employer rejection theories or private records in fixtures.
 Live authenticated/deployed browser and Neon multi-connection transport remain
 external gates; PGlite is serialized and cannot establish live locking behavior.
+
+## Phase 8 runtime acceptance
+
+Focused: `node --import tsx --test tests/phase-8-runtime.test.ts` on Node 24.x.
+Adapter tests exercise finish/close/error/abort/throw/deadline, removed listeners,
+exactly-once lazy pool cleanup, interleaved synthetic owners/data/errors and late
+continuations, original nested method/query/path forwarding, no-config health/auth/
+private JSON headers, malformed/oversized body, 2 MiB current private streaming,
+provider stream failure and disconnect cancellation. Existing Phase 1/2 tests retain
+auth/cookie/Origin/transactions/restart/compensation/reconcile/delete coverage.
+
+After build: `npm run runtime:check` checks Node/npm/config, fallback precedence,
+hashed client output, server environment names/available values and server-module
+markers absent from client. It does not print values. `npm run release:check` runs
+the complete prior gates; migration drift, standalone evidence validators and
+`node --import tsx --test tests/phase-2-runtime.smoke.ts` remain separate checks.
+This is local adapter/config acceptance, not Vercel CLI or live preview acceptance.
+No CLI/project link or authorized nonproduction resources were available. Generated
+Vercel Function count/routes/size, original rewrite path, large JSON response behavior,
+deployed browser cookies, Neon transport/locking, Blob OIDC/CDN and Gemini remain
+explicit external gates. Phase 8 is PARTIAL until unresolved platform behavior is
+demonstrated; do not begin Phase 9 from a successful Vite build alone.

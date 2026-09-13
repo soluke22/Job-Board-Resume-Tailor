@@ -24,6 +24,9 @@ export function createAuthOptions(database: BetterAuthOptions['database'], findO
   const config = authConfiguration();
   return {
     appName: 'CareerOS', baseURL: config.origin, secret: process.env.BETTER_AUTH_SECRET!,
+    // Library error objects can contain provider/query/session internals. Route
+    // boundaries expose generic operational failures instead of logging them.
+    logger: { disabled: true },
     database,
     trustedOrigins: [config.origin],
     emailAndPassword: { enabled: false, disableSignUp: true },
