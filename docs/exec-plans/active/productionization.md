@@ -5,52 +5,30 @@ Truthful discovery and evidence-grounded career workflows with durable owner-onl
 private storage and a separate synthetic demo. GitHub is canonical.
 
 ## Current Branch
-dev; Phase 9 began clean at freshly fetched dev == origin/dev == b98a2a8.
-Authorized coherent Phase 9 checkpoints and normal fast-forward origin/dev push.
-No Phase 10/main/PR/Studio/Vercel deployment/remote migration.
+Phase 10 dev release candidate; baseline freshly fetched clean dev/origin/dev
+24a5737537d92c7c51b5df2939a3352bcaead082. Main unchanged at
+18bde7f451e4e5f39e303f82a0507a30233cd35e. Normal scoped dev checkpoint/push.
 
 ## Current Phase / Scope and Acceptance
-Phase 9.1 — historical marker provenance/disposition follow-up.
-Baseline clean dev == freshly fetched origin/dev == df4edc9. Narrow scope: trace
-three historical blobs safely, establish exposure, obtain owner classification,
-record disposition and verify current builds. No repeated full security audit.
-Acceptance: no raw historical values printed/persisted; exact trace and owner
-confirmation; no current marker occurrences; relevant scans/full release green;
-normal dev checkpoint/push. No Phase 10/main/Studio/Vercel/history rewrite.
-[Phase 9 matrix](phase-9-acceptance.md) records threat model, controls, findings,
-adversarial evidence, dependencies and release checklist. Parent owns writes;
-requested GPT-5.6 Sol High reviewer read-only.
+Phase 10 — dev -> main pull request and merge readiness.
+[Phase 10 acceptance](phase-10-acceptance.md) records categorized release delta,
+checks, dependencies/migrations, privacy, clean reproduction and PR status.
+No merge/main mutation, Phase11, Vercel deployment or remote migration authorized.
 
 ## Current Status
-**PASS — Phase 9.1 resolves the sole remaining historical provenance/disposition
-question. Phase 9 PASS; Phase 10 code readiness YES, not begun.**
-Owner explicitly confirms the one shared real/current professional/job-search
-email was deliberately published on resumes, not synthetic, a credential or
-private-workspace-only data. All three marker blobs are classification B /
-INTENDED PUBLIC DATA. No rotation or history rewrite required for this value.
-First containing commit 18bde7f; last dev containing snapshot b12fd5b; removed
-in 41a04f8. Public origin/main and origin/dev contain introduction ancestry;
-main tip still retains intentional public contact. No other fetched branches/tags.
-Reproducible safe scan: 27 commits/395 text blobs, three marker blobs, one value,
-five occurrences/three paths; no current dev/client/server-build occurrences.
-Final Phase 9.1 release validation/publication recorded below.
-Concrete moderate gaps remediated: legacy gap client payload, unbounded provider
-volume, deeply nested persistent metadata and sensitive candidate/edited-claim
-model leakage. No demonstrated auth/CSRF/IDOR/SSRF/file bypass remains in bounded
-review. Durable owner budgets reserve each AI call plus external/file operations;
-0003 adds counter table only. Core assessment v3 invalidates old cached bases.
-Full Node24 release composition passes 113/113 tests, typecheck/build/harness,
-strict privacy zero and runtime bundle scan (3 files/706087 bytes). Focused 24/24
-before final scanner fixture; startup smoke 1/1; migration no-drift/fresh/upgrade
-and synthetic evidence validators pass. Final publication recorded below.
-Dependency audit: baseline 6 moderate ->4 moderate, zero high/critical. qs6.16
-override fixes runtime chain; four old Drizzle/esbuild loader-chain entries are
-explicitly accepted because vulnerable serve API is not invoked. npm ci/tree pass.
-Initial history triage found three former seed/auth marker objects. Phase 9.1
-resolves their provenance through owner confirmation and safe commit trace; no
-values copied, no main/history rewrite/rotation. Intent applies only to this value.
-Actual Vercel/Google OAuth/browser/Neon/Private Blob/Gemini remain
-PENDING_EXTERNAL_CONFIG, carried from Phase 8 deferral and not Phase 9 defects.
+PASS — deterministic release checks 114/114, typecheck/build/harness/strict privacy
+zero/runtime, migration drift/fresh/upgrade, evidence validators/startup pass.
+Baseline exact-SHA clean Git archive reproduces install/typecheck/114 tests/build.
+Phase10 removes two EOF blanks and adds acceptance/plan records only.
+PR #1: https://github.com/soluke22/Job-Board-Resume-Tailor/pull/1 (main <- dev).
+READY_TO_MERGE after final published-head mergeability/check verification.
+Phase9 accepted history/contact/security/dependency dispositions remain valid;
+four moderate Drizzle/esbuild tooling entries, zero high/critical; unchanged lock.
+Assessment phase4.1-v3 retains accepted Phase9 cache invalidation/calibration.
+Provider gates deferred; code merge readiness is not production readiness.
+Next exact step: owner review/authorize merge. After merged canonical main exists,
+Phase11 Google AI Studio merged-main compatibility verification; not begun here.
+Historical Phase9/Phase8 entries below retain their original checkpoint context.
 
 ## Historical Phase 8 accepted/deferred status
 
@@ -87,11 +65,9 @@ both evidence validators, built startup smoke and diff check pass. Publication
 recorded in the checkpoint below; plan encoding normalized from four legacy dash bytes.
 
 ## Next Exact Step
-Historical contact/seed disposition resolved by owner in Phase 9.1.
-Next phase after separate authorization:
-**Phase 10 — dev → main pull request and merge readiness.**
-Do not begin Phase 10 in this task. Phase 8 external gates remain deferred; no
-main/PR/Studio/Vercel deployment/remote resource action authorized here.
+Owner review/authorize merge of dev -> main PR #1.
+After canonical merged main exists: Phase 11 Google AI Studio merged-main
+compatibility verification. No Studio/deployment/remote migrations in Phase10.
 
 ## Historical Phase 7 Branch
 dev; Phase 7 began clean at freshly fetched dev == origin/dev ==
@@ -623,3 +599,6 @@ Phase 9.1 PASS; Phase 9 final PASS; Phase 10 code readiness YES, not begun.
 Live Vercel/OAuth/browser/Neon/Blob/Gemini PENDING_EXTERNAL_CONFIG unchanged.
 No raw historical values printed/persisted; no main/PR/Studio/Vercel/remote
 migration/rotation/history rewrite. Stop after checkpoint publication.
+
+## Phase 10 authorized scope (2026-09-13)
+Clean freshly fetched dev/origin/dev 24a5737537d92c7c51b5df2939a3352bcaead082; main 18bde7f451e4e5f39e303f82a0507a30233cd35e; 0 main-side /26 dev-side commits. Verify release delta, dependencies, migrations, deterministic gates and clean-source reproduction; create dev -> main PR and inspect readiness. Acceptance: phase-10-acceptance.md. No merge/main mutation, Phase 11, deployment or remote migration. External gates remain deferred.
