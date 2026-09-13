@@ -37,6 +37,7 @@ test('real file repository: owner scope, durable recovery, upload/download/delet
   let gets = 0, puts = 0, unexpectedStatus = 0;
   const app = express();
   installPrivateFiles(app, {
+    budget: async () => {},
     guard: (_req, res, next) => { res.locals.ownerId = currentOwner; next(); },
     repository: {
       list: owner => { if (dbReadFailure) throw new Error('synthetic DB outage'); return repo.list(owner); },

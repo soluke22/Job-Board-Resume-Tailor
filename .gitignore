@@ -20,4 +20,6 @@ credentials/
 *.key
 *.p12
 .vercel/
+.npm-cache/
+.phase9-*.json
 .harness-tools/

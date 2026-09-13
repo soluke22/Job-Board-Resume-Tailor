@@ -37,6 +37,7 @@ test('private files enforce ownership and proxy data without permanent URLs', as
   let current: typeof session | null = null;
   const records: any[] = []; let reads = 0;
   const app = express(); installPrivateFiles(app, {
+    budget: async () => {},
     guard: createOwnerGuard(async () => current),
     repository: { list: async owner => records.filter(r => r.ownerId === owner), find: async (owner,id) => records.find(r => r.ownerId === owner && r.id === id), insert: async record => { records.push(record); return record as any; }, remove: async () => {}, upload: async (record, write) => { await write(); records.push(record); return record as any; }, reconcile: async () => 0 },
     blobs: { put: async (path: string) => ({ pathname: path }), get: async () => { reads++; return { statusCode: 200, stream: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('private')); c.close(); } }) }; }, del: async () => {} } as any,

@@ -64,8 +64,8 @@ and failure/retry tests. Live Neon/Blob and multi-connection behavior remain pen
 
 Legacy private browser data is read only through explicit owner import preview;
 originals remain on the device until the user removes them. New private/auth
-records are never written to localStorage. Privacy redaction exists, but free-text
-minimization, semantic evidence provenance and SSRF remain later acceptance work.
+records are never written to localStorage. Privacy redaction, selected-evidence minimization, deterministic provenance and
+DNS-pinned SSRF controls are audited locally; live/semantic limits remain explicit.
 No service worker/static cache stores real private records. No credentials belong
 in browser-prefixed variables, public bundles or repository files.
 
@@ -83,3 +83,32 @@ acceptance and private localStorage defaults. Those descriptions are historical,
 not current dev behavior. Inherited integrations were committed in 41a04f8;
 stale persistence fixtures were corrected in 0828816. Phase 1 audited and fixed
 the committed implementation without replacing Better Auth.
+
+## Phase 9 release privacy controls
+
+New workspace saves/imports and JSON uploads reject excessive depth (>64), more
+than 100000 JSON nodes and prototype-shaped keys before recursive validation or
+persistence. Owner-scoped imports still downgrade evidence/artifact trust and are
+atomic. Exported owner JSON contains private PII and is not encrypted.
+
+Provider usage is durable owner/category/hour/day data without prompts/content.
+Each Gemini invocation (including proof batches) requires atomic reservation:
+60/hour and 200/day. External fetch/discovery and private Blob read/mutation
+operations allow120/hour and 500/day per category. DB outage/limit denial fails
+closed; failed calls retain usage; limits bound counts, not dollars/tokens.
+Fixed-window boundary bursts are possible; provider billing caps/alerts remain
+later operational acceptance. All Gemini requests use 30-second timeouts.
+
+Unused legacy gap generation returns410; it cannot send arbitrary client evidence.
+Assessment/resume/regeneration exclude detected sensitive candidate context before
+Gemini; a sensitive edited claim is rejected even with a safe evidence envelope.
+Core assessment version phase 4.1-v3 makes prior cached bases stale without changing
+scoring coefficients. Shared lexical privacy triage is conservative, not exhaustive
+semantic classification; ordinary concurrency/medical-software/booking domain
+phrases have tested exceptions. Owner should supply concise, non-sensitive evidence.
+
+Current strict source/client triage is zero findings. Reachable Git history still
+has personal-contact markers in former auth defaults/private seed; authenticity
+and exposure disposition are UNVERIFIED. No private literal is repeated in audit
+artifacts. Release cannot claim history free of real PII; see Phase 9 matrix.
+Historical remediation/rotation is not automatic, and main remains untouched.

@@ -9,6 +9,7 @@ import * as s from './db/schema';
 import { workspaceInput } from './db/workspaceValidation';
 import { assessmentMetadata, isCurrent, fingerprint } from './assessment';
 import { inspectResume, factualClaims } from './resumeProvenance';
+import { assertBoundedJson } from './inputBounds';
 export { workspaceInput } from './db/workspaceValidation';
 
 export type WorkspaceInput = z.infer<typeof workspaceInput>;
@@ -105,6 +106,7 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
   }
   async function save(ownerId: string, raw: unknown, revision: number, importing = false, assessedJobId?: string, resumeJobId?: string, artifactJobId?: string, artifactKey?: string) {
     if (!ownerId) throw new WorkspaceValidationError('Owner identity required');
+    try { assertBoundedJson(raw); } catch { throw new WorkspaceValidationError('Invalid workspace complexity'); }
     const parsed = workspaceInput.safeParse(raw);
     if (!parsed.success || !Number.isSafeInteger(revision) || revision < 0) throw new WorkspaceValidationError('Invalid workspace or revision');
     const input = parsed.data;

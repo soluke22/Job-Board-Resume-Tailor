@@ -21,6 +21,20 @@ function fixture() {
   const output:any={claims:[{claimType:'summary',scopeId:'',text:'Implemented React components.',evidenceIds:['e1'],requirementIds:['r1']},{claimType:'experience',scopeId:'beta',text:'Supported TypeScript testing.',evidenceIds:['e2'],requirementIds:[]},{claimType:'experience',scopeId:'acme',text:'Triaged 75+ Jira tickets.',evidenceIds:['e3'],requirementIds:['r1']},{claimType:'project',scopeId:'project-a',text:'Contributed Node.js project modules.',evidenceIds:['p1'],requirementIds:[]},{claimType:'skill',scopeId:'',text:'React',evidenceIds:['e1'],requirementIds:['r1']}]};
   return {w,job,output,resume:assembleResume(output,w,job,new Set(['e1','e2','p1','e3']))};
 }
+
+test('Phase 9 sensitive manual claim is rejected before regeneration reaches Gemini', async () => {
+  const { w, job, resume } = fixture();
+  const claim = resume.claimLedger!.find(c => c.claimType === 'experience')!;
+  const text = 'I have bipolar disorder; implemented React components.';
+  claim.text = text;
+  const bullet = resume.experience.flatMap(e => e.bullets).find(b => b.id === claim.claimId)!;
+  bullet.text = text;
+  job.tailoredResume = resume;
+  let called = false; let status = 0;
+  const handler = createResumeHandler('regenerate', () => async () => { called = true; throw new Error('Provider must not be called'); }, { read: async () => w } as any);
+  await handler({ body: { jobId: job.id, claimId: claim.claimId } } as any, { locals: { ownerId: 'owner-a' }, set() {}, status(code: number) { status = code; return this; }, json() {} } as any);
+  assert.equal(called, false); assert.equal(status, 422);
+});
 test('Phase 5 current assessment is mandatory; stretch is eligible and SKIP excluded',()=>{
   const {w,job}=fixture();assert.equal(currentJob(w,job.id),job);assert.equal(buildPlan(w,job).skillsToBackfill.length,0);
   for(const state of ['UNASSESSED','STALE',undefined])assert.throws(()=>currentJob({...w,jobs:[{...job,assessmentStatus:state}]},job.id));

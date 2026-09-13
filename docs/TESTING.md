@@ -261,3 +261,29 @@ Vercel Function count/routes/size, original rewrite path, large JSON response be
 deployed browser cookies, Neon transport/locking, Blob OIDC/CDN and Gemini remain
 explicit external gates. Phase 8 is PARTIAL until unresolved platform behavior is
 demonstrated; do not begin Phase 9 from a successful Vite build alone.
+
+## Phase 9 security/release coverage
+
+Focused: node --import tsx --test tests/phase-9-security.test.ts, plus Phase 5
+sensitive-manual-claim and Phase 2 migration-preservation regressions. Tests cover
+exact Origin adversaries, reserved/encoded SSRF destinations and mixed DNS,
+atomic JSON complexity rejection, scanner positive/negative fixtures with no
+matched-value logging, legacy gap410, malformed private JSON no-store, model
+payload sensitivity and durable per-owner budget concurrency/rollback/outages.
+
+release:check additionally runs runtime:check (Node24, one lock, Vercel config,
+client environment/module/value scan). privacy:scan now scans tracked text and
+fresh client/maps plus strong PEM/provider-key/DB-URL/bearer-JWT/.env accident
+rules. New files must be reviewed/staged so tracked-file scan includes them.
+Weak synthetic test credentials do not disable strong rules. These are bounded
+regex/code-path checks, not comprehensive DLP or live provider certification.
+
+Run and record full and omit-dev npm audit near release; do not force major fixes.
+Optional peers can retain build tooling in omit-dev, so inspect runtime imports
+and vulnerable API reachability. Critical/high production findings block;
+moderates require fix or concrete documented disposition. The accepted old
+Drizzle-loader esbuild chain does not invoke vulnerable serve; do not expose
+old tooling dev servers. Registry unavailability is UNVERIFIED, never zero.
+Reachable-history contact markers remain unresolved separately from green current
+source checks. Full authenticated/deployed browser/header acceptance remains
+PENDING_EXTERNAL_CONFIG; no local fixture claims live OAuth/Neon/Blob/Gemini.
