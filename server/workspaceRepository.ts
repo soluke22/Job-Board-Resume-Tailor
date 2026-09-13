@@ -1,16 +1,16 @@
-import { normalizeApplicationJob, transitionRequestSchema } from '../src/types/application';
-import { transitionApplication, ApplicationTransitionError } from './applicationLifecycle';
-import { inspectArtifact, preserveArtifact } from './artifactProvenance';
+import { normalizeApplicationJob, transitionRequestSchema } from '../src/types/application.js';
+import { transitionApplication, ApplicationTransitionError } from './applicationLifecycle.js';
+import { inspectArtifact, preserveArtifact } from './artifactProvenance.js';
 import { and, eq, notInArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { getDb } from './db/client';
-import * as s from './db/schema';
-import { workspaceInput } from './db/workspaceValidation';
-import { assessmentMetadata, isCurrent, fingerprint } from './assessment';
-import { inspectResume, factualClaims } from './resumeProvenance';
-import { assertBoundedJson } from './inputBounds';
-export { workspaceInput } from './db/workspaceValidation';
+import { getDb } from './db/client.js';
+import * as s from './db/schema.js';
+import { workspaceInput } from './db/workspaceValidation.js';
+import { assessmentMetadata, isCurrent, fingerprint } from './assessment.js';
+import { inspectResume, factualClaims } from './resumeProvenance.js';
+import { assertBoundedJson } from './inputBounds.js';
+export { workspaceInput } from './db/workspaceValidation.js';
 
 export type WorkspaceInput = z.infer<typeof workspaceInput>;
 export class WorkspaceConflict extends Error {}

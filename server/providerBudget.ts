@@ -1,6 +1,6 @@
 import { and, eq, lt, sql } from 'drizzle-orm';
-import { getDb } from './db/client';
-import { providerUsage } from './db/schema';
+import { getDb } from './db/client.js';
+import { providerUsage } from './db/schema.js';
 
 export class ProviderBudgetExceeded extends Error {}
 // Count each Gemini invocation (including proof batches); uploads/fetches count

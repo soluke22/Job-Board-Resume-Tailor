@@ -1,21 +1,21 @@
-import { createArtifactHandler } from './server/artifactRoutes';
+import { createArtifactHandler } from './server/artifactRoutes.js';
 import { z } from 'zod';
-import { AssessmentError } from './server/assessment';
-import { createAssessmentHandler } from './server/assessmentRoutes';
-import { createResumeHandler } from './server/resumeRoutes';
+import { AssessmentError } from './server/assessment.js';
+import { createAssessmentHandler } from './server/assessmentRoutes.js';
+import { createResumeHandler } from './server/resumeRoutes.js';
 import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
-import { installAuth, requireWorkspaceOwner, privateNoStore } from './server/auth';
-import { assertBoundedJson } from './server/inputBounds';
-import { reserveProviderCall, ProviderBudgetExceeded, isBudgetedExternalPath } from './server/providerBudget';
-import { installPrivateFiles } from './server/privateFiles';
-import { createWorkspaceRouter } from './server/workspaceRoutes';
-import { redactAiPayload } from './server/privacy';
-import { verifyPostingAts } from './server/atsAdapters';
-import { executeDiscoveryRequest, validateDiscoveryInput } from './server/discovery';
-import { mergeDiscoveredJobs } from './src/utils/jobIdentity';
-import { safeFetchText } from './server/safeFetch';
+import { installAuth, requireWorkspaceOwner, privateNoStore } from './server/auth.js';
+import { assertBoundedJson } from './server/inputBounds.js';
+import { reserveProviderCall, ProviderBudgetExceeded, isBudgetedExternalPath } from './server/providerBudget.js';
+import { installPrivateFiles } from './server/privateFiles.js';
+import { createWorkspaceRouter } from './server/workspaceRoutes.js';
+import { redactAiPayload } from './server/privacy.js';
+import { verifyPostingAts } from './server/atsAdapters.js';
+import { executeDiscoveryRequest, validateDiscoveryInput } from './server/discovery.js';
+import { mergeDiscoveredJobs } from './src/utils/jobIdentity.js';
+import { safeFetchText } from './server/safeFetch.js';
 
 
 dotenv.config();

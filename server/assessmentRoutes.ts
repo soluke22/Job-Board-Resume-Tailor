@@ -1,8 +1,8 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { assessJob, AssessmentError, type StructuredModel } from './assessment';
-import { workspaceRepository, WorkspaceConflict } from './workspaceRepository';
-import type { JobRecord } from '../src/types';
+import { assessJob, AssessmentError, type StructuredModel } from './assessment.js';
+import { workspaceRepository, WorkspaceConflict } from './workspaceRepository.js';
+import type { JobRecord } from '../src/types/index.js';
 
 const requestSchema=z.object({jobId:z.string().min(1).max(200)}).strict();
 export function createAssessmentHandler(modelForRequest:(req:Request)=>StructuredModel, repository=workspaceRepository) {

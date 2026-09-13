@@ -1,7 +1,7 @@
-import app from '../server';
+import app from '../server.js';
 import express from 'express';
 import path from 'node:path';
-import { closeDb } from './db/client';
+import { closeDb } from './db/client.js';
 
 if (process.env.NODE_ENV !== 'production') {
   const { createServer } = await import('vite');

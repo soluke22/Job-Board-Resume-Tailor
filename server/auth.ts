@@ -3,8 +3,8 @@ import { betterAuth, type BetterAuthOptions } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { fromNodeHeaders, toNodeHandler } from 'better-auth/node';
-import { getDb } from './db/client';
-import * as schema from './db/schema';
+import { getDb } from './db/client.js';
+import * as schema from './db/schema.js';
 
 export function authConfiguration() {
   const names = ['OWNER_EMAIL', 'DATABASE_URL', 'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'] as const;

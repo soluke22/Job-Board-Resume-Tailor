@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { assessmentMetadata, eligibleEvidence, fingerprint, isCurrent, type StructuredModel } from './assessment';
-import { redactAiPayload, isSensitiveCandidateText } from './privacy';
-import type { EvidenceItem, JobRecord, TailoredResume, TailoringPlan } from '../src/types';
-import type { ResumeBasis, ResumeClaim } from '../src/types/provenance';
+import { assessmentMetadata, eligibleEvidence, fingerprint, isCurrent, type StructuredModel } from './assessment.js';
+import { redactAiPayload, isSensitiveCandidateText } from './privacy.js';
+import type { EvidenceItem, JobRecord, TailoredResume, TailoringPlan } from '../src/types/index.js';
+import type { ResumeBasis, ResumeClaim } from '../src/types/provenance.js';
 
 export const TAILORING_VERSION = 'phase5-extractive-v1';
 export class ResumeError extends Error {}

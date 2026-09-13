@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { effectiveEvents, normalizeHistory, type TransitionRequest, type StatusTransitionEvent, type ApplicationSnapshot } from '../src/types/application';
-import { fingerprint } from './assessment';
+import { effectiveEvents, normalizeHistory, type TransitionRequest, type StatusTransitionEvent, type ApplicationSnapshot } from '../src/types/application.js';
+import { fingerprint } from './assessment.js';
 function applicationFreshness(publishedAt: string | undefined, at: string) {
   const age=(Date.parse(at)-Date.parse(publishedAt || ''))/86400000;
   return !Number.isFinite(age) || age<0 ? 'UNKNOWN' : Math.floor(age)<=7 ? 'NEW' : Math.floor(age)<=21 ? 'RECENT' : Math.floor(age)<=45 ? 'ESTABLISHED' : 'OLD';
