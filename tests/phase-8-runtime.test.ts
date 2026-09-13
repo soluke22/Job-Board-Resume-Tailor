@@ -163,6 +163,7 @@ test('private 2 MiB streaming, provider failure and client disconnect close adap
   const boundaries: ReturnType<typeof boundary>[] = [];
   const application = express();
   installPrivateFiles(application, {
+    budget: async () => {},
     guard: (_req, res, next) => { getDb(); res.locals.ownerId = 'synthetic-owner'; next(); },
     repository: { find: async () => ({ id: 'synthetic', ownerId: 'synthetic-owner', blobPath: 'private/synthetic', originalFilename: 'synthetic.txt', mimeType: 'text/plain', size: MAX_PRIVATE_FILE_BYTES }) } as any,
     blobs: { get: async (_path: string, options: any) => {

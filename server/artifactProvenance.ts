@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { eligibleEvidence, fingerprint, retrieveEvidence, type StructuredModel } from './assessment';
 import { currentJob, inspectResume, factualClaims, evidenceSentences, type ResumeWorkspace } from './resumeProvenance';
-import { redactAiPayload } from './privacy';
+import { redactAiPayload, isSensitiveText } from './privacy';
+export { isSensitiveText } from './privacy';
 import type { JobRecord, EvidenceItem } from '../src/types';
 import type { ArtifactProvenance, QuestionCategory } from '../src/types/artifacts';
 
@@ -141,9 +142,6 @@ export async function generateMessage(w:ResumeWorkspace,job:JobRecord,model:Stru
     concreteImpact:evidence,whyCandidateRelevant:fit,generatedAt:new Date().toISOString()},w,job,'outreach',ids,requirements,skip?'NEEDS_REVIEW':'READY',skip?['User override; assessment blocker remains']:[]);
 }
 
-export function isSensitiveText(text:string) {
-  return /\brace\b|ethnic|disabil|veteran|gender|\bsex\b|religio|sexual orientation|criminal|medical|accommodat|health condition|pregnan|bipolar|\badhd\b|autis|depress|anxiety|psychiatr|mental health|\bhiv\b|diabet|cancer|diagnos|\bblind\b|deaf|\bage\b|year.old|date of birth|born in|\btransgender\b|\bnon.binary\b|\bgay\b|\blesbian\b/.test(text.toLowerCase());
-}
 export function classifyQuestion(question:string):QuestionCategory {
   const q=question.toLowerCase();
   if(isSensitiveText(q))return 'SENSITIVE_MANUAL';

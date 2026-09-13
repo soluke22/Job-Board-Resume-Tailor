@@ -54,7 +54,7 @@ test('matching direct Strong, adjacency Moderate/Weak, Missing; unknown IDs and 
   assert.throws(()=>validateMatches({matches:matching().matches.map(m=>({...m,requirementId:'unknown'}))},c.requirements,[evidence()]));
 });
 test('fixed arithmetic, stronger evidence improves results, role family cannot assign score',()=>{
-  assert.equal(ALGORITHM_VERSION,'phase4.1-v2');assert.equal(scored().qualificationFit,10);
+  assert.equal(ALGORITHM_VERSION,'phase4.1-v3');assert.equal(scored().qualificationFit,10);
   assert.equal(scored('Moderate').qualificationFit,5.5);assert.equal(scored('Moderate').evidenceCoverage,3.5);
   assert.equal(scored('Moderate').recommendation,'SELECTIVE_APPLY');assert.equal(scored('Missing').qualificationFit,0);
   const c=contract(),m=validateMatches(matching(),c.requirements,[evidence()]);

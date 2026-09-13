@@ -5,20 +5,39 @@ Truthful discovery and evidence-grounded career workflows with durable owner-onl
 private storage and a separate synthetic demo. GitHub is canonical.
 
 ## Current Branch
-dev; Phase 8 began clean at freshly fetched dev == origin/dev ==
-bec000ba171c2eb40342e518727af058fda6f880 (Phase 7 documentation publication).
-Authorized coherent Phase 8 commits and normal fast-forward dev push only.
-Deferral continuation recovered clean dev == origin/dev == b2d5d40; only this plan
-and the Phase 8 acceptance matrix may change. No renewed platform investigation.
-No main, PR, Studio, production deployment, remote migration or Phase 9.
+dev; Phase 9 began clean at freshly fetched dev == origin/dev == b98a2a8.
+Authorized coherent Phase 9 checkpoints and normal fast-forward origin/dev push.
+No Phase 10/main/PR/Studio/Vercel deployment/remote migration.
 
 ## Current Phase / Scope and Acceptance
-Phase 8 — Vercel-compatible architecture completion + runtime acceptance.
-[Phase 8 matrix](phase-8-acceptance.md) records pre-edit scope and final contracts.
-Retain Vite/Express; parent owns writes; requested read-only docs researcher verifies
-official provider contracts. No framework migration or prior business-contract redesign.
+Phase 9 — Security/privacy/release audit.
+[Phase 9 matrix](phase-9-acceptance.md) records threat model, controls, findings,
+adversarial evidence, dependencies and release checklist. Parent owns writes;
+requested GPT-5.6 Sol High reviewer read-only.
 
 ## Current Status
+**PARTIAL — deterministic code/security audit completed; historical contact/seed
+provenance and exposure disposition UNVERIFIED. Phase 10 readiness: NO.**
+Concrete moderate gaps remediated: legacy gap client payload, unbounded provider
+volume, deeply nested persistent metadata and sensitive candidate/edited-claim
+model leakage. No demonstrated auth/CSRF/IDOR/SSRF/file bypass remains in bounded
+review. Durable owner budgets reserve each AI call plus external/file operations;
+0003 adds counter table only. Core assessment v3 invalidates old cached bases.
+Full Node24 release composition passes 113/113 tests, typecheck/build/harness,
+strict privacy zero and runtime bundle scan (3 files/706087 bytes). Focused 24/24
+before final scanner fixture; startup smoke 1/1; migration no-drift/fresh/upgrade
+and synthetic evidence validators pass. Final publication recorded below.
+Dependency audit: baseline 6 moderate ->4 moderate, zero high/critical. qs6.16
+override fixes runtime chain; four old Drizzle/esbuild loader-chain entries are
+explicitly accepted because vulnerable serve API is not invoked. npm ci/tree pass.
+History triage 341 text blobs found contact-marker objects in former seed/auth
+files reachable through main. Current zero findings does not certify historical
+PII; no values copied, no main/history rewrite/rotation. Resolve before Phase 10.
+Actual Vercel/Google OAuth/browser/Neon/Private Blob/Gemini remain
+PENDING_EXTERNAL_CONFIG, carried from Phase 8 deferral and not Phase 9 defects.
+
+## Historical Phase 8 accepted/deferred status
+
 **PARTIAL — code/runtime contract accepted locally; external Vercel/provider acceptance deferred until a Vercel project and isolated staging resources exist.**
 Deterministic/local Vercel-compatible contract: verified by the prior accepted gates.
 Actual generated Vercel build/Function output, routing/path preservation, deployed
@@ -52,11 +71,11 @@ both evidence validators, built startup smoke and diff check pass. Publication
 recorded in the checkpoint below; plan encoding normalized from four legacy dash bytes.
 
 ## Next Exact Step
-**Phase 9 — Security/privacy/release audit**
-Do not begin it in this turn. The user's deferral instruction supersedes the earlier
-requirement to resolve actual Phase 8 platform gates first. Deferred acceptance
-requires a future explicitly authorized Vercel project and isolated staging resources;
-do not create/link/deploy or change architecture to compensate for their absence.
+Resolve historical contact/seed provenance and exposure disposition before release.
+Next phase after that prerequisite and separate authorization:
+**Phase 10 — dev → main pull request and merge readiness.**
+Do not begin Phase 10 in this task. Phase 8 external gates remain deferred; no
+main/PR/Studio/Vercel deployment/remote resource action authorized here.
 
 ## Historical Phase 7 Branch
 dev; Phase 7 began clean at freshly fetched dev == origin/dev ==
@@ -97,7 +116,7 @@ directly rechecked both demonstrated calibration defects and confirmed resolved.
 Calibration checkpoint ac28e4f published by normal fast-forward to origin/dev;
 fresh fetch verified clean dev == origin/dev after publication. This documentation
 checkpoint records completion; verify clean/equal fetched refs after its publication.
-Algorithm phase4.1-v2; old assessments/artifacts become stale via existing basis.
+Algorithm phase 4.1-v2; old assessments/artifacts become stale via existing basis.
 
 Phase 5 conservative deterministic contract complete and published. Focused 11/11 and full
 63/63 tests pass; initial release composition passes typecheck/build/harness/tests
@@ -529,3 +548,22 @@ Same hashed assets and client total 706107 bytes reproduced; six moderate npm
 advisories and >500 kB warning unchanged. No actual Vercel CLI/live runtime/provider
 acceptance inferred. Final docs-only checkpoint records reproduction/publication;
 harness/diff checks and normal dev push follow. No main/PR/Studio/production/Phase 9.
+
+## Phase 9 authorized audit (2026-09-13)
+Baseline clean dev == freshly fetched origin/dev == b98a2a8. Scope and acceptance recorded before fixes in [Phase 9 matrix](phase-9-acceptance.md). Audit auth/ownership/files/SSRF/AI/import/history and release/supply-chain boundaries; parent owns writes, requested read-only security reviewer. No Phase 10/main/PR/Studio/deployment/remote migration. Phase 8 external gates remain PENDING_EXTERNAL_CONFIG and are not defects. Historical pre-fix scope entry; audit/remediation results are recorded in the validated checkpoint below.
+
+## Phase 9 validated checkpoint (2026-09-13)
+PARTIAL. Threat model and all boundary evidence/dispositions recorded in Phase 9
+matrix. Auth/IDOR/files/SSRF: no demonstrated bypass in bounded code/synthetic
+review. AI/import/input/budget findings fixed with adversarial regressions.
+Current-source secrets/logging/bundle: strict zero; historical contact/seed
+provenance remains UNVERIFIED and blocks unqualified Phase 10 readiness.
+Full and production audits four accepted moderate loader-chain entries after
+runtime qs fix; no high/critical advisory. Main-to-dev diff and additive migration
+reviewed without main writes. Node24 npm ci/npm ls/full release 113/113 passed;
+focused 24/24 (before final scanner fixture), smoke 1/1, no-drift/fresh/upgrade,
+evidence validators and privacy/harness pass. Final source/doc/staged checks and
+scoped checkpoint publication follow; no hash embedded for this checkpoint.
+External Vercel/OAuth/Neon/Blob/Gemini gates PENDING_EXTERNAL_CONFIG.
+Next exact phase: Phase 10 — dev → main pull request and merge readiness, only
+after history disposition and new authorization; not begun.

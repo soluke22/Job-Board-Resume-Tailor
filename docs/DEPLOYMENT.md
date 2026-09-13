@@ -245,3 +245,22 @@ All phases converge on dev -> release/security audit -> dev/main PR -> merged ma
 GitHub -> main stable -> finalize Vercel production. Previews can support later
 validation. No main mutation, main PR, Studio opening or production deployment
 belongs to Phase 2. See DEVELOPMENT_WORKFLOW and the active execution plan.
+
+## Phase 9 release/security procedure
+
+Apply additive 0003 provider_usage migration to the explicitly authorized target
+before enabling private provider calls; missing counter storage fails closed.
+Counters are server-only operational metadata and not workspace exports.
+No remote migration has been run. Follow reviewed backup/target/apply/preservation
+order; never delete production data to recover. Vercel static/API header rules
+configure nosniff/no-referrer/frame denial; actual deployed headers remain pending.
+An enforcing SPA CSP needs rendered compatibility testing (motion/print inline
+styles); file downloads retain restrictive sandbox CSP now.
+
+Release requires current-source gates plus a fresh dependency disposition and
+historical-contact exposure decision. Phase 9 found unresolved contact markers in
+reachable former seed/auth history; no values included in reports, no history
+rewrite/main modification/rotation. Code audit and live production acceptance
+remain distinct. Do not advance to Phase 10 while that privacy question is unresolved.
+The previously deferred Vercel/Google/Neon/Blob/Gemini gates remain
+PENDING_EXTERNAL_CONFIG; their absence is not a new architecture defect.

@@ -257,7 +257,7 @@ export const storageService = {
       // Keep recent 100 entries
       cache.setItem(KEYS.PRIVATE_AUDIT_LOG, JSON.stringify(logs.slice(0, 100)));
     } catch (e) {
-      console.error('Failed to log audit event:', e);
+      console.error('Failed to log audit event:');
     }
   },
 

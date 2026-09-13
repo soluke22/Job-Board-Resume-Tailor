@@ -4,24 +4,19 @@ import { AssessmentError } from './server/assessment';
 import { createAssessmentHandler } from './server/assessmentRoutes';
 import { createResumeHandler } from './server/resumeRoutes';
 import express, { Request, Response, NextFunction } from 'express';
-import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
-import { installAuth, requireWorkspaceOwner } from './server/auth';
+import { installAuth, requireWorkspaceOwner, privateNoStore } from './server/auth';
+import { assertBoundedJson } from './server/inputBounds';
+import { reserveProviderCall, ProviderBudgetExceeded, isBudgetedExternalPath } from './server/providerBudget';
 import { installPrivateFiles } from './server/privateFiles';
 import { createWorkspaceRouter } from './server/workspaceRoutes';
 import { redactAiPayload } from './server/privacy';
-import { detectAtsProvider, verifyPostingAts } from './server/atsAdapters';
+import { verifyPostingAts } from './server/atsAdapters';
 import { executeDiscoveryRequest, validateDiscoveryInput } from './server/discovery';
 import { mergeDiscoveredJobs } from './src/utils/jobIdentity';
 import { safeFetchText } from './server/safeFetch';
-import {
 
-  calculateFreshnessBand,
-
-
-} from './server/searchEngine';
-import { JobRecord, SearchProfile } from './src/types';
 
 dotenv.config();
 
@@ -30,11 +25,20 @@ app.disable('x-powered-by');
 app.use((_req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('X-Frame-Options', 'DENY'); next(); });
 installAuth(app);
 installPrivateFiles(app);
+app.use('/api', privateNoStore);
 app.use(express.json({ limit: '3mb' }));
+app.use('/api', (req, res, next) => {
+  try { assertBoundedJson(req.body); next(); } catch { res.status(400).json({ error: 'Invalid request complexity' }); }
+});
 app.use('/api/workspace', createWorkspaceRouter());
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 // All remaining application APIs handle private data or invoke private services.
 app.use('/api', requireWorkspaceOwner);
+app.use('/api', async (req, res, next) => {
+  if (!isBudgetedExternalPath(req.path)) { next(); return; }
+  try { await reserveProviderCall(res.locals.ownerId, 'external'); next(); }
+  catch (error) { res.status(error instanceof ProviderBudgetExceeded ? 429 : 503).json({ error: 'External operation budget unavailable or exceeded; retry later' }); }
+});
 
 // Lazy initialization of GoogleGenAI
 function getGeminiClient(req: Request, alreadyMinimized = false): GoogleGenAI | null {
@@ -51,23 +55,15 @@ function getGeminiClient(req: Request, alreadyMinimized = false): GoogleGenAI | 
     }
   });
   const generate = client.models.generateContent.bind(client.models);
-  if (!alreadyMinimized) client.models.generateContent = (params: any) => generate(redactAiPayload(params, req.body?.candidateProfile));
+  client.models.generateContent = async (params: any) => {
+    await reserveProviderCall(req.res!.locals.ownerId, 'ai');
+    const bounded = { ...params, config: { ...params.config, httpOptions: { ...params.config?.httpOptions, timeout: 30000 } } };
+    return generate(alreadyMinimized ? bounded : redactAiPayload(bounded, req.body?.candidateProfile));
+  };
   return client;
 }
 
 const MODEL_NAME = 'gemini-3.8-flash';
-
-// Helper to safely extract JSON from Gemini response
-function extractCleanJson(text: string): any {
-  let cleaned = text.trim();
-  // Strip markdown code fences if present
-  if (cleaned.startsWith('```json')) {
-    cleaned = cleaned.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-  } else if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
-  }
-  return JSON.parse(cleaned);
-}
 
 // ==========================================
 // 0. Fetch Job Posting from URL
@@ -130,70 +126,9 @@ app.post('/api/match-evidence', assessmentHandler);
 // ==========================================
 // 3. Gap Interview Questions
 // ==========================================
-app.post('/api/gap-interview', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { fit, evidenceMatches, parsedJob } = req.body;
-
-    // Per spec: Only ask questions if projected fit is 8.0 or higher, a hard requirement has weak/missing evidence,
-    // and it could plausibly have been covered by undocumented past work.
-    if (!fit || fit.tailoredFitScore < 8.0) {
-      res.json({ questions: [] });
-      return;
-    }
-
-    const candidateGaps = (evidenceMatches || []).filter(
-      (m: any) => m.isHardRequirement && (m.strength === 'Weak' || m.strength === 'Missing')
-    );
-
-    if (candidateGaps.length === 0) {
-      res.json({ questions: [] });
-      return;
-    }
-
-    const ai = getGeminiClient(req);
-    if (!ai) {
-      res.status(503).json({
-        error:
-          'Gemini API key is not configured. Studio fails closed to prevent unverified hallucinations.'
-      });
-      return;
-    }
-
-    const prompt = `The candidate is interviewing for ${parsedJob.roleTitle} at ${parsedJob.company}.
-Their tailored fit score is ${fit.tailoredFitScore}/10 (8.0+).
-Generate up to 3 targeted, respectful interview questions for the candidate about specific gaps in hard requirements that could plausibly have been covered by undocumented past work in prior work or personal projects.
-Do NOT suggest inventing anything.
-NO em dashes.
-
-Gaps:
-${JSON.stringify(candidateGaps)}
-
-Return JSON:
-{
-  "questions": [
-    {
-      "id": string,
-      "requirement": string,
-      "question": string,
-      "contextRationale": string
-    }
-  ]
-}`;
-
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ text: prompt }],
-      config: {
-        responseMimeType: 'application/json'
-      }
-    });
-
-    const json = extractCleanJson(response.text || '{}');
-    res.json(json);
-  } catch (error: any) {
-    console.error('Private operation failed');
-    res.status(500).json({ error: 'Failed to generate gap questions' });
-  }
+// No UI caller remains. Fence arbitrary client gap context.
+app.post('/api/gap-interview', (_req, res) => {
+  res.status(410).json({ error: 'Legacy gap generation is unavailable; use reviewed evidence and current assessment' });
 });
 
 // ==========================================
@@ -255,11 +190,11 @@ Return JSON:
       model: MODEL_NAME,
       contents: [{ text: prompt }],
       config: {
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json', httpOptions: { timeout: 30000 }
       }
     });
 
-    const generated = extractCleanJson(response.text || '{}');
+    const generated = z.object({ paragraphs: z.array(z.string().max(6000)).min(3).max(4), evidenceThemesUsed: z.array(z.string().max(500)).max(20) }).strict().parse(JSON.parse(response.text || ''));
     const candidateName =
       candidateProfile?.name ||
       candidateProfile?.fullName ||

@@ -102,6 +102,10 @@ test('additive upload recovery migration preserves existing workspace, metadata 
     assert.deepEqual(await repo.read('owner-a'), before);
     assert.equal((await db.select().from(s.privateFiles)).length, 1); assert.equal((await db.select().from(s.session)).length, 1);
     assert.deepEqual(await db.select().from(s.privateFileUploads), []);
+    await pg.exec(await readFile('migrations/0003_previous_kinsey_walden.sql', 'utf8'));
+    assert.deepEqual(await repo.read('owner-a'), before);
+    assert.equal((await db.select().from(s.privateFiles)).length, 1); assert.equal((await db.select().from(s.session)).length, 1);
+    assert.deepEqual(await db.select().from(s.providerUsage), []);
   } finally { await pg.close(); }
 });
 

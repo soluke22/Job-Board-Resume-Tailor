@@ -59,3 +59,10 @@ export const privateFileUploads = pgTable('private_file_uploads', {
   id: text('id').notNull(), blobPath: text('blob_path').notNull().unique(),
   state: text('state').notNull().default('pending'), ...times(),
 }, t => [primaryKey({ columns: [t.ownerId, t.id] }), index('private_file_uploads_owner_updated_idx').on(t.ownerId, t.updatedAt)]);
+
+// Fixed window counters; no private payload or tokens. Shared across Functions.
+export const providerUsage = pgTable('provider_usage', {
+  ownerId: text('owner_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  category: text('category').notNull(), window: text('window').notNull(),
+  count: integer('count').notNull(), expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+}, t => [primaryKey({ columns: [t.ownerId, t.category, t.window] })]);

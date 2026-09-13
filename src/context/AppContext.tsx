@@ -422,7 +422,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setJobs(merged.jobs);
       if (merged.newJobs[0]) setActiveJobId(merged.newJobs[0].id);
     } catch (err: any) {
-      console.error('Job discovery failed:', err);
+      console.error('Job discovery failed:');
       setError(err.message || 'Job discovery encountered an error');
     } finally {
       setIsDiscovering(false);
@@ -451,7 +451,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       setJobs(currentJobs.map(j => j.id === jobId ? updated : j));
     } catch (err: any) {
-      console.error('ATS verification error:', err);
+      console.error('ATS verification error:');
     }
   };
 
@@ -579,7 +579,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       adopt(result);
       setActiveJobId(jobId);
     } catch (err: any) {
-      console.error('Job analysis failed:', err);
+      console.error('Job analysis failed:');
       setError(err.message || 'Job analysis failed');
     } finally {
       setIsAnalyzing(false);
@@ -674,7 +674,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       updateJob(updated);
     } catch (err: any) {
-      console.error('Cover letter generation failed:', err);
+      console.error('Cover letter generation failed:');
       setError(err.message || 'Cover letter generation failed');
     } finally {
       setIsGenerating(false);

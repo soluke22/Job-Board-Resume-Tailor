@@ -5,6 +5,8 @@ import { pipeline } from 'node:stream/promises';
 import { put, get, del } from '@vercel/blob';
 import { z } from 'zod';
 import { requireWorkspaceOwner, privateNoStore } from './auth';
+import { assertBoundedJson } from './inputBounds';
+import { reserveProviderCall, ProviderBudgetExceeded } from './providerBudget';
 import { createPrivateFileRepository, type FileRecord, type FileRepository } from './privateFileRepository';
 export type { FileRepository } from './privateFileRepository';
 
@@ -28,17 +30,22 @@ export function validateUpload(input: unknown) {
   } else {
     const text = new TextDecoder('utf-8', { fatal: true }).decode(content);
     if (text.includes('\0')) throw new Error('Invalid text file');
-    if (data.mimeType === 'application/json') JSON.parse(text);
+    if (data.mimeType === 'application/json') assertBoundedJson(JSON.parse(text));
   }
   return { ...data, content };
 }
 const repository = createPrivateFileRepository();
 const blobStore = { put, get, del };
 function publicMetadata(record: FileRecord) { const { blobPath, ownerId, ...metadata } = record; return metadata; }
-export function installPrivateFiles(app: Express, deps: { guard?: RequestHandler; repository?: FileRepository; blobs?: typeof blobStore } = {}) {
+export function installPrivateFiles(app: Express, deps: { guard?: RequestHandler; repository?: FileRepository; blobs?: typeof blobStore; budget?: typeof reserveProviderCall } = {}) {
   const guard = deps.guard ?? requireWorkspaceOwner;
   const files = deps.repository ?? repository;
   const blobs = deps.blobs ?? blobStore;
+  const budget = deps.budget ?? reserveProviderCall;
+  const boundedMutation: RequestHandler = async (_req, res, next) => {
+    try { await budget(res.locals.ownerId, 'files'); next(); }
+    catch (error) { res.status(error instanceof ProviderBudgetExceeded ? 429 : 503).json({ error: 'Private file budget unavailable or exceeded; retry later' }); }
+  };
   app.use('/api/private/files', privateNoStore);
   const cleanup = async (ownerId: string) => {
     const abortSignal = AbortSignal.timeout(15_000);
@@ -48,7 +55,7 @@ export function installPrivateFiles(app: Express, deps: { guard?: RequestHandler
     try { res.json({ files: (await files.list(res.locals.ownerId)).map(publicMetadata) }); }
     catch { res.status(503).json({ error: 'Private file storage is unavailable' }); }
   });
-  app.post('/api/private/files', guard, express.json({ limit: '3mb' }), async (req, res) => {
+  app.post('/api/private/files', guard, boundedMutation, express.json({ limit: '3mb' }), async (req, res) => {
     let data: ReturnType<typeof validateUpload>;
     try { data = validateUpload(req.body); } catch { res.status(400).json({ error: 'Upload requires a valid PDF, UTF-8 text, LaTeX or JSON file up to 2 MiB' }); return; }
     const id = randomUUID();
@@ -68,11 +75,11 @@ export function installPrivateFiles(app: Express, deps: { guard?: RequestHandler
       res.status(503).json({ error: 'Private file upload failed; retry later' });
     }
   });
-  app.post('/api/private/files/reconcile', guard, async (_req, res) => {
+  app.post('/api/private/files/reconcile', guard, boundedMutation, async (_req, res) => {
     try { res.json({ checked: await cleanup(res.locals.ownerId) }); }
     catch { res.status(503).json({ error: 'Private file cleanup is unavailable; retry later' }); }
   });
-  app.get('/api/private/files/:id', guard, async (req, res) => {
+  app.get('/api/private/files/:id', guard, boundedMutation, async (req, res) => {
     try {
       const record = await files.find(res.locals.ownerId, req.params.id);
       if (!record) { res.status(404).json({ error: 'File not found' }); return; }
@@ -86,7 +93,7 @@ export function installPrivateFiles(app: Express, deps: { guard?: RequestHandler
       await pipeline(Readable.fromWeb(result.stream as any), res);
     } catch { if (!res.headersSent) res.status(503).json({ error: 'Private file download failed' }); else res.destroy(); }
   });
-  app.delete('/api/private/files/:id', guard, async (req, res) => {
+  app.delete('/api/private/files/:id', guard, boundedMutation, async (req, res) => {
     try {
       const record = await files.find(res.locals.ownerId, req.params.id);
       if (!record) { res.status(404).json({ error: 'File not found' }); return; }
