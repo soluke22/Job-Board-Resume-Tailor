@@ -4,11 +4,11 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { put, get, del } from '@vercel/blob';
 import { z } from 'zod';
-import { requireWorkspaceOwner, privateNoStore } from './auth';
-import { assertBoundedJson } from './inputBounds';
-import { reserveProviderCall, ProviderBudgetExceeded } from './providerBudget';
-import { createPrivateFileRepository, type FileRecord, type FileRepository } from './privateFileRepository';
-export type { FileRepository } from './privateFileRepository';
+import { requireWorkspaceOwner, privateNoStore } from './auth.js';
+import { assertBoundedJson } from './inputBounds.js';
+import { reserveProviderCall, ProviderBudgetExceeded } from './providerBudget.js';
+import { createPrivateFileRepository, type FileRecord, type FileRepository } from './privateFileRepository.js';
+export type { FileRepository } from './privateFileRepository.js';
 
 export const MAX_PRIVATE_FILE_BYTES = 2 * 1024 * 1024;
 const uploadSchema = z.object({

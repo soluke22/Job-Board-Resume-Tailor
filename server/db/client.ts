@@ -2,7 +2,7 @@ import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from 'ws';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import * as schema from './schema';
+import * as schema from './schema.js';
 
 neonConfig.webSocketConstructor = ws;
 export function createDatabaseBoundary(configuration = () => process.env.DATABASE_URL,

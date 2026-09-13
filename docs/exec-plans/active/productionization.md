@@ -1,5 +1,40 @@
 # Productionization execution plan
 
+## Phase 12 authorized staging runtime fix
+Scope: repair only relative import resolution in the Node-executed Function graph
+on dev. Live canonical main 0f0acdd51238cf7e9a692291bb5c2e58e2e0d818 fails with
+ERR_UNSUPPORTED_DIR_IMPORT at api/index.ts:1, before Express initialization.
+Acceptance: reproduce with unbundled emitted JavaScript and native Node24 (no tsx
+loader); resolve the complete reachable runtime graph; public unconfigured health
+returns 200 JSON; npm ci/typecheck/tests/build/runtime/release gates pass; scoped
+dev checkpoint only. Preserve local .gitignore/.vercel/.env.local linkage; exclude
+these and credentials from commit. No main edit, PR, deployment, environment
+change, migration or OAuth/Blob/Gemini configuration. Phase11 remains accepted
+per owner confirmation. Local fix complete; validated dev checkpoint follows.
+
+### Phase 12 local validation result
+Native Node24.21.0 baseline reproduced the live directory-import exception in
+unbundled emitted api/index.js. Explicit .js relative specifiers now resolve
+through TypeScript to source .ts files and through Node to emitted .js files;
+directory type imports explicitly name index.js. Audited runtime graph includes
+30 Function-startup source modules plus the local shell. All 23 changed TypeScript
+files change only import/export specifiers, including two shared server-consumed
+utilities; frontend-only modules untouched. No dependency/configuration changes.
+New tests/phase-12-native-esm.test.mjs emits separate modules without rewriting
+specifiers or bundling, runs a native child without inherited loaders/private
+environment/dotenv files, imports the Function and verifies public health200 JSON.
+It runs directly with Node24 --test and in npm test; the prior tsx suite and bundled
+local build did not exercise native unbundled module resolution.
+Node24 npm ci, typecheck, full115/115 tests, build, runtime:check and release:check
+pass; direct native regression1/1 passes. Strict build privacy zero; harness passes.
+Client hashes/706087 bytes unchanged. Existing four moderate tooling advisories,
+Rollup annotation and >500kB client warnings remain. No Vercel artifact build or
+redeployment performed; deterministic emission is the local regression equivalent,
+not a live runtime acceptance claim. Final staged privacy/harness/diff checks and
+dev-only commit follow. Next exact action: obtain separate PR authorization;
+main remains canonical affected SHA; live staging acceptance still blocked until
+reviewed merge and separately authorized staging redeploy/health verification.
+
 ## Project Goal
 Truthful discovery and evidence-grounded career workflows with durable owner-only
 private storage and a separate synthetic demo. GitHub is canonical.

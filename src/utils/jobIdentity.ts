@@ -1,4 +1,4 @@
-import { JobRecord } from '../types';
+import { JobRecord } from '../types/index.js';
 
 export function normalizedJobUrl(input?: string): string | undefined {
   try {
