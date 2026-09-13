@@ -268,3 +268,25 @@ Phase 6 proof packs/outreach/application answers are not certified by this phase
 ## Validation
 Synthetic contracts and manual smoke instructions: [TESTING.md](TESTING.md).
 Acceptance and limitations: [Phase 3 matrix](exec-plans/active/phase-3-acceptance.md).
+
+## Phase 6 downstream writing
+Current owner job/JD + current Phase 4.1 assessment + eligible persisted evidence
+(+ current READY Phase 5 resume for proof packs) -> strict artifact-specific model
+selection -> deterministic support/length validation -> revisioned persisted draft.
+No external sending/submission occurs. Proofs retain every enabled claim's exact
+Phase 5 envelope and become stale when that resume changes. Recruiter/referral fit
+reflects calibrated priority, never a generic frontend assumption or direct-fit
+promise for a stretch. Company enthusiasm and relationship history are not invented.
+
+Application questions route before model use; factual questions retrieve bounded
+relevant evidence per question. Profile fields assemble deterministically; subjective
+motivation, preferences/compensation, sensitive identification/health and legal
+attestations remain review/manual. Server owns state and source fingerprints; local
+source edits immediately fence copying, and repository reads recheck freshness.
+Changed artifact content cannot inherit validation through saves/imports.
+[Phase 6 acceptance](exec-plans/active/phase-6-acceptance.md) records conservative
+whole-statement/partial STAR limits and external Gemini/browser gates.
+Proof explanation is not new evidence, outreach confidence is not qualification,
+model-written motivation is not user motivation, relationship labels do not establish
+history, and an application answer is not an unsupported personal attestation.
+READY does not send or submit content.

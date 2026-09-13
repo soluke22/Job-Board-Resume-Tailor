@@ -165,73 +165,10 @@ export const apiService = {
     return res.json();
   },
 
-  async generateProofPack(
-    tailoredResume: any,
-    candidateEvidence: any[],
-    parsedJob: any
-  ): Promise<{ proofPack: any }> {
-    const res = await privateFetch('/api/generate-proof-pack', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tailoredResume, candidateEvidence, parsedJob })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to generate interview proof pack');
-    }
-    return res.json();
-  },
-
-  async generateOutreach(
-    parsedJob: any,
-    candidateProfile: any,
-    tailoredResume?: any
-  ): Promise<{ outreach: any }> {
-    const res = await privateFetch('/api/generate-outreach', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parsedJob, candidateProfile, tailoredResume })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to generate outreach');
-    }
-    return res.json();
-  },
-
-  async generateAnswers(
-    questions: string[],
-    parsedJob: any,
-    candidateEvidence: any[]
-  ): Promise<{ answers: any[] }> {
-    const res = await privateFetch('/api/generate-answers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ questions, parsedJob, candidateEvidence })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to generate application answers');
-    }
-    return res.json();
-  },
-
-  async generateReferral(
-    contactName: string,
-    relationship: string,
-    company: string,
-    roleTitle: string,
-    jobUrl: string
-  ): Promise<{ referralMessage: string }> {
-    const res = await privateFetch('/api/generate-referral', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contactName, relationship, company, roleTitle, jobUrl })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to generate referral request');
-    }
+  async generateArtifact(operation:'proof'|'outreach'|'answers'|'referral', jobId:string, context:Record<string,unknown>={}):Promise<any> {
+    const path={proof:'generate-proof-pack',outreach:'generate-outreach',answers:'generate-answers',referral:'generate-referral'}[operation];
+    const res=await privateFetch(`/api/${path}`,jsonRequest({jobId,...context}));
+    if(!res.ok){const data=await res.json();throw new Error(data.error || 'Artifact generation failed');}
     return res.json();
   },
 

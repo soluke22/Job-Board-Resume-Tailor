@@ -31,7 +31,11 @@ test('explicit collection/history/application replacement and owner deletion rol
     const attachmentKeys = ['fit', 'tailoringPlan', 'tailoredResume', 'proofPack', 'outreachDrafts', 'recruiterOutreach', 'referralContact'];
     const baseJob = Object.fromEntries(Object.entries(job).filter(([key]) => !attachmentKeys.includes(key)));
     const pruned = await repo.save('owner-a', { jobs: [{ ...baseJob, versionHistory: [job.versionHistory[1]], statusHistory: [job.statusHistory[0]], appliedDate: undefined, applicationAnswers: undefined }] }, 1);
-    for (const key of attachmentKeys.filter(key=>key!=='tailoredResume')) assert.deepEqual(pruned.jobs[0][key], job[key], 'omitted attachments preserve existing owner/job state');
+    for (const key of attachmentKeys.filter(key=>key!=='tailoredResume')) {
+      const {provenance,...content}=pruned.jobs[0][key];
+      assert.deepEqual(content,job[key],'omitted attachments preserve existing owner/job content');
+      if(['proofPack','outreachDrafts','recruiterOutreach','referralContact'].includes(key))assert.equal(provenance.validationStatus,'DRAFT','legacy artifact remains uncertified');
+    }
     const {claimLedger,readiness,readinessIssues,...preservedResume}=pruned.jobs[0].tailoredResume;
     assert.deepEqual(preservedResume,resume,'legacy resume text and identity survive; new readiness metadata does not certify it');
     assert.equal(readiness,'STALE');

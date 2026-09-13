@@ -1,3 +1,5 @@
+import type { ApplicationQuestion } from '../types/artifacts';
+import { invalidateJobArtifacts, invalidateEditedArtifacts } from '../utils/artifactReadiness';
 import { invalidateEditedResume } from '../utils/resumeReadiness';
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { mergeDiscoveredJobs } from '../utils/jobIdentity';
@@ -124,13 +126,13 @@ interface AppContextType {
 
   // Preparation & Outreach
   generateProofPack: (jobId: string) => Promise<void>;
-  generateOutreach: (jobId: string) => Promise<void>;
-  generateAnswers: (jobId: string, questions: string[]) => Promise<void>;
+  generateOutreach: (jobId: string, overrideReason?:string) => Promise<void>;
+  generateAnswers: (jobId: string, questions: (string|ApplicationQuestion)[]) => Promise<void>;
   generateReferral: (
     jobId: string,
     contactName: string,
     relationship: string,
-    jobUrl?: string
+    overrideReason?: string
   ) => Promise<string>;
 
   // Dialogs & Modals
@@ -345,18 +347,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Profile and data setters with storage persistence
   const setProfile = (newProfile: CandidateProfile) => {
+    if(JSON.stringify(newProfile)!==JSON.stringify(profile))setJobs(jobs.map(j=>invalidateJobArtifacts(j,'Profile changed; reload or regenerate before use')));
     setProfileState(newProfile);
     storageService.saveProfile(newProfile, workspaceMode);
   };
 
   const updateSearchProfile = (newSearchProfile: SearchProfile) => {
-    if (JSON.stringify(newSearchProfile) !== JSON.stringify(searchProfile)) setJobs(jobs.map(j=>j.fit?{...j,assessmentStatus:'STALE'}:j));
+    if (JSON.stringify(newSearchProfile) !== JSON.stringify(searchProfile)) setJobs(jobs.map(j=>invalidateJobArtifacts(j.fit?{...j,assessmentStatus:'STALE'}:j,'Assessment source changed; reassess and regenerate before use')));
     setSearchProfileState(newSearchProfile);
     storageService.saveSearchProfile(newSearchProfile, workspaceMode);
   };
 
   const setEvidence = (newEvidence: EvidenceItem[]) => {
-    if (JSON.stringify(newEvidence) !== JSON.stringify(evidence)) setJobs(jobs.map(j=>j.fit?{...j,assessmentStatus:'STALE'}:j));
+    if (JSON.stringify(newEvidence) !== JSON.stringify(evidence)) setJobs(jobs.map(j=>invalidateJobArtifacts(j.fit?{...j,assessmentStatus:'STALE'}:j,'Assessment source changed; reassess and regenerate before use')));
     setEvidenceState(newEvidence);
     storageService.saveEvidence(newEvidence, workspaceMode);
   };
@@ -372,12 +375,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const setJobs = (newJobs: JobRecord[]) => {
+    const previousJobs=storageService.getJobs(workspaceMode);
+    newJobs=newJobs.map(job=>{
+      const old=previousJobs.find(j=>j.id===job.id);
+      if(!old)return job;
+      const sourceFields=['description','rawDescription','jdSource','canonicalContentStatus','title','company','verificationStatus','publishedAt','freshnessBand','compensation','assessmentMetadata','assessmentStatus','fit','parsed','requirements','evidenceMatches','tailoredResume'] as const;
+      return sourceFields.some(k=>JSON.stringify(old[k])!==JSON.stringify(job[k]))?
+        invalidateJobArtifacts(job,'Job, assessment or resume basis changed; regenerate before use'):invalidateEditedArtifacts(old,job);
+    });
     setJobsState(newJobs);
     storageService.saveJobs(newJobs, workspaceMode);
     setAnalyticsState(storageService.getAnalytics(workspaceMode));
   };
 
   const saveMasterResume = (resume: TailoredResume) => {
+    if(JSON.stringify(resume)!==JSON.stringify(masterResume))setJobs(jobs.map(j=>invalidateJobArtifacts(j,'Master resume changed; revalidate sources before use')));
     setMasterResumeState(resume);
     storageService.saveMasterResume(resume, workspaceMode);
   };
@@ -505,6 +517,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateJob = (updatedJob: JobRecord) => {
     const previous = jobs.find(j=>j.id===updatedJob.id);
     if (previous?.fit && ['description','rawDescription','jdSource','canonicalContentStatus','verificationStatus','publishedAt','freshnessBand','compensation'].some(k=>JSON.stringify(previous[k as keyof JobRecord])!==JSON.stringify(updatedJob[k as keyof JobRecord]))) updatedJob = {...updatedJob,assessmentStatus:'STALE'};
+    if(previous && ['tailoredResume','description','rawDescription','jdSource','canonicalContentStatus','title','company','assessmentMetadata'].some(k=>JSON.stringify(previous[k as keyof JobRecord])!==JSON.stringify(updatedJob[k as keyof JobRecord])))updatedJob=invalidateJobArtifacts(updatedJob,'Job or resume basis changed; regenerate before use');
     const updated = jobs.map((j) => (j.id === updatedJob.id ? updatedJob : j));
     setJobs(updated);
   };
@@ -686,105 +699,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const regenerateBullet = async (jobId:string, bulletId:string, employerOrProject:string, currentText:string, targetReq:string, underlyingEvidence:string) => {
     await runResumeOperation('regenerate',jobId,bulletId);
   };
-  // Preparation & Outreach
-  const generateProofPack = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target) return;
-
-    const resumeToUse = target.tailoredResume || masterResume;
-    const parsedJob = target.parsed || {
-      roleTitle: target.title,
-      company: target.company
-    };
-
-    setIsGenerating(true);
-    setError(null);
+  // Phase 6 responses are persisted server-side; adopt only if local state stayed unchanged.
+  const runArtifactOperation = async (operation:'proof'|'outreach'|'answers'|'referral',jobId:string,context:Record<string,unknown>={}) => {
+    setIsGenerating(true);setError(null);
+    const startedEpoch=epoch.current;
     try {
-      const res = await apiService.generateProofPack(resumeToUse, evidence, parsedJob);
-      const updated: JobRecord = {
-        ...target,
-        proofPack: res.proofPack
-      };
-      updateJob(updated);
-      setCurrentView('proof-packs');
-    } catch (err: any) {
-      console.error('Failed to generate proof pack:', err);
-      setError(err.message || 'Failed to generate proof pack');
-    } finally {
-      setIsGenerating(false);
-    }
+      await persistCurrent();
+      const before=JSON.stringify(storageService.privateSnapshot());
+      const result=await apiService.generateArtifact(operation,jobId,context);
+      if(startedEpoch!==epoch.current)return;
+      if(before!==JSON.stringify(storageService.privateSnapshot())) {
+        ready.current=false;
+        throw new Error('Local edits occurred during generation. Reload required; local edits were preserved.');
+      }
+      adopt(result);setActiveJobId(jobId);
+      setCurrentView(operation==='proof'?'proof-packs':'outreach');
+      return result.job;
+    }catch(err:any){setError(err.message || 'Artifact generation failed');}
+    finally{setIsGenerating(false);}
   };
-
-  const generateOutreach = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target) return;
-
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const parsedJob = target.parsed || {
-        id: target.id,
-        roleTitle: target.title,
-        company: target.company
-      };
-      const res = await apiService.generateOutreach(parsedJob, profile, target.tailoredResume);
-      const updated: JobRecord = {
-        ...target,
-        recruiterOutreach: res.outreach
-      };
-      updateJob(updated);
-      setCurrentView('outreach');
-    } catch (err: any) {
-      console.error('Failed to generate outreach:', err);
-      setError(err.message || 'Failed to generate outreach');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const generateAnswers = async (jobId: string, questions: string[]) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target) return;
-
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const parsedJob = target.parsed || {
-        roleTitle: target.title,
-        company: target.company
-      };
-      const res = await apiService.generateAnswers(questions, parsedJob, evidence);
-      const updated: JobRecord = {
-        ...target,
-        applicationAnswers: res.answers
-      };
-      updateJob(updated);
-    } catch (err: any) {
-      console.error('Failed to generate answers:', err);
-      setError(err.message || 'Failed to generate application answers');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const generateReferral = async (
-    jobId: string,
-    contactName: string,
-    relationship: string,
-    jobUrl?: string
-  ): Promise<string> => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target) return '';
-
-    const effectiveUrl = jobUrl || target.canonicalUrl || target.applyUrl || target.sourceUrl || '';
-    const res = await apiService.generateReferral(
-      contactName,
-      relationship,
-      target.company,
-      target.title,
-      effectiveUrl
-    );
-    return res.referralMessage;
+  const generateProofPack = async(jobId:string)=>{await runArtifactOperation('proof',jobId);};
+  const generateOutreach = async(jobId:string,overrideReason?:string)=>{await runArtifactOperation('outreach',jobId,overrideReason?.trim()?{overrideReason}:{});};
+  const generateAnswers = async(jobId:string,questions:(string|ApplicationQuestion)[])=>{await runArtifactOperation('answers',jobId,{questions});};
+  const generateReferral = async(jobId:string,contactName:string,relationship:string,overrideReason?:string):Promise<string>=>{
+    const job=await runArtifactOperation('referral',jobId,{contactName,relationship,...(overrideReason?.trim()?{overrideReason}:{})});
+    return job?.referralContact?.referralMessage || '';
   };
 
   // Evidence & Entities

@@ -86,7 +86,7 @@ test('pending workspace/export and AI replies cannot return private data after a
   const original = globalThis.fetch;
   setBeforePrivateRequest(async () => {});
   try {
-    for (const action of [() => workspaceRequest('/api/workspace/data'), () => apiService.exportWorkspace(), () => apiService.generateAnswers([], {} as any, [])]) {
+    for (const action of [() => workspaceRequest('/api/workspace/data'), () => apiService.exportWorkspace(), () => apiService.generateArtifact('answers','synthetic-job',{questions:['Describe React experience']})]) {
       authenticate();
       let release!: (response: Response) => void;
       globalThis.fetch = () => new Promise<Response>(resolve => { release = resolve; });
