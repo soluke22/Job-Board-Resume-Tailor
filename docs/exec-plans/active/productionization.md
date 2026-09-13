@@ -567,3 +567,17 @@ scoped checkpoint publication follow; no hash embedded for this checkpoint.
 External Vercel/OAuth/Neon/Blob/Gemini gates PENDING_EXTERNAL_CONFIG.
 Next exact phase: Phase 10 — dev → main pull request and merge readiness, only
 after history disposition and new authorization; not begun.
+
+## Phase 9 publication checkpoint (2026-09-13)
+
+Implementation/audit ad08f97dd818cfda7a68a4358bdb0d8a549ce62c published normally
+from b98a2a8. Fresh fetch verified clean dev == origin/dev == ad08f97; main and
+origin/main remain18bde7f. Final staged current-source privacy/runtime scan and
+startup smoke passed. All113/113 tests and complete release composition passed;
+four accepted moderate tooling-chain audit entries remain. Historical contact/
+seed provenance remains UNVERIFIED; Phase9 PARTIAL, Phase10 readiness NO.
+This docs-only publication record is checked and normally pushed next; its own
+hash is verified in final report rather than embedded. No main/PR/Studio/Vercel
+resource action/remote migration/Phase10. Next exact phase after history
+privacy disposition and separate authorization: Phase10 — dev → main pull
+request and merge readiness.

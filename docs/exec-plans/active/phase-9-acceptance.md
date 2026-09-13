@@ -200,3 +200,8 @@ Safe historical marker locations (blob IDs, not secret values):
 server.ts blob49e933f lines28/612; AuthModal.tsx blob702c6bd line18;
 privateSeedTemplate.ts blob533c45e lines17/113. These are historical blobs, not
 current source line references. Confirm provenance before claiming synthetic data.
+
+Publication: implementation/audit ad08f97 published by normal fast-forward;
+fresh fetch verified clean dev == origin/dev at that commit, main unchanged.
+Documentation publication checkpoint follows without embedding its own hash.
+Overall PARTIAL / Phase10 NO remains; historical privacy disposition unresolved.
