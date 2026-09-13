@@ -62,7 +62,14 @@ Phase 4 server/assessment.ts plus assessmentRoutes.ts use owner repository conte
 strict shared structured schemas, bounded retrieval and deterministic arithmetic.
 Assessments persist under revision guards; fingerprinted certification/cache and
 stale-history reads replace the old process-local analysis cache. Later artifact
-routes are not certified by this assessment change.
+routes require their own artifact-specific validation.
+Phase 5 resumeProvenance/resumeRoutes certify exact supported claim ledgers and final
+export. Phase 6 artifactProvenance/artifactRoutes reuse current assessment and evidence
+eligibility, require READY resume ledgers for proofs, and persist fingerprinted
+downstream artifacts under workspace revisions. Existing JSON-backed proof/outreach/
+contact/application records need no migration. Repository reads recheck stale bases;
+ordinary saves/imports cannot forge approval. Profile/manual question routing bypasses
+Gemini; model context excludes private contact/history and unrelated evidence metadata.
 
 ## Acceptance versus target
 Phase 1 audits authentication and public/private isolation. Deterministic tests
@@ -71,8 +78,9 @@ behavior. Live Google OAuth acceptance pending external configuration.
 Live Neon/Blob durability, multi-connection transport/locking, deployment and authenticated browser
 acceptance remain external/persistence gates; do not infer them from builds.
 
-Future phases enforce generated claims, complete
-live discovery/storage acceptance, and validate deployed Vercel runtime.
+Remaining phases complete live discovery/storage/model acceptance and validate
+deployed Vercel runtime. Deterministic claim/artifact contracts do not establish live
+semantic inference, browser behavior or runtime-provider acceptance.
 Server operations must derive identity from verified sessions and authorize every
 record/file. Client state is a view/cache, never authentication or storage authority.
 Private failures must remain explicit, never synthetic replacements.

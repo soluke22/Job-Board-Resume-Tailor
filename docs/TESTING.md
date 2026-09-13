@@ -167,3 +167,44 @@ bounded synthetic-only structured generation request. Do not send real private
 career data merely to test connectivity. Whole-statement certification intentionally
 withholds arbitrary paraphrases; add separately reviewed concise evidence to support
 alternate wording. Startup smoke: node --import tsx --test tests/phase-2-runtime.smoke.ts.
+
+## Phase 6 deterministic coverage and live acceptance
+Focused: `node --import tsx --test tests/phase-6-artifacts.test.ts` (14 grouped tests).
+Synthetic current assessments, Phase 5 READY ledgers and real PGlite owner repository
+routes cover 17 enabled claims across two batches; exact evidence/claim envelopes;
+missing/unknown IDs, context/STAR/metric/leadership inflation; disabled claims; stale
+resume/evidence/JD/assessment/profile; backend evidence without frontend hardcoding;
+all calibrated priorities and SKIP override; explicit/unknown contact labels and
+model minimization; six question categories, zero-model deterministic fields;
+late-bank per-question retrieval; subjective motivation; original and explicit
+stricter word/character limits; manual hash invalidation/browser forgery;
+revision conflict and prior-artifact preservation on malformed output/model failure.
+Reviewer-reported pregnancy/bipolar/age mixed technical questions route manual with
+zero calls; sensitive evidence metadata is omitted and sensitive statement/technology
+records withheld. The classifier is lexical, not exhaustive semantic classification.
+
+Run Phase 4/4.1/5 regressions and the full release composition, standalone evidence
+ID validator and startup smoke. Legacy persistence expectations separately assert
+unchanged content plus DRAFT metadata; earlier ownership/replacement/rollback gates
+remain. No live model or private data is needed for deterministic fixtures.
+
+Manual authenticated browser gate: assess synthetic current JD/evidence, generate a
+READY resume and proof with >8 claims; inspect all linked sources, supported context
+and explicit missing STAR components. Change evidence/JD/profile/resume and verify
+STALE and blocked app copy. Generate backend outreach with APPLY FIRST/gap/stretch,
+verify distinct wording and no invented company excitement. Test SKIP with/without
+explicit reason. Referral name/relationship should persist for the active job without
+invented history. Ask location/degree/authorization, missing profile, technical,
+motivation, compensation, disability/race/veteran/gender/health and attestation
+questions; inspect categories and empty manual answers. Set actual limits and
+verify explicit overlength errors preserve prior artifacts. Edit sources during a
+request: local work must survive and adoption must require reload. Legacy cover
+letters remain uncertified. READY never sends/submits or attests automatically.
+
+Phase 6 deterministic artifact contracts: verified with synthetic structured fixtures.
+Live Gemini proof/outreach/answer acceptance: pending external configuration.
+GEMINI_API_KEY absent; only .env.example. Strict JSON schema/Zod, MEDIUM thinking,
+30-second requests, no loose extraction or invented fallback. A configured server
+key permits synthetic-only smoke; authenticated/deployed browser acceptance remains
+an external gate. Whole-statement certification withholds general paraphrases and
+STAR component assignment; manual artifact edits need fresh generation.

@@ -1,3 +1,6 @@
+import type { ApplicationQuestion } from '../types/artifacts';
+import { ArtifactStatus } from '../components/ArtifactStatus';
+import { canCopyArtifact } from '../utils/artifactReadiness';
 import React, { useState } from 'react';
 import {
   Send,
@@ -30,21 +33,25 @@ export const OutreachView: React.FC = () => {
 
   // Referral state
   const [contactName, setContactName] = useState('');
-  const [relationship, setRelationship] = useState('Former Colleague');
-  const [generatedReferralText, setGeneratedReferralText] = useState<string | null>(null);
+  const [relationship, setRelationship] = useState('');
+  const generatedReferralText=activeJob?.referralContact?.referralMessage || null;
   const [isGeneratingReferral, setIsGeneratingReferral] = useState(false);
 
   // Portal Questions state
-  const [portalQuestions, setPortalQuestions] = useState<string[]>([
-    'Why are you excited to join our team?',
-    'Describe a challenging technical project you worked on and your specific contributions.'
+  const [portalQuestions, setPortalQuestions] = useState<ApplicationQuestion[]>([
+    {question:'Why are you interested in this role?'},
+    {question:'Describe a challenging technical project you worked on and your specific contributions.'}
   ]);
   const [newQuestionInput, setNewQuestionInput] = useState('');
+  const [overrideReason,setOverrideReason]=useState('');
+  const skip=activeJob?.fit?.applicationPriority==='SKIP' || activeJob?.fit?.recommendation==='SKIP' || !!activeJob?.fit?.blockers?.length;
 
   const outreach = activeJob?.recruiterOutreach;
   const answers = activeJob?.applicationAnswers;
 
   const handleCopy = (text: string, key: string) => {
+    const a=key.startsWith('ans-')?answers?.[Number(key.slice(4))]:key==='referral'?activeJob?.referralContact:outreach;
+    if(!canCopyArtifact(a))return;
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
@@ -55,8 +62,7 @@ export const OutreachView: React.FC = () => {
     if (!activeJob || !contactName.trim()) return;
     setIsGeneratingReferral(true);
     try {
-      const msg = await generateReferral(activeJob.id, contactName, relationship);
-      setGeneratedReferralText(msg);
+      await generateReferral(activeJob.id, contactName, relationship,overrideReason);
     } finally {
       setIsGeneratingReferral(false);
     }
@@ -64,7 +70,7 @@ export const OutreachView: React.FC = () => {
 
   const handleAddQuestion = () => {
     if (!newQuestionInput.trim()) return;
-    setPortalQuestions([...portalQuestions, newQuestionInput.trim()]);
+    setPortalQuestions([...portalQuestions, {question:newQuestionInput.trim()}]);
     setNewQuestionInput('');
   };
 
@@ -75,9 +81,9 @@ export const OutreachView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/30">
-              Phase 4: Outreach &amp; Application
+              Outreach &amp; Application
             </span>
-            <span className="text-xs text-slate-400">High-Conversion Grounded Communications</span>
+            <span className="text-xs text-slate-400">Evidence-grounded drafts</span>
           </div>
           <h1 className="text-2xl font-bold text-white mt-1">Outreach &amp; Application Portal</h1>
           <p className="text-sm text-slate-300 mt-1 max-w-2xl">
@@ -101,8 +107,8 @@ export const OutreachView: React.FC = () => {
 
           {activeTab === 'recruiter' && (
             <button
-              onClick={() => activeJob && generateOutreach(activeJob.id)}
-              disabled={isGenerating || !activeJob}
+              onClick={() => activeJob && generateOutreach(activeJob.id,overrideReason)}
+              disabled={isGenerating || !activeJob || activeJob.assessmentStatus!=='ASSESSED' || skip && !overrideReason.trim()}
               className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-lg shadow-purple-900/30 flex items-center space-x-1.5 transition cursor-pointer disabled:opacity-50"
             >
               {isGenerating ? (
@@ -122,7 +128,7 @@ export const OutreachView: React.FC = () => {
           {activeTab === 'answers' && (
             <button
               onClick={() => activeJob && generateAnswers(activeJob.id, portalQuestions)}
-              disabled={isGenerating || !activeJob}
+              disabled={isGenerating || !activeJob || !portalQuestions.length}
               className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-lg shadow-purple-900/30 flex items-center space-x-1.5 transition cursor-pointer disabled:opacity-50"
             >
               <Sparkles className="w-4 h-4" />
@@ -171,6 +177,10 @@ export const OutreachView: React.FC = () => {
         </button>
       </div>
 
+      {activeTab==='recruiter' && outreach && <ArtifactStatus artifact={outreach} />}
+      {activeTab==='referral' && activeJob?.referralContact && <ArtifactStatus artifact={activeJob.referralContact} />}
+      {activeJob?.assessmentStatus!=='ASSESSED' && <p className="text-xs text-amber-300">Reassess before generating fit-dependent drafts. Profile and manual questions can still be classified.</p>}
+      {skip && activeTab!=='answers' && <div className="text-xs text-amber-300 space-y-2"><p>SKIP / assessment blocker: {activeJob?.fit?.blockers?.join('; ') || activeJob?.priorityReason}. Generation requires your reason to override and remains NEEDS REVIEW.</p><input aria-label="Outreach override reason" value={overrideReason} onChange={e=>setOverrideReason(e.target.value)} placeholder="Why is outreach appropriate despite this blocker?" className="w-full bg-slate-900 rounded p-2" /></div>}
       {/* Tab 1: Recruiter InMail & Email */}
       {activeTab === 'recruiter' && (
         <div className="space-y-6">
@@ -202,6 +212,7 @@ export const OutreachView: React.FC = () => {
 
                 <div className="flex justify-end">
                   <button
+                    disabled={!canCopyArtifact(outreach)}
                     onClick={() => handleCopy(outreach.linkedInMessage, 'inmail')}
                     className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center space-x-1.5 transition cursor-pointer"
                   >
@@ -245,6 +256,7 @@ export const OutreachView: React.FC = () => {
 
                 <div className="flex justify-end space-x-2">
                   <button
+                    disabled={!canCopyArtifact(outreach)}
                     onClick={() => handleCopy(`${outreach.emailSubject}\n\n${outreach.emailBody}`, 'email')}
                     className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center space-x-1.5 transition cursor-pointer"
                   >
@@ -279,7 +291,13 @@ export const OutreachView: React.FC = () => {
                   key={i}
                   className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 flex items-center justify-between"
                 >
-                  <span>{q}</span>
+                  <div className="flex-1 space-y-2"><span>{q.question}</span>
+                    <div className="flex gap-2">
+                      <input aria-label="Character limit" type="number" min="1" placeholder="Character limit" value={q.characterLimit || ''} className="w-32 bg-slate-900 p-2 rounded" onChange={e=>setPortalQuestions(portalQuestions.map((v,index)=>index===i?{...v,characterLimit:e.target.value?Number(e.target.value):undefined}:v))} />
+                      <input aria-label="Word limit" type="number" min="1" placeholder="Word limit" value={q.wordLimit || ''} className="w-32 bg-slate-900 p-2 rounded" onChange={e=>setPortalQuestions(portalQuestions.map((v,index)=>index===i?{...v,wordLimit:e.target.value?Number(e.target.value):undefined}:v))} />
+                    </div>
+                    <input aria-label="Personal motivation" placeholder="Your personal motivation, if this question asks for it" value={q.motivation || ''} className="w-full bg-slate-900 p-2 rounded" onChange={e=>setPortalQuestions(portalQuestions.map((v,index)=>index===i?{...v,motivation:e.target.value}:v))} />
+                  </div>
                   <button
                     onClick={() => setPortalQuestions(portalQuestions.filter((_, idx) => idx !== i))}
                     className="text-slate-500 hover:text-red-400 text-xs"
@@ -322,8 +340,11 @@ export const OutreachView: React.FC = () => {
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 leading-relaxed">
                     {ans.answer}
                   </div>
+                  <ArtifactStatus artifact={ans} />
+                  <p className="text-xs text-slate-400">{ans.category} · {ans.inputStatus}</p>
                   <div className="flex justify-end">
                     <button
+                      disabled={!canCopyArtifact(ans)}
                       onClick={() => handleCopy(ans.answer, `ans-${i}`)}
                       className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 text-xs font-medium flex items-center space-x-1.5"
                     >
@@ -384,7 +405,7 @@ export const OutreachView: React.FC = () => {
             <div className="pt-2 flex justify-end">
               <button
                 type="submit"
-                disabled={isGeneratingReferral || !activeJob}
+                disabled={isGeneratingReferral || !activeJob || activeJob.assessmentStatus!=='ASSESSED' || skip && !overrideReason.trim()}
                 className="px-4 py-2 rounded-xl bg-purple-600 text-white font-semibold flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
               >
                 {isGeneratingReferral ? (
@@ -410,6 +431,7 @@ export const OutreachView: React.FC = () => {
               </div>
               <div className="flex justify-end">
                 <button
+                  disabled={!canCopyArtifact(activeJob?.referralContact)}
                   onClick={() => handleCopy(generatedReferralText, 'referral')}
                   className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 text-xs font-medium flex items-center space-x-1.5"
                 >

@@ -5,23 +5,35 @@ Truthful discovery and evidence-grounded career workflows with durable owner-onl
 private storage and a separate synthetic demo. GitHub is canonical.
 
 ## Current Branch
-dev; Phase 4.1 began clean at freshly fetched dev == origin/dev ==
-610a00f369d589ba8c76ca7b9cc67f354770555b (published Phase 5).
-User requests coherent calibration checkpoint and normal fast-forward origin/dev push.
-No main, release PR, Studio or production deployment.
+dev; Phase 6 began clean at freshly fetched dev == origin/dev ==
+b0be6da57359bb74b8f707302d93816ce41f98fe (published Phase 4.1, Phase 5 intact).
+Recovery found no Phase 6 commits, only the existing uncommitted implementation.
+User authorizes coherent Phase 6 checkpoints and normal fast-forward origin/dev push.
+No main, PR, Studio, deployment, external messages/submission or Phase 7.
 
 ## Current Phase / Scope and Acceptance
-Phase 4.1 calibration hardening, before Phase 6. Bounded scope/centrality/depth
-and relationship arithmetic, caps, priority and synthetic regressions. Acceptance:
-[calibration matrix](phase-4-1-calibration.md). Phase 5 remains complete.
-Parent owns writes; one narrow read-only calibration security review.
-Previous completed scope: Phase 5 â€” Resume provenance + tailoring + manual validation.
-Acceptance: [Phase 5 matrix](phase-5-acceptance.md). Current certified assessment,
-owner-resolved eligible evidence, exact-text claim ledger, deterministic identity,
-manual invalidation/revalidation, safe regeneration, version history and final export.
-No Phase 6. Parent owns writes; one narrow read-only security-reviewer.
+Phase 6 — Proof packs + outreach + application answers, deterministic contract complete.
+Acceptance: [Phase 6 matrix](phase-6-acceptance.md). Current owner-resolved assessment,
+eligible evidence, exact READY Phase 5 proof ledger; calibrated recruiter/referral
+fit and explicit relationship context; question routing, strict structured output,
+revisioned server persistence, state/hash/staleness and copy fences. Parent owns all
+writes; one narrow read-only boundary reviewer. No Phase 7 implementation.
+Phase 4.1 [calibration](phase-4-1-calibration.md) and Phase 5
+[acceptance](phase-5-acceptance.md) remain intact with passing regression suites.
 
 ## Current Status
+Phase 6 deterministic artifact contracts: verified. Focused 14/14, prior Phase
+4/4.1/5 regressions 29/29 within full npm test 83/83. Final release:check passes
+typecheck/build/harness/full tests/strict required-build privacy (zero findings).
+Standalone privacy/evidence validator, startup smoke 1/1 and diff checks pass.
+Reviewer directly rechecked two demonstrated sensitive-data defects: resolved;
+no remaining demonstrated defect in the bounded review. All private test data is
+synthetic. GEMINI_API_KEY absent; live proof/outreach/answer acceptance pending
+external configuration. Authenticated/deployed browser and earlier live gates remain.
+Implementation validated locally; scoped commit and normal dev publication next.
+
+Previous Phase 4.1/5 publication evidence (historical):
+
 Phase 4.1 calibration hardening complete locally. Focused Phase 4/4.1/5 29/29,
 full suite 69/69, final release composition, startup smoke 1/1, standalone evidence
 validator, privacy triage (zero findings) and git diff --check pass. Reviewer
@@ -47,6 +59,10 @@ React/Vite + Express/Gemini, Better Auth owner sessions, Neon/Drizzle revisioned
 owner workspace, private Blob/recovery intents and isolated synthetic demo retained.
 Phase 5 adds strict reusable claim/basis types and a server provenance service.
 No database migration: JSON-backed owner resume/version records retain the ledger.
+Phase 6 adds strict reusable artifact provenance and server services/routes to existing
+JSON-backed proof/outreach/contact/application records. Private generation reads the
+owner snapshot and persists under its revision; browser adoption preserves in-flight
+edits and session boundaries. Model selection cannot invent new candidate prose.
 
 ## Completed Work
 Phase 1 b8c9999: auth/session/origin/browser-memory contracts; live OAuth pending.
@@ -181,11 +197,11 @@ docs/exec-plans/active/productionization.md; publication verified by clean/equal
 freshly fetched refs without a self-hash loop.
 
 ## Next Exact Step
-Phase 6 â€” Proof packs + outreach + application answers.
-Begin only on a new explicit continuation; this task stops after Phase 4.1 publication
-and report. Live Phase 5 synthetic Gemini acceptance awaits external configuration.
-Release audit precedes dev/main PR, merged-main AI Studio verification and final
-Vercel production. Do not begin Phase 6 in this task.
+Phase 7 — Application tracking + outcome analytics.
+Begin only on a new explicit continuation. This task stops after Phase 6 publication.
+Live synthetic Gemini and authenticated/deployed browser acceptance remain external
+gates. Release audit precedes dev/main PR, merged-main Studio verification and final
+Vercel production; none is authorized in this task.
 
 ## Remaining Phases
 1. Authentication code-complete; live Google/browser acceptance pending.
@@ -193,10 +209,93 @@ Vercel production. Do not begin Phase 6 in this task.
 3. Discovery/ATS deterministic contracts complete; live provider/Gemini gates pending.
 4. Qualification/ranking deterministic contract complete; live semantics pending.
 5. Conservative resume provenance/tailoring/manual validation implemented; live gates pending.
-6. Proof packs + outreach + application answers.
+6. Conservative proof/outreach/referral/answer contracts complete; live gates pending.
 7. Application tracking + outcome analytics.
 8. Vercel-compatible architecture completion/live runtime acceptance.
 9. Security/privacy/release audit.
 10. dev -> main PR (separate authorization).
 11. Google AI Studio verifies merged canonical main.
 12. Vercel production after main/Studio verification.
+
+## Phase 6 authorized continuation
+Scope and acceptance recorded before code changes in [Phase 6 matrix](phase-6-acceptance.md).
+Owner-resolved proof/outreach/referral/answers, strict structured selection and exact
+supported statement validation, current assessment/resume basis, manual question
+routing, artifact state/staleness and copy fences. Parent owns writes. No Phase 7.
+Baseline clean dev == freshly fetched origin/dev at b0be6da57359bb74b8f707302d93816ce41f98fe.
+Initial pre-cutoff checkpoint (historical): implementation and validation underway.
+Completed validation is recorded in Current Status and Phase 6 completion below.
+
+
+## Phase 6 recovery implementation checkpoint (2026-09-13, historical)
+Recovered existing uncommitted work on dev == origin/dev b0be6da; no Phase 6 commit.
+Preserved service/route/type work and repaired misplaced AppContext insertion using
+unchanged published definitions. Added UI state/evidence/copy fences, user motivation
+and question limits, explicit SKIP reason control, sensitive precedence and model
+minimization, strict persisted artifact schemas, synthetic tests. Focused Phase 6
+and prior Phase 4/4.1/5 passed 42/42 before final sensitivity regression; typecheck
+and build pass. Initial full 81/82 had one legacy DRAFT metadata expectation; exact
+content-preservation assertions updated and focused Phase 2/6 now pass. Final
+release checks/reviewer recheck pending. GEMINI_API_KEY absent; no live call.
+Next exact internal step: final Phase 6 review and all completion gates, then scoped
+commit and normal dev publication. Do not begin Phase 7.
+
+
+## Phase 6 completed contracts and validation
+Shared artifact ID/type/job and assessment/evidence/JD/profile/algorithm fingerprints,
+optional exact resume hash, generation timestamp, support/requirement IDs and exact
+content/validated hashes preserve factual basis. Repository reads return DRAFT for
+legacy/imports, NEEDS_REVIEW for manual/subjective/override content, READY for current
+validated factual drafts, and STALE when sources change. Local setters/job updates
+invalidate immediately, including refreshed ATS/assessment inputs. No external actions.
+
+Proof packs require current READY Phase 5 resume and cover all enabled factual claims
+in stable 12-claim batches, including summary/skills. Exact evidence envelope and
+full supported statements constrain explanations/context; invented IDs/technology/
+metrics/ownership and unsupported STAR results fail. Current evidence lacks reviewed
+atomic STAR components: situation/task/result remain explicitly not documented;
+action may faithfully reuse the linked claim. Proof explanation is never new evidence.
+
+Recruiter/referral selection uses current matched eligible evidence and requirements.
+APPLY FIRST close alignment, STRONG WITH GAP incomplete fit, CALIBRATED STRETCH
+transferable overlap. SKIP/hard blockers require an explicit reason and stay review.
+No fixed frontend messaging, company enthusiasm or inferred personal interest.
+Referral name/relationship label is explicit owner input, no relationship history,
+contact details or unrelated metadata sent to Gemini. Outreach needs no resume.
+
+Six question categories: EVIDENCE_BACKED, DETERMINISTIC_PROFILE, ROLE_MOTIVATION,
+PREFERENCE, SENSITIVE_MANUAL, UNKNOWN_MANUAL. Factual questions reuse Phase 4 relevance
+retrieval (max eight) and validate selected IDs before assembling complete evidence
+statements. Profile location/authorization/master education use stored fields with
+no model; missing/unreviewed fields need input. Motivation is neutral role alignment
+or separately marked verbatim user motivation, always review. Sensitive identity/
+medical/mental health/pregnancy/age, legal attestations, preferences and salary stay
+empty/manual. No unsupported personal attestation. Real word/character limits are
+measured, stricter supplied/source constraint wins; LinkedIn measured <=300 chars.
+
+Ordinary saves/imports cannot forge a basis or approval; changed actual content clears
+validated hash, fresh server generation is needed. No artifact text editor/semantic
+edit validator added. Views show state/issues/support and block non-ready app copy.
+READY is grounded/current for review, never sent or submitted. Cover letters remain
+explicitly uncertified legacy drafts. Model prose does not establish motivation.
+
+Gemini uses strict responseJsonSchema + Zod/JSON.parse, MEDIUM, 30-second requests,
+no loose JSON fallback, no fabricated fallback and no partial READY save. Only selected
+statements/technologies/IDs and relevant requirement/match data reach the model; full
+profile/bank/history/contact and sensitive evidence metadata are excluded. Failures
+preserve prior content; revision conflicts 409; local edits during requests require
+reload and are preserved. Live Gemini pending external configuration, key absent.
+
+Validation: Phase 6 14/14; full npm test 83/83 includes Phase 4/4.1/5 29/29.
+Final release:check passes typecheck/build/harness/full tests/strict build privacy
+zero findings. Standalone privacy/evidence validator, startup smoke 1/1 and diff
+check pass. Existing >500 kB warning remains (546.37 kB). Reviewer original mixed
+sensitive questions and metadata reproductions fixed and directly verified. Initial
+full 81/82 expectation failure was legacy metadata, not lost content; assertions now
+check unchanged legacy content plus uncertified DRAFT without weakening rollback.
+
+Limits: whole-statement support is conservative, not semantic paraphrase certification;
+STAR atomic component assignment awaits explicit reviewed evidence contracts; lexical
+classification/retrieval is not exhaustive; motivation/override/manual drafts have no
+attestation promotion; authenticated/deployed browser/live provider/model gates remain.
+Phase 7 — Application tracking + outcome analytics is next, not begun.

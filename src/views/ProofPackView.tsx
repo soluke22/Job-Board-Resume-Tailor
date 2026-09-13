@@ -1,3 +1,5 @@
+import { ArtifactStatus } from '../components/ArtifactStatus';
+import { canCopyArtifact } from '../utils/artifactReadiness';
 import React, { useState } from 'react';
 import {
   ShieldCheck,
@@ -30,6 +32,7 @@ export const ProofPackView: React.FC = () => {
   const proofPack = activeJob?.proofPack;
 
   const handleCopy = (text: string, id: string) => {
+    if(!canCopyArtifact(proofPack))return;
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -42,9 +45,9 @@ export const ProofPackView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
-              Phase 3: Interview Defensibility
+              Interview Defensibility
             </span>
-            <span className="text-xs text-slate-400">Zero-Hallucination Skepticism Shield</span>
+            <span className="text-xs text-slate-400">Evidence and uncertainty</span>
           </div>
           <h1 className="text-2xl font-bold text-white mt-1">Interview Proof Pack</h1>
           <p className="text-sm text-slate-300 mt-1 max-w-2xl">
@@ -68,7 +71,7 @@ export const ProofPackView: React.FC = () => {
 
           <button
             onClick={() => activeJob && generateProofPack(activeJob.id)}
-            disabled={isGenerating || !activeJob}
+            disabled={isGenerating || !activeJob || activeJob.assessmentStatus!=='ASSESSED' || activeJob.tailoredResume?.readiness!=='READY'}
             className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-900/30 flex items-center space-x-1.5 transition cursor-pointer disabled:opacity-50"
           >
             {isGenerating ? (
@@ -86,6 +89,7 @@ export const ProofPackView: React.FC = () => {
         </div>
       </div>
 
+      {activeJob && (activeJob.assessmentStatus!=='ASSESSED' || activeJob.tailoredResume?.readiness!=='READY') && <p className="text-xs text-amber-300">Proof packs require a current assessment and a READY resume. Reassess or validate the resume first.</p>}
       {!activeJob ? (
         <div className="p-12 text-center bg-slate-900/60 border border-slate-800 rounded-2xl text-slate-400">
           Select or add a job to generate an Interview Proof Pack.
@@ -99,7 +103,7 @@ export const ProofPackView: React.FC = () => {
           </p>
           <button
             onClick={() => generateProofPack(activeJob.id)}
-            disabled={isGenerating}
+            disabled={isGenerating || activeJob.tailoredResume?.readiness!=='READY' || activeJob.assessmentStatus!=='ASSESSED'}
             className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold cursor-pointer"
           >
             Generate Now
@@ -112,9 +116,10 @@ export const ProofPackView: React.FC = () => {
               Generated {new Date(proofPack.generatedAt).toLocaleDateString()} ·{' '}
               {proofPack.claims.length} defensible claims prepared
             </span>
-            <span className="text-emerald-400 font-medium">100% Grounded in Verified Evidence</span>
+            <span className="text-emerald-400 font-medium">{proofPack.provenance?.validationStatus || 'DRAFT'}</span>
           </div>
 
+          <ArtifactStatus artifact={proofPack} />
           {proofPack.claims.map((claim: InterviewProofClaim, idx: number) => {
             const isExpanded = expandedClaimId === claim.id || (!expandedClaimId && idx === 0);
             return (
@@ -163,6 +168,8 @@ export const ProofPackView: React.FC = () => {
                       <p className="text-slate-300 leading-relaxed">
                         {claim.defensibleExplanation}
                       </p>
+                      <p className="text-slate-400">Technical context: {claim.technicalContext}</p>
+                      <p className="text-amber-300">Avoid extending this claim to undocumented architecture, scale, leadership or outcomes.</p>
                     </div>
 
                     {/* STAR Story Breakdown */}
@@ -190,6 +197,7 @@ export const ProofPackView: React.FC = () => {
                     {/* Copy Full Answer Button */}
                     <div className="flex justify-end pt-1">
                       <button
+                        disabled={!canCopyArtifact(proofPack)}
                         onClick={() =>
                           handleCopy(
                             `Interviewer Question: ${claim.likelyFollowUpQuestion}\n\nDefensible Answer: ${claim.defensibleExplanation}\n\nSTAR Breakdown:\nSituation: ${claim.starStory?.situation}\nTask: ${claim.starStory?.task}\nAction: ${claim.starStory?.action}\nResult: ${claim.starStory?.result}`,

@@ -1,3 +1,4 @@
+import { inspectArtifact, preserveArtifact } from './artifactProvenance';
 import { and, eq, notInArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
@@ -90,13 +91,17 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       job.tailoredResume = inspectResume(job.tailoredResume, output as any, job);
       if (job.tailoredResume.readiness !== 'READY') delete job.evaluation;
     }
+    for (const job of output.jobs) {
+      for (const key of ['proofPack','recruiterOutreach','outreachDrafts','referralContact']) if(job[key])job[key]=inspectArtifact(job[key],output as any,job);
+      if(job.applicationAnswers)job.applicationAnswers=job.applicationAnswers.map((a:any)=>inspectArtifact(a,output as any,job));
+    }
     return output;
   }
   async function read(ownerId: string) {
     if (!ownerId) throw new WorkspaceValidationError('Owner identity required');
     return database().transaction(tx => snapshot(tx, ownerId), { isolationLevel: 'repeatable read', accessMode: 'read only' });
   }
-  async function save(ownerId: string, raw: unknown, revision: number, importing = false, assessedJobId?: string, resumeJobId?: string) {
+  async function save(ownerId: string, raw: unknown, revision: number, importing = false, assessedJobId?: string, resumeJobId?: string, artifactJobId?: string, artifactKey?: string) {
     if (!ownerId) throw new WorkspaceValidationError('Owner identity required');
     const parsed = workspaceInput.safeParse(raw);
     if (!parsed.success || !Number.isSafeInteger(revision) || revision < 0) throw new WorkspaceValidationError('Invalid workspace or revision');
@@ -156,6 +161,11 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
             const assessmentFields = (j:any) => j && Object.fromEntries(['fit','parsed','requirements','evidenceMatches','assessmentMetadata','assessmentFacts','qualificationFit','evidenceCoverage','applicationPriority','priorityReason','primaryRoleFamily','roleModifiers','hardRequirements','preferredRequirements','technologies','responsibilities','hiringSignals','hardBlockers','softGaps'].map(k=>[k,j[k]]));
             if (importing || !old || old.assessmentStatus !== 'ASSESSED' || fingerprint(assessmentFields(old)) !== fingerprint(assessmentFields(job))) job.assessmentStatus = 'STALE';
           }
+          const previousJob=previous.jobs.find((j:any)=>j.id===job.id);
+          for(const key of ['proofPack','recruiterOutreach','outreachDrafts','referralContact']) {
+            if(job[key] && !(job.id===artifactJobId && key===artifactKey))job[key]=preserveArtifact(job[key],importing?undefined:previousJob?.[key]);
+          }
+          if(Array.isArray(job.applicationAnswers) && !(job.id===artifactJobId && artifactKey==='applicationAnswers'))job.applicationAnswers=job.applicationAnswers.map((a:any)=>preserveArtifact(a,importing?undefined:previousJob?.applicationAnswers?.find((old:any)=>old.id===a.id)));
           const id = job.id as string;
           const oldVersions=previous.jobs.find((j:any)=>j.id===id)?.versionHistory || [];
           const protectedVersions=oldVersions.filter((v:any)=>v.resume?.basis?.tailoringAlgorithmVersion);
@@ -212,6 +222,6 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       return snapshot(tx, ownerId);
     });
   }
-  return { read, save, saveAssessment: (ownerId: string, input: unknown, revision: number, jobId:string) => save(ownerId,input,revision,false,jobId), saveResume:(ownerId:string,input:unknown,revision:number,jobId:string)=>save(ownerId,input,revision,false,undefined,jobId), import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
+  return { read, save, saveArtifact:(ownerId:string,input:unknown,revision:number,jobId:string,key:string)=>save(ownerId,input,revision,false,undefined,undefined,jobId,key), saveAssessment: (ownerId: string, input: unknown, revision: number, jobId:string) => save(ownerId,input,revision,false,jobId), saveResume:(ownerId:string,input:unknown,revision:number,jobId:string)=>save(ownerId,input,revision,false,undefined,jobId), import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
 }
 export const workspaceRepository = createWorkspaceRepository();

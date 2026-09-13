@@ -1,3 +1,4 @@
+import { artifactProvenanceSchema, artifactStateSchema, questionCategorySchema } from '../../src/types/artifacts';
 import { z } from 'zod';
 import { claimSchema, resumeBasisSchema } from '../../src/types/provenance';
 import { metadataSchema, requirementSchema, extractionSchema } from '../../src/types/assessment';
@@ -53,11 +54,12 @@ const plan = object({ professionalSummaryAngle: text,
   projectSelection: list(object({ projectId: text, bulletCount: number, rationale: text })),
   skillsOrdering: list(object({ category: text, skills: strings })), skillsToRemove: strings, skillsToBackfill: strings, unsupportedClaimsToWithhold: strings });
 const letter = object({ id, jobId: text, date: text, recipientName: text, companyName: text, roleTitle: text, paragraphs: strings, signOff: text, evidenceThemesUsed: strings });
-const outreach = object({ jobId: text, company: text, roleTitle: text, linkedInMessage: text, emailSubject: text, emailBody: text, concreteImpact: text, whyCandidateRelevant: text, generatedAt: text });
-const proof = object({ jobId: text, generatedAt: text, prepNotes: strings, claims: list(object({ id, resumeBulletText: text,
+const artifactReview={provenance:z.union([artifactProvenanceSchema,z.object({validationStatus:artifactStateSchema,issues:z.array(z.string())}).strict()]).optional()};
+const outreach = object({ ...artifactReview, jobId: text, company: text, roleTitle: text, linkedInMessage: text, emailSubject: text, emailBody: text, concreteImpact: text, whyCandidateRelevant: text, generatedAt: text });
+const proof = object({ ...artifactReview, jobId: text, generatedAt: text, prepNotes: strings, claims: list(object({ id, resumeBulletText: text,
   underlyingEvidenceIds: strings, technicalContext: text, likelyFollowUpQuestion: text, defensibleExplanation: text,
   starStory: object({ situation: text, task: text, action: text, result: text }).optional() })) });
-const contact = object({ id, contactName: text, relationship: text, company: text, role: text, contactSource: text,
+const contact = object({ ...artifactReview, id, contactName: text, relationship: text, company: text, role: text, contactSource: text,
   outreachStatus: z.enum(['NOT_STARTED', 'REQUESTED', 'ACCEPTED', 'DECLINED']), referralMessage: text, updatedAt: text });
 const match = object({ id, requirement: text, isHardRequirement: flag, candidateEvidence: text, strength: text, gap: text,
   matchedEvidenceId: text.optional(), supportingEvidenceIds: strings.optional(), supportingSkillIds: strings.optional(), supportingProjectIds: strings.optional(), concern: text.optional() });
@@ -91,7 +93,7 @@ export const jobSchema = object({ id, atsProvider: text, atsBoard: text.optional
   tailoringPlan: plan.optional(), tailoredResume: resumeSchema.optional(), tailoredCoverLetter: letter.optional(), coverLetter: letter.optional(), evaluation: evaluation.optional(),
   versionHistory: list(object({ versionId: id, timestamp: text, note: text, resume: resumeSchema })).refine(records => new Set(records.map(r => r.versionId)).size === records.length, 'Duplicate version ids').optional(),
   proofPack: proof.optional(), outreachDrafts: outreach.optional(), recruiterOutreach: outreach.optional(), referralContact: contact.optional(),
-  applicationAnswers: list(object({ id, question: text, answer: text, evidenceIds: strings, rationale: text.optional() })).optional(),
+  applicationAnswers: list(object({ ...artifactReview,category:questionCategorySchema.optional(),inputStatus:text.optional(),characterLimit:number.int().positive().optional(),wordLimit:number.int().positive().optional(),id, question: text, answer: text, evidenceIds: strings, rationale: text.optional() })).optional(),
   statusHistory: list(object({ from: text, to: text, timestamp: text, note: text.optional() })).optional(), ...review }).superRefine((job, context) => {
     if (job.assessmentStatus === 'UNASSESSED') {
       if (job.qualificationFit !== undefined || job.evidenceCoverage !== undefined || job.fit !== undefined || job.applicationPriority !== 'UNASSESSED')

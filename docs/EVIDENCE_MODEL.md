@@ -91,7 +91,7 @@ records the version selected for export, and compares it with visible content.
 Export checkpoint records selection, not proof the OS print/download completed.
 Native browser printing is labeled draft unless the app just confirmed final print.
 Cover letters remain separately labeled uncertified drafts and are not certified
-by resume approval. No Phase 6 proof/outreach/application-answer work is included.
+by resume approval. Phase 6 consumes this contract through separate downstream validation.
 
 ## Validation and limits
 See [TESTING.md](TESTING.md), [Phase 5 acceptance](exec-plans/active/phase-5-acceptance.md)
@@ -100,3 +100,58 @@ The standalone evidence validator checks ID/eligibility/ownership integrity only
 not semantic support. Live Gemini and authenticated/deployed browser/print acceptance
 remain external configuration gates. Page fit is an estimate, never a page-count
 or ATS guarantee.
+
+## Phase 6 downstream artifact contract
+Proof packs, recruiter outreach, referral requests and application answers resolve
+the authenticated owner's current persisted job, assessment and eligible evidence.
+Browser evidence/profile/score/readiness/resume assertions are rejected. The existing
+Phase 4 eligibility primitive is shared; there is no separate approval rule.
+
+`src/types/artifacts.ts` and `server/artifactProvenance.ts` retain artifact ID/type,
+job ID, assessment/evidence/JD/profile fingerprints, optional exact resume hash,
+generation time/algorithm, supporting evidence/requirement IDs, actual text hash,
+validated hash, state and issues. Repository reads compare current basis; changed
+JD, evidence, assessment or relevant profile makes artifacts STALE. Proofs also
+require the exact current READY Phase 5 resume and enabled claim ledger. Stable
+batches cover every enabled factual claim, including summary and skills.
+
+The model selects supported statements/IDs through strict schemas. Factual prose
+reuses complete approved evidence statements; new technical context, scope changes,
+metrics, ownership and unsupported STAR outcomes fail. STAR situation/task/result
+are withheld as not documented because current records lack reviewed atomic STAR
+component contracts. This conservatism must not be replaced by forced story completion.
+
+Recruiter/referral introductions use persisted role/company and calibrated Phase
+4.1 fit. APPLY FIRST allows close alignment, STRONG WITH GAP names gaps, CALIBRATED
+STRETCH uses transferable overlap. SKIP/blockers require an explicit override reason
+and remain NEEDS_REVIEW. Outreach needs no resume. Contact names/relationship labels
+stay server-side; no relationship history is invented or contact details sent.
+
+Questions route to EVIDENCE_BACKED, DETERMINISTIC_PROFILE, ROLE_MOTIVATION,
+PREFERENCE, SENSITIVE_MANUAL or UNKNOWN_MANUAL before generation. Per-question Phase
+4 relevance retrieval bounds model evidence to eight records. Profile location,
+work authorization and stored master education assemble without Gemini; missing or
+unreviewed data needs input. Salary, preferences, legal attestations, unknowns and
+sensitive self-identification/medical/mental-health/pregnancy/age questions stay
+manual with empty responses. Sensitive selected statements/technology labels are
+withheld, and unrelated evidence metadata is not sent. Lexical classification is
+conservative and not exhaustive semantic understanding.
+
+Motivation uses neutral role alignment or separately identified verbatim user input,
+and always remains NEEDS_REVIEW. No admiration, emotions or interest history are
+inferred. Actual word/character constraints are measured; stricter declared/source
+limits win and overlong text fails, preserving the prior artifact.
+
+READY means factually grounded and current. DRAFT is uncertified/legacy/import text;
+NEEDS_REVIEW includes manual edits, subjective input and overrides; STALE has changed
+sources. Ordinary saves cannot forge approval, IDs or a new basis. Changed actual
+content clears validated hashes; fresh generation validates it again. No artifact
+text editor or semantic edit-certifier is introduced. Non-ready app copy controls
+are blocked; content stays visible for review. Cover letters remain uncertified.
+
+proof explanation ≠ new evidence
+outreach confidence ≠ qualification
+model-written motivation ≠ user motivation
+relationship label ≠ invented relationship history
+application answer ≠ factual attestation without support
+READY ≠ automatically sent/submitted

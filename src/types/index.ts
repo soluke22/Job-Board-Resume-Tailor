@@ -1,3 +1,4 @@
+import type { ArtifactProvenance, QuestionCategory } from './artifacts';
 import type { AssessmentMetadata, Requirement, Extraction } from './assessment';
 export type PrimaryRoleFamily =
   | 'frontend-product'
@@ -482,6 +483,7 @@ export interface InterviewProofClaim {
 }
 
 export interface InterviewProofPack {
+  provenance?: ArtifactProvenance;
   jobId: string;
   generatedAt: string;
   claims: InterviewProofClaim[];
@@ -489,6 +491,7 @@ export interface InterviewProofPack {
 }
 
 export interface RecruiterOutreach {
+  provenance?: ArtifactProvenance;
   jobId: string;
   company: string;
   roleTitle: string;
@@ -501,6 +504,7 @@ export interface RecruiterOutreach {
 }
 
 export interface ReferralContact {
+  provenance?: ArtifactProvenance;
   id: string;
   contactName: string;
   relationship: string;
@@ -513,6 +517,11 @@ export interface ReferralContact {
 }
 
 export interface ApplicationAnswer {
+  category?: QuestionCategory;
+  inputStatus?: string;
+  characterLimit?: number;
+  wordLimit?: number;
+  provenance?: ArtifactProvenance;
   id: string;
   question: string;
   answer: string;
