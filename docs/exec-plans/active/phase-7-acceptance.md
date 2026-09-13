@@ -81,3 +81,10 @@ Publication is recorded in the active plan.
 Build client chunk 639.41 kB, existing >500 kB warning retained (shared runtime
 validation increases size). Public synthetic AX/form/reload checks pass; no claim
 of full authenticated browser or live Neon multi-connection acceptance.
+
+## Publication
+Implementation 46f5fa2d5c2f18d0f92229682136005fa40fbc56 published normally to
+origin/dev; freshly fetched clean/equal dev and origin/dev verified. Active plan
+records contracts, all local gates and external limitations. Documentation checkpoint
+follows. Next: Phase 8 — Vercel-compatible architecture completion/live runtime
+acceptance, on a separate explicit continuation. Phase 8 not begun.

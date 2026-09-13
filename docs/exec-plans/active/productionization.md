@@ -11,7 +11,7 @@ User authorizes coherent Phase 7 commits and normal fast-forward origin/dev push
 No main, PR, Studio, deployment, external messages/submission or Phase 8.
 
 ## Current Phase / Scope and Acceptance
-Phase 7 — Application tracking + outcome analytics.
+Phase 7 — Application tracking + outcome analytics, deterministic contracts complete.
 Acceptance: [Phase 7 matrix](phase-7-acceptance.md). Parent owns writes: shared
 runtime/TS lifecycle history, atomic owner transitions/audit, immutable application
 snapshot, legacy normalization/quarantine, correction/idempotence, deterministic
@@ -19,7 +19,7 @@ observed funnel/cohorts and truthful UI. Phase 4.1 scoring stays unchanged.
 Phase 4.1 [calibration](phase-4-1-calibration.md), Phase 5/6 acceptance remain intact.
 
 ## Current Status
-Phase 7 deterministic contracts complete locally. Focused 12/12; full npm test
+Phase 7 deterministic contracts complete and published at 46f5fa2. Focused 12/12; full npm test
 95/95 and release:check (typecheck/build/harness/strict build privacy) pass.
 Standalone privacy zero findings, both synthetic evidence validators, built startup
 smoke 1/1, db:generate no drift and git diff --check pass. Final source check after
@@ -29,7 +29,9 @@ no remaining demonstrated defect in the bounded review. Public synthetic browser
 verified stages, form controls, insufficient-data labels and screen history retained
 after rejection/reload. Authenticated/deployed browser and Neon multi-connection
 behavior remain external gates. Client chunk is 639.41 kB (existing >500 kB warning;
-shared runtime history validation increases size). Normal dev publication pending.
+shared runtime history validation increases size). Implementation published normally; freshly fetched clean dev == origin/dev at
+46f5fa2d5c2f18d0f92229682136005fa40fbc56. This documentation checkpoint records
+publication; its own publication is verified in the final task report.
 No Phase 8 implementation or scoring changes.
 
 Previous Phase 4.1/5 publication evidence (historical):
@@ -189,16 +191,16 @@ shared provenance/index types; API/AppContext, editor/evidence/history/export/pr
 views and CSS; Phase 5 tests, auth/storage expectation updates and domain docs.
 
 ## Last Known Good Commit
-Phase 6 implementation 7031b58bf8922d3c7edd7ccd26dca849318fb3f2, published to
-origin/dev by normal fast-forward and freshly verified clean/equal refs. All local
-completion gates pass; live Gemini/browser gates remain explicit. This documentation
-checkpoint records implementation publication; final report verifies its publication.
-Recovery baseline b0be6da (Phase 4.1 ac28e4f; Phase 5 c00c5e2/610a00f) remains intact.
+Phase 7 implementation 46f5fa2d5c2f18d0f92229682136005fa40fbc56, published to
+origin/dev by normal fast-forward and freshly verified clean/equal refs.
+All local completion gates pass; authenticated/deployed/live Neon and earlier
+provider/model gates remain external. Phase 6 e751f05 baseline remains intact.
+This documentation checkpoint records implementation publication; final report
+verifies publication of this checkpoint without embedding its own hash.
 
 ## Next Exact Step
-Finish Phase 7 final local gates and normal dev publication, then stop.
-Next separately authorized phase: Phase 8 — Vercel-compatible architecture
-completion/live runtime acceptance. Do not begin Phase 8 in this task.
+Phase 8 — Vercel-compatible architecture completion/live runtime acceptance.
+Begin only on a new explicit continuation. This task stops after Phase 7 publication.
 Live authenticated/deployed browser and earlier provider/model gates remain external.
 Release audit precedes dev/main PR, merged-main Studio verification and final
 Vercel production; none is authorized in this task.
@@ -210,7 +212,7 @@ Vercel production; none is authorized in this task.
 4. Qualification/ranking deterministic contract complete; live semantics pending.
 5. Conservative resume provenance/tailoring/manual validation implemented; live gates pending.
 6. Conservative proof/outreach/referral/answer contracts complete; live gates pending.
-7. Application tracking + outcome analytics.
+7. Application tracking + outcome analytics deterministic contracts complete.
 8. Vercel-compatible architecture completion/live runtime acceptance.
 9. Security/privacy/release audit.
 10. dev -> main PR (separate authorization).
@@ -383,3 +385,15 @@ live Neon transport remain external, not inferred from local fixtures. Existing
 >500 kB client warning remains, now 639.41 kB with shared runtime validation.
 Boundary reviewer directly verified all four demonstrated defects resolved; no
 remaining demonstrated defect in the bounded Phase 7 review. Checkpoint/push next.
+
+## Phase 7 publication checkpoint (2026-09-13)
+Implementation 46f5fa2 published by normal fast-forward from e751f05; fresh fetch
+verified clean dev == origin/dev == 46f5fa2d5c2f18d0f92229682136005fa40fbc56.
+Final source release composition passes full 95/95, typecheck/build/harness/strict
+required-build privacy zero. Phase 7 12/12, startup smoke 1/1, standalone privacy,
+both synthetic evidence validators, db:generate no drift and staged diff check pass.
+Boundary reviewer directly confirmed all four demonstrated defects resolved; no
+remaining demonstrated defect in the bounded review. Docs-only checkpoint follows
+with harness/diff validation. No main/PR/Studio/deployment/Phase 8. Next exact step
+is Phase 8 — Vercel-compatible architecture completion/live runtime acceptance,
+separately authorized. All previous live limitations remain explicit.
