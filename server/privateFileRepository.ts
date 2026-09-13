@@ -1,6 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm';
-import { getDb } from './db/client';
-import { privateFiles, privateFileUploads } from './db/schema';
+import { getDb } from './db/client.js';
+import { privateFiles, privateFileUploads } from './db/schema.js';
 
 export type FileRecord = typeof privateFiles.$inferSelect;
 type FileInput = typeof privateFiles.$inferInsert;

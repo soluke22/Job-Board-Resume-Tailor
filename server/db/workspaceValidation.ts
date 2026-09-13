@@ -1,8 +1,8 @@
-import { applicationStatusSchema, applicationEventSchema, applicationSnapshotSchema, normalizeApplicationJob } from '../../src/types/application';
-import { artifactProvenanceSchema, artifactStateSchema, questionCategorySchema } from '../../src/types/artifacts';
+import { applicationStatusSchema, applicationEventSchema, applicationSnapshotSchema, normalizeApplicationJob } from '../../src/types/application.js';
+import { artifactProvenanceSchema, artifactStateSchema, questionCategorySchema } from '../../src/types/artifacts.js';
 import { z } from 'zod';
-import { claimSchema, resumeBasisSchema } from '../../src/types/provenance';
-import { metadataSchema, requirementSchema, extractionSchema } from '../../src/types/assessment';
+import { claimSchema, resumeBasisSchema } from '../../src/types/provenance.js';
+import { metadataSchema, requirementSchema, extractionSchema } from '../../src/types/assessment.js';
 
 // Runtime counterparts of the persisted UI contracts. Unknown optional metadata is
 // preserved for forwards compatibility; known fields never bypass shape validation.

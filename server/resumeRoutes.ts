@@ -1,10 +1,10 @@
 import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { workspaceRepository, WorkspaceConflict } from './workspaceRepository';
-import { currentJob, buildPlan, generateResume, inspectResume, revalidateResume, evaluationFor, generationSchema, validateClaim, ResumeError } from './resumeProvenance';
-import type { StructuredModel } from './assessment';
-import { redactAiPayload, isSensitiveCandidateText } from './privacy';
+import { workspaceRepository, WorkspaceConflict } from './workspaceRepository.js';
+import { currentJob, buildPlan, generateResume, inspectResume, revalidateResume, evaluationFor, generationSchema, validateClaim, ResumeError } from './resumeProvenance.js';
+import type { StructuredModel } from './assessment.js';
+import { redactAiPayload, isSensitiveCandidateText } from './privacy.js';
 
 const requestSchema=z.object({jobId:z.string().min(1).max(200),claimId:z.string().min(1).max(200).optional()}).strict();
 export function createResumeHandler(operation:'plan'|'generate'|'evaluate'|'validate'|'regenerate'|'export', modelForRequest:(req:Request)=>StructuredModel,repository=workspaceRepository) {

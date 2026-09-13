@@ -1,5 +1,5 @@
-import type { JobRecord } from '../types';
-import { effectiveEvents, normalizeHistory, type ApplicationStatus } from '../types/application';
+import type { JobRecord } from '../types/index.js';
+import { effectiveEvents, normalizeHistory, type ApplicationStatus } from '../types/application.js';
 
 export type SampleState = 'INSUFFICIENT_SAMPLE' | 'EARLY_SIGNAL' | 'OBSERVED';
 export const sampleState = (n: number): SampleState => n < 5 ? 'INSUFFICIENT_SAMPLE' : n < 15 ? 'EARLY_SIGNAL' : 'OBSERVED';

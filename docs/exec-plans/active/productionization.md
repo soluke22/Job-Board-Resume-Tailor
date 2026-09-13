@@ -1,34 +1,70 @@
 # Productionization execution plan
 
+## Phase 12 authorized staging runtime fix
+Scope: repair only relative import resolution in the Node-executed Function graph
+on dev. Live canonical main 0f0acdd51238cf7e9a692291bb5c2e58e2e0d818 fails with
+ERR_UNSUPPORTED_DIR_IMPORT at api/index.ts:1, before Express initialization.
+Acceptance: reproduce with unbundled emitted JavaScript and native Node24 (no tsx
+loader); resolve the complete reachable runtime graph; public unconfigured health
+returns 200 JSON; npm ci/typecheck/tests/build/runtime/release gates pass; scoped
+dev checkpoint only. Preserve local .gitignore/.vercel/.env.local linkage; exclude
+these and credentials from commit. No main edit, PR, deployment, environment
+change, migration or OAuth/Blob/Gemini configuration. Phase11 remains accepted
+per owner confirmation. Local fix complete; validated dev checkpoint follows.
+
+### Phase 12 local validation result
+Native Node24.21.0 baseline reproduced the live directory-import exception in
+unbundled emitted api/index.js. Explicit .js relative specifiers now resolve
+through TypeScript to source .ts files and through Node to emitted .js files;
+directory type imports explicitly name index.js. Audited runtime graph includes
+30 Function-startup source modules plus the local shell. All 23 changed TypeScript
+files change only import/export specifiers, including two shared server-consumed
+utilities; frontend-only modules untouched. No dependency/configuration changes.
+New tests/phase-12-native-esm.test.mjs emits separate modules without rewriting
+specifiers or bundling, runs a native child without inherited loaders/private
+environment/dotenv files, imports the Function and verifies public health200 JSON.
+It runs directly with Node24 --test and in npm test; the prior tsx suite and bundled
+local build did not exercise native unbundled module resolution.
+Node24 npm ci, typecheck, full115/115 tests, build, runtime:check and release:check
+pass; direct native regression1/1 passes. Strict build privacy zero; harness passes.
+Client hashes/706087 bytes unchanged. Existing four moderate tooling advisories,
+Rollup annotation and >500kB client warnings remain. No Vercel artifact build or
+redeployment performed; deterministic emission is the local regression equivalent,
+not a live runtime acceptance claim. Final staged privacy/harness/diff checks and
+dev-only commit follow. Next exact action: obtain separate PR authorization;
+main remains canonical affected SHA; live staging acceptance still blocked until
+reviewed merge and separately authorized staging redeploy/health verification.
+
 ## Project Goal
 Truthful discovery and evidence-grounded career workflows with durable owner-only
 private storage and a separate synthetic demo. GitHub is canonical.
 
 ## Current Branch
-Phase 10 dev release candidate; baseline freshly fetched clean dev/origin/dev
-24a5737537d92c7c51b5df2939a3352bcaead082. Main unchanged at
-18bde7f451e4e5f39e303f82a0507a30233cd35e. Normal scoped dev checkpoint/push.
+dev; audited candidate 2d73941c126a313f35788b8b64f097ed5c3a3d8a merged into main
+through PR #1 using the normal merge commit strategy. Documentation checkpoint
+continues through dev; no additional main changes.
 
 ## Current Phase / Scope and Acceptance
-Phase 10 — dev -> main pull request and merge readiness.
-[Phase 10 acceptance](phase-10-acceptance.md) records categorized release delta,
-checks, dependencies/migrations, privacy, clean reproduction and PR status.
-No merge/main mutation, Phase11, Vercel deployment or remote migration authorized.
+Phase 10 — complete, PASS. Owner explicitly authorized PR #1 dev -> main merge.
+Phase 11 is ready but has not begun.
 
 ## Current Status
-PASS — deterministic release checks 114/114, typecheck/build/harness/strict privacy
-zero/runtime, migration drift/fresh/upgrade, evidence validators/startup pass.
-Baseline exact-SHA clean Git archive reproduces install/typecheck/114 tests/build.
-Phase10 removes two EOF blanks and adds acceptance/plan records only.
-PR #1: https://github.com/soluke22/Job-Board-Resume-Tailor/pull/1 (main <- dev).
-READY_TO_MERGE after final published-head mergeability/check verification.
-Phase9 accepted history/contact/security/dependency dispositions remain valid;
-four moderate Drizzle/esbuild tooling entries, zero high/critical; unchanged lock.
-Assessment phase4.1-v3 retains accepted Phase9 cache invalidation/calibration.
-Provider gates deferred; code merge readiness is not production readiness.
-Next exact step: owner review/authorize merge. After merged canonical main exists,
-Phase11 Google AI Studio merged-main compatibility verification; not begun here.
-Historical Phase9/Phase8 entries below retain their original checkpoint context.
+PR #1: https://github.com/soluke22/Job-Board-Resume-Tailor/pull/1 — MERGED.
+Final fetched origin/main: 0f0acdd51238cf7e9a692291bb5c2e58e2e0d818.
+Pre-merge fetched main 18bde7f451e4e5f39e303f82a0507a30233cd35e and dev
+2d73941c126a313f35788b8b64f097ed5c3a3d8a matched the authorized tips;
+GitHub base main/head dev, CLEAN/MERGEABLE, clean local candidate with no later
+commits or unexpected file changes. Main-side 0 / dev-side 27 commits.
+Merge parents are exactly those two tips; audited dev is an ancestor of merged
+main, merged tree equals candidate, and only the merge commit exists outside
+those parents' histories. PR reports MERGED; dev retained at audited tip before
+this documentation-only checkpoint. No squash/rebase/force-push/tag/deletion.
+Phase 10 deterministic release validation remains the accepted 114/114 and
+clean-source reproduction recorded in the Phase 10 acceptance matrix.
+Deferred Vercel, Google OAuth live browser, Neon, Private Blob and Gemini gates
+remain PENDING_EXTERNAL_CONFIG. No Studio, deployment or remote migration run.
+Next exact step: **Phase 11 — Google AI Studio merged-main compatibility verification.**
+Historical entries below retain their original checkpoint context.
 
 ## Historical Phase 8 accepted/deferred status
 
@@ -65,9 +101,8 @@ both evidence validators, built startup smoke and diff check pass. Publication
 recorded in the checkpoint below; plan encoding normalized from four legacy dash bytes.
 
 ## Next Exact Step
-Owner review/authorize merge of dev -> main PR #1.
-After canonical merged main exists: Phase 11 Google AI Studio merged-main
-compatibility verification. No Studio/deployment/remote migrations in Phase10.
+**Phase 11 — Google AI Studio merged-main compatibility verification.**
+Not begun in this turn. Deferred external gates remain unchanged.
 
 ## Historical Phase 7 Branch
 dev; Phase 7 began clean at freshly fetched dev == origin/dev ==
