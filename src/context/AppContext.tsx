@@ -1,4 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { effectiveEvents, normalizeHistory, transitionRequestSchema, type TransitionRequest } from '../types/application';
+import type { ApplicationQuestion } from '../types/artifacts';
+import { invalidateJobArtifacts, invalidateEditedArtifacts } from '../utils/artifactReadiness';
+import { invalidateEditedResume } from '../utils/resumeReadiness';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { mergeDiscoveredJobs } from '../utils/jobIdentity';
 import {
   CandidateProfile,
   EvidenceItem,
@@ -18,7 +23,7 @@ import {
   RecruiterOutreach
 } from '../types';
 import { storageService } from '../services/storage';
-import { apiService } from '../services/api';
+import { apiService, setBeforePrivateRequest, invalidatePrivateRequests, signOutPrivateWorkspace } from '../services/api';
 
 export type AppView =
   | 'dashboard'
@@ -44,8 +49,12 @@ interface AppContextType {
   workspaceMode: WorkspaceMode;
   setWorkspaceMode: (mode: WorkspaceMode) => void;
   authSession: AuthSession;
-  login: (email: string, passwordOrToken?: string) => Promise<boolean>;
-  logout: () => Promise<void>;
+  login: () => Promise<boolean>;
+  workspaceEpoch: number;
+  syncStatus: string;
+  sessionLoading: boolean;
+  logout: () => Promise<boolean>;
+  signOutPending: boolean;
 
   // Data Models
   profile: CandidateProfile;
@@ -80,7 +89,8 @@ interface AppContextType {
     rawDescription: string,
     sourceUrl?: string,
     company?: string,
-    title?: string
+    title?: string,
+    userProvided?: boolean
   ) => Promise<JobRecord>;
   deleteJob: (id: string) => void;
   updateJob: (job: JobRecord) => void;
@@ -88,8 +98,9 @@ interface AppContextType {
     jobId: string,
     status: ApplicationStatus,
     notes?: string,
-    rejectionReason?: string
-  ) => void;
+    rejectionReason?: string,
+    metadata?: Partial<TransitionRequest>
+  ) => Promise<void>;
 
   // Tailoring Workflow
   analyzeJob: (jobId: string) => Promise<void>;
@@ -103,6 +114,7 @@ interface AppContextType {
   generateResume: (jobId: string) => Promise<void>;
   generateCoverLetter: (jobId: string) => Promise<void>;
   evaluateResume: (jobId: string) => Promise<void>;
+  prepareResumeExport: (jobId: string) => Promise<TailoredResume>;
   updateResume: (jobId: string, resume: TailoredResume) => void;
   updateCoverLetter: (jobId: string, coverLetter: TailoredCoverLetter) => void;
   regenerateBullet: (
@@ -116,13 +128,13 @@ interface AppContextType {
 
   // Preparation & Outreach
   generateProofPack: (jobId: string) => Promise<void>;
-  generateOutreach: (jobId: string) => Promise<void>;
-  generateAnswers: (jobId: string, questions: string[]) => Promise<void>;
+  generateOutreach: (jobId: string, overrideReason?:string) => Promise<void>;
+  generateAnswers: (jobId: string, questions: (string|ApplicationQuestion)[]) => Promise<void>;
   generateReferral: (
     jobId: string,
     contactName: string,
     relationship: string,
-    jobUrl?: string
+    overrideReason?: string
   ) => Promise<string>;
 
   // Dialogs & Modals
@@ -145,8 +157,8 @@ interface AppContextType {
   updateSkillItem: (skill: SkillItem) => void;
 
   // Workspace Sync & Migration
-  importWorkspaceJson: (jsonString: string) => { success: boolean; message: string };
-  exportWorkspaceJson: () => string;
+  importWorkspaceJson: (jsonString: string) => Promise<{ success: boolean; message: string }>;
+  exportWorkspaceJson: () => Promise<string>;
   clearWorkspace: () => void;
   resetAllData: () => void;
 }
@@ -204,69 +216,152 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsAuthModalOpen(true);
       return;
     }
+    if (newMode !== storageService.getWorkspaceMode()) { epoch.current++; invalidatePrivateRequests(); setWorkspaceEpoch(v => v + 1); }
     setWorkspaceModeState(newMode);
     storageService.setWorkspaceMode(newMode);
     reloadDataForMode(newMode);
   };
 
   // Auth actions
-  const login = async (email: string, passwordOrToken?: string): Promise<boolean> => {
-    setError(null);
-    try {
-      const res = await apiService.login(email, passwordOrToken);
-      const session: AuthSession = {
-        isAuthenticated: true,
-        userEmail: res.userEmail,
-        userName: res.userName,
-        token: res.token,
-        isOwner: true,
-        mode: 'PRIVATE_WORKSPACE'
-      };
-      setAuthSession(session);
-      storageService.saveAuthSession(session);
-      setWorkspaceModeState('PRIVATE_WORKSPACE');
-      reloadDataForMode('PRIVATE_WORKSPACE');
-      setIsAuthModalOpen(false);
-      return true;
-    } catch (err: any) {
-      setError(err.message || 'Authentication failed');
-      return false;
-    }
-  };
+  const revision = useRef(0);
+  const ready = useRef(false);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const epoch = useRef(0);
+  const saved = useRef('');
+  const scheduled = useRef('');
+  const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
+  const [syncStatus, setSyncStatus] = useState('');
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [signOutPending, setSignOutPending] = useState(false);
 
-  const logout = async (): Promise<void> => {
-    try {
-      if (authSession.token) {
-        await apiService.logout(authSession.token);
-      }
-    } catch {
-      // Non-blocking
-    }
+  const clearPrivateView = () => {
+    ready.current = false;
+    epoch.current++;
+    invalidatePrivateRequests();
     storageService.clearAuthSession();
-    const publicSession: AuthSession = {
-      isAuthenticated: false,
-      userEmail: null,
-      userName: null,
-      isOwner: false,
-      mode: 'PUBLIC_DEMO'
-    };
-    setAuthSession(publicSession);
+    setAuthSession(storageService.getAuthSession());
     setWorkspaceModeState('PUBLIC_DEMO');
     reloadDataForMode('PUBLIC_DEMO');
+    setCurrentView('dashboard');
+    setIsAuthModalOpen(false); setIsQuickGrabOpen(false); setIsAtsGuardsOpen(false);
+    setWorkspaceEpoch(v => v + 1);
+    setSyncStatus('');
+    setIsAnalyzing(false); setIsGenerating(false); setIsDiscovering(false);
+  };
+  const adopt = (result: any) => {
+    storageService.hydratePrivateWorkspace(result.data);
+    revision.current = result.revision;
+    saved.current = scheduled.current = JSON.stringify(storageService.privateSnapshot());
+    reloadDataForMode('PRIVATE_WORKSPACE');
+  };
+  const persistCurrent = (): Promise<void> => {
+    if (storageService.getWorkspaceMode() !== 'PRIVATE_WORKSPACE') return Promise.resolve();
+    if (!ready.current) return Promise.reject(new Error('Private workspace is not ready. Reload before editing.'));
+    const data = storageService.privateSnapshot(), serialized = JSON.stringify(data), started = epoch.current;
+    if (serialized === scheduled.current) return queue.current;
+    scheduled.current = serialized;
+    setSyncStatus('Saving…');
+    queue.current = queue.current.then(async () => {
+      if (started !== epoch.current) return;
+      const result = await apiService.saveWorkspaceData(data, revision.current);
+      if (started !== epoch.current) return;
+      revision.current = result.revision;
+      saved.current = serialized;
+      setSyncStatus('Saved privately');
+    }).catch(err => {
+      if (started === epoch.current) { ready.current = false; setSyncStatus('Not saved — reload required'); setError(err.message); }
+      throw err;
+    });
+    return queue.current;
+  };
+  useEffect(() => {
+    setBeforePrivateRequest(persistCurrent);
+    if (workspaceMode === 'PRIVATE_WORKSPACE' && ready.current) void persistCurrent().catch(() => {});
+  }, [profile, searchProfile, evidence, projects, skills, jobs, masterResume, workspaceMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const started = epoch.current;
+    const restore = async () => {
+      try {
+        const session = await apiService.getSession();
+        if (cancelled || started !== epoch.current) return;
+        if (!session.authenticated || !session.isOwner) {
+          if (new URLSearchParams(window.location.search).get('workspace') === 'private') setError('Private sign-in was not accepted. Continue with the configured owner Google account.');
+          return;
+        }
+        const result = await apiService.getWorkspaceData();
+        if (cancelled || started !== epoch.current) return;
+        const identity: AuthSession = { isAuthenticated: true, isOwner: true, userEmail: session.user.email, userName: session.user.name, mode: 'PRIVATE_WORKSPACE' };
+        storageService.saveAuthSession(identity); setAuthSession(identity);
+        adopt(result); ready.current = true;
+        setWorkspaceModeState('PRIVATE_WORKSPACE');
+        setCurrentView(result.data?.profile?.name ? 'dashboard' : 'candidate-setup');
+        setSyncStatus('Saved privately');
+        scheduleExpiry(session.expiresAt);
+      } catch (err: any) {
+        if (!cancelled && started === epoch.current && new URLSearchParams(window.location.search).get('workspace') === 'private') setError(err.message);
+      } finally { if (!cancelled) setSessionLoading(false); }
+    };
+    void restore();
+    const lost = () => { clearPrivateView(); setError('Private access is unavailable or expired. Sign in again.'); };
+    let expiryTimer: number | undefined;
+    const scheduleExpiry = (expiresAt: string) => {
+      window.clearTimeout(expiryTimer);
+      const remaining = new Date(expiresAt).getTime() - Date.now();
+      if (!Number.isFinite(remaining) || remaining <= 0) { lost(); return; }
+      const scheduledEpoch = epoch.current;
+      expiryTimer = window.setTimeout(() => { if (scheduledEpoch === epoch.current) lost(); }, remaining);
+    };
+    let checking = false;
+    const checkSession = async () => {
+      if (checking || !storageService.getAuthSession().isAuthenticated) return;
+      checking = true;
+      const checkedEpoch = epoch.current;
+      try {
+        const session = await apiService.getSession();
+        if (checkedEpoch === epoch.current) {
+          if (!session.authenticated || !session.isOwner) lost();
+          else scheduleExpiry(session.expiresAt);
+        }
+      } catch {
+        if (checkedEpoch === epoch.current) lost();
+      } finally { checking = false; }
+    };
+    const visible = () => { if (document.visibilityState === 'visible') void checkSession(); };
+    const timer = window.setInterval(() => void checkSession(), 30_000);
+    window.addEventListener('focus', checkSession);
+    document.addEventListener('visibilitychange', visible);
+    const pagehide = () => { if (storageService.getWorkspaceMode() === 'PRIVATE_WORKSPACE') { document.documentElement.style.visibility = 'hidden'; clearPrivateView(); } };
+    const pageshow = (event: PageTransitionEvent) => { if (event.persisted) window.location.reload(); else document.documentElement.style.visibility = ''; };
+    const otherTab = (event: StorageEvent) => { if (event.key === 'caos_logout_event') clearPrivateView(); };
+    window.addEventListener('workspace-access-lost', lost);
+    window.addEventListener('pagehide', pagehide); window.addEventListener('pageshow', pageshow); window.addEventListener('storage', otherTab);
+    return () => { cancelled = true; window.clearTimeout(expiryTimer); window.clearInterval(timer); window.removeEventListener('focus', checkSession); document.removeEventListener('visibilitychange', visible); window.removeEventListener('workspace-access-lost', lost); window.removeEventListener('pagehide', pagehide); window.removeEventListener('pageshow', pageshow); window.removeEventListener('storage', otherTab); };
+  }, []);
+  const login = async (): Promise<boolean> => { await apiService.login(); return true; };
+  const logout = async (): Promise<boolean> => {
+    // Invalidate client access immediately; server sign-out revokes the durable session.
+    setSignOutPending(true);
+    try { await signOutPrivateWorkspace(clearPrivateView); setSignOutPending(false); return true; }
+    catch (err: any) { setError('Server sign-out could not be confirmed. Retry sign-out before leaving this device. ' + err.message); setIsAuthModalOpen(true); return false; }
   };
 
   // Profile and data setters with storage persistence
   const setProfile = (newProfile: CandidateProfile) => {
+    if(JSON.stringify(newProfile)!==JSON.stringify(profile))setJobs(jobs.map(j=>invalidateJobArtifacts(j,'Profile changed; reload or regenerate before use')));
     setProfileState(newProfile);
     storageService.saveProfile(newProfile, workspaceMode);
   };
 
   const updateSearchProfile = (newSearchProfile: SearchProfile) => {
+    if (JSON.stringify(newSearchProfile) !== JSON.stringify(searchProfile)) setJobs(jobs.map(j=>invalidateJobArtifacts(j.fit?{...j,assessmentStatus:'STALE'}:j,'Assessment source changed; reassess and regenerate before use')));
     setSearchProfileState(newSearchProfile);
     storageService.saveSearchProfile(newSearchProfile, workspaceMode);
   };
 
   const setEvidence = (newEvidence: EvidenceItem[]) => {
+    if (JSON.stringify(newEvidence) !== JSON.stringify(evidence)) setJobs(jobs.map(j=>invalidateJobArtifacts(j.fit?{...j,assessmentStatus:'STALE'}:j,'Assessment source changed; reassess and regenerate before use')));
     setEvidenceState(newEvidence);
     storageService.saveEvidence(newEvidence, workspaceMode);
   };
@@ -282,12 +377,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const setJobs = (newJobs: JobRecord[]) => {
+    const previousJobs=storageService.getJobs(workspaceMode);
+    newJobs=newJobs.map(job=>{
+      const old=previousJobs.find(j=>j.id===job.id);
+      if(!old)return job;
+      const sourceFields=['description','rawDescription','jdSource','canonicalContentStatus','title','company','verificationStatus','publishedAt','freshnessBand','compensation','assessmentMetadata','assessmentStatus','fit','parsed','requirements','evidenceMatches','tailoredResume'] as const;
+      return sourceFields.some(k=>JSON.stringify(old[k])!==JSON.stringify(job[k]))?
+        invalidateJobArtifacts(job,'Job, assessment or resume basis changed; regenerate before use'):invalidateEditedArtifacts(old,job);
+    });
     setJobsState(newJobs);
     storageService.saveJobs(newJobs, workspaceMode);
     setAnalyticsState(storageService.getAnalytics(workspaceMode));
   };
 
   const saveMasterResume = (resume: TailoredResume) => {
+    if(JSON.stringify(resume)!==JSON.stringify(masterResume))setJobs(jobs.map(j=>invalidateJobArtifacts(j,'Master resume changed; revalidate sources before use')));
     setMasterResumeState(resume);
     storageService.saveMasterResume(resume, workspaceMode);
   };
@@ -310,21 +414,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const res = await apiService.discoverJobs(searchProfile, undefined, queryBudget, jobs);
       const newDiscovered = res.discoveredJobs || [];
 
-      if (newDiscovered.length > 0) {
-        // Merge with deduplication
-        const existingUrls = new Set(jobs.map((j) => (j.canonicalUrl || j.sourceUrl || '').toLowerCase()));
-        const filteredNew = newDiscovered.filter(
-          (j) => !existingUrls.has((j.canonicalUrl || j.sourceUrl || '').toLowerCase())
-        );
-
-        const updated = [...filteredNew, ...jobs];
-        setJobs(updated);
-        if (filteredNew[0]) {
-          setActiveJobId(filteredNew[0].id);
-        }
-      }
+      // Read the latest cache after the await: an in-flight search must not undo
+      // application edits or resurrect a history record deleted meanwhile.
+      const currentJobs = storageService.getJobs(workspaceMode);
+      const retainedRefreshes = (res.refreshedJobs || []).filter(j => currentJobs.some(current => current.id === j.id));
+      const merged = mergeDiscoveredJobs(currentJobs, [...retainedRefreshes, ...newDiscovered]);
+      setJobs(merged.jobs);
+      if (merged.newJobs[0]) setActiveJobId(merged.newJobs[0].id);
     } catch (err: any) {
-      console.error('Job discovery failed:', err);
+      console.error('Job discovery failed:');
       setError(err.message || 'Job discovery encountered an error');
     } finally {
       setIsDiscovering(false);
@@ -340,17 +438,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!url) return;
 
       const res = await apiService.verifyAts(url, target.atsProvider, target.atsBoard, target.atsJobId);
+      const currentJobs = storageService.getJobs(workspaceMode);
+      const current = currentJobs.find(j => j.id === jobId);
+      if (!current) return;
       const updated: JobRecord = {
-        ...target,
-        verificationStatus: res.status || target.verificationStatus,
-        isCurrentlyListed: res.isListed !== false,
+        ...current,
+        verificationStatus: res.status || 'UNKNOWN',
+        isCurrentlyListed: res.status === 'LISTED',
         lastVerifiedAt: res.lastVerifiedAt || new Date().toISOString(),
-        canonicalUrl: res.canonicalUrl || target.canonicalUrl,
-        applyUrl: res.applyUrl || target.applyUrl
+        canonicalUrl: res.canonicalUrl || current.canonicalUrl,
+        applyUrl: res.applyUrl || current.applyUrl
       };
-      updateJob(updated);
+      setJobs(currentJobs.map(j => j.id === jobId ? updated : j));
     } catch (err: any) {
-      console.error('ATS verification error:', err);
+      console.error('ATS verification error:');
     }
   };
 
@@ -358,9 +459,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     rawDescription: string,
     sourceUrl?: string,
     company?: string,
-    title?: string
+    title?: string,
+    userProvided = true
   ): Promise<JobRecord> => {
-    const effectiveUrl = sourceUrl || 'https://jobs.example.com';
+    const effectiveUrl = sourceUrl || '';
     const newJob: JobRecord = {
       id: `job-${Date.now()}`,
       atsProvider: 'company-careers',
@@ -370,26 +472,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       applyUrl: effectiveUrl,
       sourceUrl,
       rawDescription,
+      jdSource: userProvided ? 'user-provided' : undefined,
       description: rawDescription,
-      location: 'Remote (US)',
-      remoteStatus: 'remote',
-      employmentType: 'full-time',
+      location: '',
+      remoteStatus: 'unknown',
+      employmentType: '',
       dateAdded: new Date().toISOString().split('T')[0],
       firstSeenAt: new Date().toISOString(),
-      lastVerifiedAt: new Date().toISOString(),
-      verificationStatus: 'LISTED',
-      isCurrentlyListed: true,
-      freshnessBand: 'NEW',
+      verificationStatus: 'UNKNOWN',
+      isCurrentlyListed: false,
+      freshnessBand: 'UNKNOWN',
       sourceChannel: 'Direct User Input',
-      applicationPriority: 'STRONG',
-      priorityReason: 'User imported target role',
-      qualificationFit: 8.5,
-      evidenceCoverage: 8.0,
+      applicationPriority: 'UNASSESSED',
+      assessmentStatus: 'UNASSESSED',
+      priorityReason: 'User imported target role; not assessed',
       applicationStatus: 'SHORTLISTED',
       status: 'Imported',
-      primaryRoleFamily: 'frontend-product',
-      roleModifiers: ['B2B_SAAS'],
-      seniority: 'Mid',
+      primaryRoleFamily: undefined,
+      roleModifiers: [],
+      seniority: 'Unspecified',
       hardRequirements: [],
       preferredRequirements: [],
       technologies: [],
@@ -416,35 +517,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateJob = (updatedJob: JobRecord) => {
+    const previous = jobs.find(j=>j.id===updatedJob.id);
+    if (previous?.fit && ['description','rawDescription','jdSource','canonicalContentStatus','verificationStatus','publishedAt','freshnessBand','compensation'].some(k=>JSON.stringify(previous[k as keyof JobRecord])!==JSON.stringify(updatedJob[k as keyof JobRecord]))) updatedJob = {...updatedJob,assessmentStatus:'STALE'};
+    if(previous && ['tailoredResume','description','rawDescription','jdSource','canonicalContentStatus','title','company','assessmentMetadata'].some(k=>JSON.stringify(previous[k as keyof JobRecord])!==JSON.stringify(updatedJob[k as keyof JobRecord])))updatedJob=invalidateJobArtifacts(updatedJob,'Job or resume basis changed; regenerate before use');
     const updated = jobs.map((j) => (j.id === updatedJob.id ? updatedJob : j));
     setJobs(updated);
   };
 
-  const logOutcome = (
-    jobId: string,
-    status: ApplicationStatus,
-    notes?: string,
-    rejectionReason?: string
-  ) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target) return;
-
-    const historyEntry = {
-      status,
-      timestamp: new Date().toISOString(),
-      notes
-    };
-
-    const updated: JobRecord = {
-      ...target,
-      applicationStatus: status,
-      appliedDate: status === 'APPLIED' ? new Date().toISOString().split('T')[0] : target.appliedDate,
-      rejectionReason: rejectionReason || target.rejectionReason,
-      statusHistory: [...(target.statusHistory || []), historyEntry]
-    };
-
-    updateJob(updated);
-    storageService.addAuditLog('OUTCOME_LOGGED', jobId, `Updated status to ${status}${notes ? `: ${notes}` : ''}`);
+  const outcomeBusy = useRef(false);
+  const logOutcome = async (jobId: string, status: ApplicationStatus, notes?: string, rejectionReason?: string, metadata: Partial<TransitionRequest> = {}) => {
+    if(outcomeBusy.current)throw new Error('An application update is already in progress');
+    outcomeBusy.current=true;
+    const startedEpoch=epoch.current;
+    try {
+      if(workspaceMode==='PUBLIC_DEMO') {
+        const target=jobs.find(j=>j.id===jobId);if(!target)return;
+        const request=transitionRequestSchema.parse({...metadata,jobId,targetStatus:status,requestId:metadata.requestId || crypto.randomUUID(),...(notes?.trim()?{note:notes.trim()}:{}),...(rejectionReason?.trim()?{reasonText:rejectionReason.trim()}:{})});
+        const history=normalizeHistory(target.statusHistory).events.map((ev,i)=>({...ev,id:ev.id || `legacy-${i}`}));
+        if(history.some(ev=>ev.requestId===request.requestId))return;
+        if(target.applicationStatus===status && !request.note && !request.supersedesEventId && !request.correctLegacyState)return;
+        if(history.length>=5000)throw new Error('Application history limit reached');
+        if(request.supersedesEventId && (!request.correctionReason || !effectiveEvents(history).some(ev=>ev.id===request.supersedesEventId)))throw new Error('Select an effective event and supply a correction reason');
+        const timestamp=request.timestamp?new Date(request.timestamp).toISOString():new Date().toISOString();
+        const {jobId:_jobId,targetStatus:_targetStatus,correctLegacyState:_legacy,...facts}=request;
+        const events=[...history,{...facts,id:crypto.randomUUID(),from:target.applicationStatus,to:status,timestamp,kind:request.supersedesEventId || request.correctLegacyState?'correction' as const:target.applicationStatus===status?'note' as const:'transition' as const}];
+        const semantic=effectiveEvents(events).slice().sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
+        setJobs(jobs.map(j=>j.id===jobId?{...j,applicationStatus:semantic.at(-1)?.to || status,statusHistory:events,appliedDate:semantic.find(ev=>ev.to==='APPLIED')?.timestamp}:j));
+        return;
+      }
+      await persistCurrent();
+      if(startedEpoch!==epoch.current)return;
+      const before=JSON.stringify(storageService.privateSnapshot());
+      const result=await apiService.transitionApplication({...metadata,jobId,targetStatus:status,requestId:metadata.requestId || crypto.randomUUID(),
+        ...(notes?.trim()?{note:notes}:{}),...(rejectionReason?.trim()?{reasonText:rejectionReason}:{})});
+      if(startedEpoch!==epoch.current)return;
+      if(before!==JSON.stringify(storageService.privateSnapshot())) {
+        ready.current=false;setSyncStatus('Application saved — reload required');
+        throw new Error('Application saved privately. Local edits were preserved; reload to reconcile before saving.');
+      }
+      adopt(result);setSyncStatus('Saved privately');
+    } catch(err:any) {if(startedEpoch===epoch.current)setError(err.message || 'Application update failed');throw err;}
+    finally {outcomeBusy.current=false;}
   };
 
   // Tailoring Workflow
@@ -455,63 +568,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAnalyzing(true);
     setError(null);
     try {
-      const textToAnalyze = target.description || target.rawDescription;
-      const { parsed, fit } = await apiService.analyzeJob(textToAnalyze, profile, evidence);
-      const updated: JobRecord = {
-        ...target,
-        company: parsed.company || target.company,
-        title: parsed.roleTitle || target.title,
-        parsed,
-        fit,
-        status: 'Fit Checked',
-        qualificationFit: fit.qualificationFit,
-        evidenceCoverage: fit.evidenceCoverage,
-        primaryRoleFamily: parsed.roleFamily || target.primaryRoleFamily,
-        hardRequirements: parsed.hardRequirements || target.hardRequirements,
-        preferredRequirements: parsed.preferredRequirements || target.preferredRequirements,
-        technologies: parsed.technologies || target.technologies
-      };
-      updateJob(updated);
-
-      // Automatically initiate evidence match
-      await matchEvidence(jobId);
+      const startedSnapshot = JSON.stringify(storageService.privateSnapshot());
+      await apiService.analyzeJob(jobId);
+      // Server persisted the assessment; reload its revision before the next local save.
+      const result = await apiService.getWorkspaceData();
+      if (startedSnapshot !== JSON.stringify(storageService.privateSnapshot())) {
+        ready.current = false;
+        throw new Error('Local edits occurred during assessment. Reload required before saving; local edits have not been overwritten.');
+      }
+      adopt(result);
+      setActiveJobId(jobId);
     } catch (err: any) {
-      console.error('Job analysis failed:', err);
+      console.error('Job analysis failed:');
       setError(err.message || 'Job analysis failed');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const matchEvidence = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target || !target.parsed) return;
-
-    setIsAnalyzing(true);
-    try {
-      const { matches } = await apiService.matchEvidence(target.parsed, evidence, projects, skills);
-      const updated: JobRecord = {
-        ...target,
-        evidenceMatches: matches
-      };
-      updateJob(updated);
-
-      // Check if gap interview is recommended
-      if (target.fit && (target.fit.verdict === 'Borderline' || (target.fit.blockers && target.fit.blockers.length > 0))) {
-        const { questions } = await apiService.getGapInterviewQuestions(target.fit, matches, target.parsed);
-        updateJob({
-          ...updated,
-          gapQuestions: questions,
-          status: 'Gap Interview Recommended'
-        });
-      }
-    } catch (err: any) {
-      console.error('Evidence matching failed:', err);
-      setError(err.message || 'Evidence matching failed');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
+  const matchEvidence = analyzeJob;
 
   const submitGapAnswers = async (
     jobId: string,
@@ -563,65 +638,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateJob(updatedJob);
   };
 
-  const generatePlan = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target || !target.parsed || !target.fit || !target.evidenceMatches) return;
-
-    setIsGenerating(true);
-    setError(null);
+  const runResumeOperation = async (operation: 'plan'|'generate'|'evaluate'|'validate'|'regenerate', jobId:string, claimId?:string) => {
+    setIsGenerating(true); setError(null);
     try {
-      const { plan } = await apiService.generatePlan(
-        target.parsed,
-        target.fit,
-        target.evidenceMatches,
-        target.sessionAnswers
-      );
-      const updated: JobRecord = {
-        ...target,
-        tailoringPlan: plan,
-        status: 'Plan Ready'
-      };
-      updateJob(updated);
-    } catch (err: any) {
-      console.error('Tailoring plan generation failed:', err);
-      setError(err.message || 'Plan generation failed');
-    } finally {
-      setIsGenerating(false);
-    }
+      await persistCurrent();
+      const startedSnapshot=JSON.stringify(storageService.privateSnapshot());
+      await apiService.resumeOperation(operation,jobId,claimId);
+      const result=await apiService.getWorkspaceData();
+      if(startedSnapshot!==JSON.stringify(storageService.privateSnapshot())) {
+        ready.current=false;
+        throw new Error('Local edits occurred during resume operation. Reload required; local edits have not been overwritten.');
+      }
+      adopt(result); setActiveJobId(jobId);
+      if(operation==='generate')setCurrentView('resume-editor');
+    }catch(err:any){setError(err.message || 'Resume operation failed');}
+    finally{setIsGenerating(false);}
   };
-
-  const generateResume = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target || !target.parsed || !target.tailoringPlan) return;
-
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const { resume } = await apiService.generateResume(
-        target.parsed,
-        target.tailoringPlan,
-        profile,
-        masterResume
-      );
-      const updated: JobRecord = {
-        ...target,
-        tailoredResume: resume,
-        status: 'Resume Generated',
-        applicationStatus: 'TAILORED'
-      };
-      updateJob(updated);
-      setCurrentView('resume-editor');
-
-      // Also evaluate resume automatically
-      await evaluateResume(jobId);
-    } catch (err: any) {
-      console.error('Resume generation failed:', err);
-      setError(err.message || 'Resume generation failed');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
+  const generatePlan = (jobId:string) => runResumeOperation('plan',jobId);
+  const generateResume = (jobId:string) => runResumeOperation('generate',jobId);
   const generateCoverLetter = async (jobId: string) => {
     const target = jobs.find((j) => j.id === jobId);
     if (!target || !target.parsed || !target.tailoredResume) return;
@@ -640,33 +674,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       updateJob(updated);
     } catch (err: any) {
-      console.error('Cover letter generation failed:', err);
+      console.error('Cover letter generation failed:');
       setError(err.message || 'Cover letter generation failed');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const evaluateResume = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target || !target.parsed || !target.tailoredResume) return;
-
-    try {
-      const { evaluation } = await apiService.evaluateResume(target.tailoredResume, target.parsed);
-      const updated: JobRecord = {
-        ...target,
-        evaluation
-      };
-      updateJob(updated);
-    } catch (err: any) {
-      console.error('Resume evaluation failed:', err);
+  const evaluateResume = (jobId:string) => runResumeOperation('validate',jobId);
+  const prepareResumeExport = async (jobId:string):Promise<TailoredResume> => {
+    await persistCurrent();
+    const startedSnapshot=JSON.stringify(storageService.privateSnapshot());
+    const exported=await apiService.resumeOperation('export',jobId);
+    const result=await apiService.getWorkspaceData();
+    if(startedSnapshot!==JSON.stringify(storageService.privateSnapshot())) {
+      ready.current=false;
+      throw new Error('Local edits occurred during export validation. Reload required; local edits have not been overwritten.');
     }
+    adopt(result);
+    return exported.resume;
   };
-
   const updateResume = (jobId: string, resume: TailoredResume) => {
     const target = jobs.find((j) => j.id === jobId);
     if (!target) return;
-    updateJob({ ...target, tailoredResume: resume });
+    updateJob({ ...target, tailoredResume: invalidateEditedResume(target.tailoredResume || resume, structuredClone(resume)), evaluation: undefined });
     storageService.addAuditLog('RESUME_MANUALLY_EDITED', jobId, 'Edited resume in Studio');
   };
 
@@ -676,160 +707,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateJob({ ...target, coverLetter });
   };
 
-  const regenerateBullet = async (
-    jobId: string,
-    bulletId: string,
-    employerOrProject: string,
-    currentText: string,
-    targetReq: string,
-    underlyingEvidence: string
-  ) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target || !target.tailoredResume) return;
-
-    setIsGenerating(true);
+  const regenerateBullet = async (jobId:string, bulletId:string, employerOrProject:string, currentText:string, targetReq:string, underlyingEvidence:string) => {
+    await runResumeOperation('regenerate',jobId,bulletId);
+  };
+  // Phase 6 responses are persisted server-side; adopt only if local state stayed unchanged.
+  const runArtifactOperation = async (operation:'proof'|'outreach'|'answers'|'referral',jobId:string,context:Record<string,unknown>={}) => {
+    setIsGenerating(true);setError(null);
+    const startedEpoch=epoch.current;
     try {
-      const { bulletText, whyThisBullet } = await apiService.regenerateBullet(
-        targetReq,
-        underlyingEvidence,
-        currentText,
-        employerOrProject
-      );
-
-      // Deep clone and replace bullet
-      const resume = JSON.parse(JSON.stringify(target.tailoredResume)) as TailoredResume;
-      let replaced = false;
-
-      resume.experience?.forEach((exp) => {
-        exp.bullets?.forEach((b) => {
-          if (b.id === bulletId) {
-            b.text = bulletText;
-            if (whyThisBullet) b.whyThisBullet = whyThisBullet;
-            replaced = true;
-          }
-        });
-      });
-
-      if (!replaced) {
-        resume.projects?.forEach((proj) => {
-          proj.bullets?.forEach((b) => {
-            if (b.id === bulletId) {
-              b.text = bulletText;
-              if (whyThisBullet) b.whyThisBullet = whyThisBullet;
-              replaced = true;
-            }
-          });
-        });
+      await persistCurrent();
+      const before=JSON.stringify(storageService.privateSnapshot());
+      const result=await apiService.generateArtifact(operation,jobId,context);
+      if(startedEpoch!==epoch.current)return;
+      if(before!==JSON.stringify(storageService.privateSnapshot())) {
+        ready.current=false;
+        throw new Error('Local edits occurred during generation. Reload required; local edits were preserved.');
       }
-
-      updateResume(jobId, resume);
-    } catch (err: any) {
-      console.error('Failed to regenerate bullet:', err);
-      setError(err.message || 'Failed to regenerate bullet');
-    } finally {
-      setIsGenerating(false);
-    }
+      adopt(result);setActiveJobId(jobId);
+      setCurrentView(operation==='proof'?'proof-packs':'outreach');
+      return result.job;
+    }catch(err:any){setError(err.message || 'Artifact generation failed');}
+    finally{setIsGenerating(false);}
   };
-
-  // Preparation & Outreach
-  const generateProofPack = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target) return;
-
-    const resumeToUse = target.tailoredResume || masterResume;
-    const parsedJob = target.parsed || {
-      roleTitle: target.title,
-      company: target.company
-    };
-
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const res = await apiService.generateProofPack(resumeToUse, evidence, parsedJob);
-      const updated: JobRecord = {
-        ...target,
-        proofPack: res.proofPack
-      };
-      updateJob(updated);
-      setCurrentView('proof-packs');
-    } catch (err: any) {
-      console.error('Failed to generate proof pack:', err);
-      setError(err.message || 'Failed to generate proof pack');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const generateOutreach = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target) return;
-
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const parsedJob = target.parsed || {
-        id: target.id,
-        roleTitle: target.title,
-        company: target.company
-      };
-      const res = await apiService.generateOutreach(parsedJob, profile, target.tailoredResume);
-      const updated: JobRecord = {
-        ...target,
-        recruiterOutreach: res.outreach
-      };
-      updateJob(updated);
-      setCurrentView('outreach');
-    } catch (err: any) {
-      console.error('Failed to generate outreach:', err);
-      setError(err.message || 'Failed to generate outreach');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const generateAnswers = async (jobId: string, questions: string[]) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target) return;
-
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const parsedJob = target.parsed || {
-        roleTitle: target.title,
-        company: target.company
-      };
-      const res = await apiService.generateAnswers(questions, parsedJob, evidence);
-      const updated: JobRecord = {
-        ...target,
-        applicationAnswers: res.answers
-      };
-      updateJob(updated);
-    } catch (err: any) {
-      console.error('Failed to generate answers:', err);
-      setError(err.message || 'Failed to generate application answers');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const generateReferral = async (
-    jobId: string,
-    contactName: string,
-    relationship: string,
-    jobUrl?: string
-  ): Promise<string> => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target) return '';
-
-    const effectiveUrl = jobUrl || target.canonicalUrl || target.applyUrl || target.sourceUrl || '';
-    const res = await apiService.generateReferral(
-      contactName,
-      relationship,
-      target.company,
-      target.title,
-      effectiveUrl
-    );
-    return res.referralMessage;
+  const generateProofPack = async(jobId:string)=>{await runArtifactOperation('proof',jobId);};
+  const generateOutreach = async(jobId:string,overrideReason?:string)=>{await runArtifactOperation('outreach',jobId,overrideReason?.trim()?{overrideReason}:{});};
+  const generateAnswers = async(jobId:string,questions:(string|ApplicationQuestion)[])=>{await runArtifactOperation('answers',jobId,{questions});};
+  const generateReferral = async(jobId:string,contactName:string,relationship:string,overrideReason?:string):Promise<string>=>{
+    const job=await runArtifactOperation('referral',jobId,{contactName,relationship,...(overrideReason?.trim()?{overrideReason}:{})});
+    return job?.referralContact?.referralMessage || '';
   };
 
   // Evidence & Entities
@@ -874,19 +779,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Workspace Import / Export / Reset
-  const importWorkspaceJson = (jsonString: string) => {
-    const result = storageService.importWorkspaceData(jsonString);
-    if (result.success) {
-      reloadDataForMode(workspaceMode);
-    }
-    return result;
+  const importWorkspaceJson = async (jsonString: string) => {
+    if (!authSession.isAuthenticated || workspaceMode !== 'PRIVATE_WORKSPACE') return { success: false, message: 'Owner sign-in required.' };
+    try {
+      const started = epoch.current;
+      await persistCurrent();
+      if (started !== epoch.current) throw new Error('Session changed');
+      const result = await apiService.importWorkspace(JSON.parse(jsonString), revision.current);
+      if (started !== epoch.current) throw new Error('Session changed');
+      adopt(result);
+      setWorkspaceEpoch(v => v + 1);
+      return { success: true, message: 'Selected records imported privately and marked for review. Local originals were retained.' };
+    } catch (err: any) { return { success: false, message: err.message }; }
   };
-
-  const exportWorkspaceJson = () => {
-    return storageService.exportPrivateWorkspace();
+  const exportWorkspaceJson = async () => {
+    if (!authSession.isAuthenticated || workspaceMode !== 'PRIVATE_WORKSPACE') throw new Error('Owner sign-in required.');
+    const started = epoch.current;
+    await persistCurrent();
+    if (started !== epoch.current) throw new Error('Session changed');
+    return JSON.stringify(await apiService.exportWorkspace(), null, 2);
   };
 
   const clearWorkspace = () => {
+    if (!authSession.isAuthenticated || workspaceMode !== 'PRIVATE_WORKSPACE') return;
     storageService.clearPrivateWorkspace();
     reloadDataForMode('PRIVATE_WORKSPACE');
   };
@@ -908,6 +823,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
+        workspaceEpoch, syncStatus, sessionLoading,
         currentView,
         setCurrentView,
         workspaceMode,
@@ -915,6 +831,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         authSession,
         login,
         logout,
+        signOutPending,
         profile,
         setProfile,
         searchProfile,
@@ -948,6 +865,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         generateResume,
         generateCoverLetter,
         evaluateResume,
+        prepareResumeExport,
         updateResume,
         updateCoverLetter,
         regenerateBullet,

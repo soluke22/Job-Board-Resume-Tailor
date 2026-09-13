@@ -1,3 +1,4 @@
+import { computeOutcomeAnalytics } from '../utils/outcomeAnalytics';
 import {
   CandidateProfile,
   EvidenceItem,
@@ -6,7 +7,6 @@ import {
   JobRecord,
   TailoredResume,
   SearchProfile,
-  OutcomeAnalytics
 } from '../types';
 
 /**
@@ -672,7 +672,8 @@ export const DEMO_JOBS: JobRecord[] = [
     priorityReason:
       'Strong technical fit on React/API integration; slight stretch on formal customer-facing forward deployed title.',
     applicationStatus: 'APPLIED',
-    appliedDate: '2026-09-07',
+    statusHistory: [{from:'TAILORED',to:'APPLIED',timestamp:'2026-09-07T12:00:00Z'}],
+    appliedDate: '2026-09-07T12:00:00Z',
     channel: 'Direct / Company Portal',
     rawDescription:
       'Cortex Applied AI is seeking a Forward Deployed Engineer to work with enterprise customers deploying our AI workflow copilot interfaces.',
@@ -681,39 +682,4 @@ export const DEMO_JOBS: JobRecord[] = [
   }
 ];
 
-export const DEMO_OUTCOME_ANALYTICS: OutcomeAnalytics = {
-  totalApplications: 14,
-  totalScreens: 6,
-  totalTechnicalInterviews: 4,
-  totalFinalInterviews: 2,
-  totalOffers: 1,
-  totalRejections: 3,
-  conversionByFamily: {
-    'ui-platform-design-systems': { total: 5, interviews: 3, rate: 0.6 },
-    'frontend-product': { total: 6, interviews: 3, rate: 0.5 },
-    'forward-deployed-software': { total: 2, interviews: 0, rate: 0.0 },
-    'frontend-heavy-fullstack': { total: 1, interviews: 0, rate: 0.0 }
-  },
-  conversionByModifier: {
-    DESIGN_SYSTEMS: { total: 5, interviews: 3, rate: 0.6 },
-    ACCESSIBILITY: { total: 4, interviews: 3, rate: 0.75 },
-    B2B_SAAS: { total: 6, interviews: 3, rate: 0.5 },
-    AI_PRODUCT: { total: 2, interviews: 1, rate: 0.5 }
-  },
-  conversionByChannel: {
-    'Ashby Direct': { total: 6, interviews: 3, rate: 0.5 },
-    'Greenhouse Board': { total: 5, interviews: 2, rate: 0.4 },
-    'Company Portal': { total: 3, interviews: 1, rate: 0.33 }
-  },
-  conversionByFitBand: {
-    'APPLY FIRST (9.0+)': { total: 6, interviews: 4, rate: 0.67 },
-    'STRONG (8.0-8.9)': { total: 5, interviews: 2, rate: 0.4 },
-    'CALIBRATED STRETCH': { total: 3, interviews: 0, rate: 0.0 }
-  },
-  conversionByFreshness: {
-    'NEW (< 7 days)': { total: 7, interviews: 4, rate: 0.57 },
-    'RECENT (7-21 days)': { total: 5, interviews: 2, rate: 0.4 },
-    'ESTABLISHED (21+ days)': { total: 2, interviews: 0, rate: 0.0 }
-  },
-  smallSampleWarning: true
-};
+export const DEMO_OUTCOME_ANALYTICS = computeOutcomeAnalytics(DEMO_JOBS);

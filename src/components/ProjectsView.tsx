@@ -18,7 +18,7 @@ export const ProjectsView: React.FC = () => {
           </span>
         </div>
         <p className="text-xs text-slate-500 mt-0.5">
-          Deep architectural context and verified leadership evidence. These projects provide defensible proof for skills not heavily featured at Disney.
+          Record project context and supporting evidence for the skills you want to demonstrate.
         </p>
       </div>
 

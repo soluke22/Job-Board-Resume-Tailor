@@ -116,7 +116,7 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
           {[
             { id: 'ats-text', label: 'Full ATS Plain Text', icon: FileText },
             { id: 'skills', label: 'Skills by Category', icon: Terminal },
-            { id: 'experience', label: 'Disney Bullets', icon: Briefcase },
+            { id: 'experience', label: 'Experience Bullets', icon: Briefcase },
             { id: 'projects', label: 'Projects Bullets', icon: Layers },
             { id: 'contact', label: 'Contact Info', icon: User },
             { id: 'summary', label: 'Summary & Bio', icon: Sparkles }
@@ -222,16 +222,16 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
             </div>
           )}
 
-          {/* TAB 3: Disney Experience Bullets */}
+          {/* TAB 3: Experience Bullets */}
           {activeTab === 'experience' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
                 <div>
                   <span className="font-semibold text-slate-900 dark:text-white block">
-                    The Walt Disney Company
+                    {currentResume.experience[0]?.employer || 'Experience'}
                   </span>
                   <span className="text-slate-500 text-[11px]">
-                    Software Engineer · 2022 - Present · Production Sports Platforms
+                    {[currentResume.experience[0]?.title, currentResume.experience[0]?.period].filter(Boolean).join(' · ')}
                   </span>
                 </div>
                 <button
@@ -240,11 +240,11 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
                       .flatMap((e) => e.bullets)
                       .map((b) => `* ${b.text}`)
                       .join('\n');
-                    copyToClipboard(allBullets, 'all-disney-bullets');
+                    copyToClipboard(allBullets, 'all-experience-bullets');
                   }}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium flex items-center space-x-1.5 cursor-pointer"
                 >
-                  {copiedKey === 'all-disney-bullets' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedKey === 'all-experience-bullets' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>Copy All Bullets</span>
                 </button>
               </div>
@@ -352,8 +352,8 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
-                  { label: 'Full Legal Name', val: profile.fullName || 'Solomon Lucas-Thornton', key: 'c-fullname' },
-                  { label: 'Display Name', val: profile.name || 'Solomon Lucas-Thornton', key: 'c-name' },
+                  { label: 'Full Legal Name', val: profile.fullName || profile.name || '', key: 'c-fullname' },
+                  { label: 'Display Name', val: profile.name || '', key: 'c-name' },
                   { label: 'Professional Title', val: profile.title, key: 'c-title' },
                   { label: 'Email Address', val: profile.email, key: 'c-email' },
                   { label: 'Phone Number', val: profile.phone, key: 'c-phone' },

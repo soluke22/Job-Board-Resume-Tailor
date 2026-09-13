@@ -22,6 +22,7 @@ import { AlertCircle, X, Loader2 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const {
+    workspaceMode, workspaceEpoch, syncStatus, sessionLoading,
     currentView,
     setCurrentView,
     error,
@@ -35,6 +36,7 @@ const AppContent: React.FC = () => {
     setIsAtsGuardsOpen
   } = useApp();
 
+  if (sessionLoading) return <div role="status" className="p-8 text-slate-500">Loading workspace…</div>;
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
       {/* Navigation Bar */}
@@ -57,7 +59,8 @@ const AppContent: React.FC = () => {
       )}
 
       {/* Main View Router */}
-      <main className="flex-1 pb-16">
+      {workspaceMode === 'PRIVATE_WORKSPACE' && <div role="status" className="px-6 py-2 text-xs text-slate-500">{syncStatus}</div>}
+      <main key={workspaceMode + workspaceEpoch} className="flex-1 pb-16">
         {currentView === 'dashboard' && <DashboardView />}
         {currentView === 'discover' && <DiscoverView />}
         {currentView === 'pipeline' && <PipelineView />}
@@ -75,7 +78,7 @@ const AppContent: React.FC = () => {
       </main>
 
       {/* Modals */}
-      <QuickDataGrabModal
+      <QuickDataGrabModal key={workspaceMode + workspaceEpoch}
         isOpen={isQuickGrabOpen}
         onClose={() => setIsQuickGrabOpen(false)}
       />

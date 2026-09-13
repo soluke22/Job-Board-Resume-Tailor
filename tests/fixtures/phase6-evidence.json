@@ -1,0 +1,1 @@
+{"ownerId":"synthetic-owner","evidence":[{"id":"phase6-e1","ownerId":"synthetic-owner","enabled":true,"verificationStatus":"verified","rawEvidence":"Implemented Node.js modules."}],"records":[{"supportingEvidenceIds":["phase6-e1"],"sourceRequirementIds":["synthetic-r1"]},{"evidenceIds":["phase6-e1"]}]}

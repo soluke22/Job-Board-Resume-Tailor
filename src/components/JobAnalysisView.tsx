@@ -49,9 +49,10 @@ export const JobAnalysisView: React.FC = () => {
     );
   }
 
-  const { parsed, fit, evidenceMatches, sessionQuestions, tailoringPlan } = activeJob;
+  const { parsed, evidenceMatches, sessionQuestions, tailoringPlan } = activeJob;
+  const fit = activeJob.assessmentStatus === 'STALE' ? undefined : activeJob.fit;
   const verdict = fit?.verdict || 'Borderline';
-  const canTailor = fit?.canTailor ?? true;
+  const canTailor = activeJob.assessmentStatus === 'ASSESSED' && !!fit?.recommendation && fit.recommendation !== 'SKIP';
 
   const handleGapAnswerChange = (qId: string, value: string) => {
     setGapAnswers((prev) => ({ ...prev, [qId]: value }));
@@ -73,6 +74,8 @@ export const JobAnalysisView: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {activeJob.assessmentStatus==='STALE' && <p className="text-amber-600">Previous assessment is stale. Reassess to see current scores and recommendation.</p>}
+      {fit?.recommendation && <div className="text-sm space-y-2"><p><strong>{fit.recommendation}</strong> · {fit.applicationPriority}</p><p>{fit.verdictReason}</p><p>Why it fits: {fit.whyFits?.join('; ') || 'No approved support'}</p><p>Why it does not: {fit.whyNot?.join('; ') || 'No extracted gap'}</p><p>Unknown constraints: {fit.unknownConstraints?.join('; ') || 'None'}</p></div>}
       {/* Back Button & Title Bar */}
       <div className="flex items-center justify-between">
         <button
@@ -148,19 +151,19 @@ export const JobAnalysisView: React.FC = () => {
           <div className="flex items-center space-x-4 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/60 shrink-0">
             <div className="text-center px-2">
               <span className="text-[10px] uppercase font-semibold text-slate-500 block">
-                Initial Fit
+                Qualification Fit
               </span>
               <span className="text-xl font-bold text-slate-800 dark:text-slate-200">
-                {fit?.initialFitScore ?? '—'} <span className="text-xs font-normal text-slate-500">/ 10</span>
+                {fit?.qualificationFit ?? '—'} <span className="text-xs font-normal text-slate-500">/ 10</span>
               </span>
             </div>
             <div className="w-px h-8 bg-slate-200 dark:bg-slate-700" />
             <div className="text-center px-2">
               <span className="text-[10px] uppercase font-semibold text-emerald-600 dark:text-emerald-400 block">
-                Best Truthful Fit
+                Evidence Coverage
               </span>
               <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-                {fit?.tailoredFitScore ?? '—'} <span className="text-xs font-normal text-emerald-700/60">/ 10</span>
+                {fit?.evidenceCoverage ?? '—'} <span className="text-xs font-normal text-emerald-700/60">/ 10</span>
               </span>
             </div>
             <div className="w-px h-8 bg-slate-200 dark:bg-slate-700" />
@@ -184,7 +187,7 @@ export const JobAnalysisView: React.FC = () => {
         </div>
 
         {/* STRICT GUARDRAIL BANNER IF SKIP */}
-        {!canTailor ? (
+        {!fit ? <p className="text-sm text-slate-500">Assessment required before an application decision or tailoring plan.</p> : !canTailor ? (
           <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-900 dark:text-rose-200 space-y-2">
             <div className="flex items-center space-x-2">
               <XCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
@@ -194,7 +197,7 @@ export const JobAnalysisView: React.FC = () => {
             </div>
             <p className="text-xs text-rose-800/90 dark:text-rose-200/90 leading-relaxed">
               {fit?.rejectionNotice ||
-                'Per core principle: We do not tailor resumes or cover letters for jobs that do not fit Solomon’s verified skills. If the job description is not a fit or a stretch, then we will not create a resume for this job.'}
+                'Per core principle: We do not tailor resumes or cover letters for jobs that do not fit the candidate’s verified skills. If the job description is not a fit or a stretch, then we will not create a resume for this job.'}
             </p>
             {fit?.blockers && fit.blockers.length > 0 && (
               <div className="pt-2">
@@ -226,7 +229,7 @@ export const JobAnalysisView: React.FC = () => {
           <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-900 dark:text-emerald-200 flex items-center space-x-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <p className="text-xs text-emerald-800 dark:text-emerald-300">
-              <strong>High Fit Confirmed:</strong> Solomon has direct production evidence (React, TypeScript, GraphQL, live-traffic testing) backing the core responsibilities of this role.
+              <strong>High Fit Confirmed:</strong> Review the assessment and supporting evidence for the core responsibilities of this role.
             </p>
           </div>
         )}
@@ -256,7 +259,7 @@ export const JobAnalysisView: React.FC = () => {
               Strongest Selling Point
             </h3>
             <p className="text-xs text-slate-700 dark:text-slate-300 mt-1.5">
-              {fit?.strongestMatch || 'Production React & TypeScript experience at Disney.'}
+              {fit?.strongestMatch || 'No supporting match has been recorded.'}
             </p>
           </div>
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -305,7 +308,7 @@ export const JobAnalysisView: React.FC = () => {
                 <span>Evidence Gap Interview (High Fit Opportunity)</span>
               </h3>
               <p className="text-xs text-slate-500">
-                Fit is 8.0+. Answer targeted questions regarding past undocumented work. You may optionally save answers to your permanent Evidence Bank.
+                Capture undocumented work for evidence review. Answers cannot support final resume claims until approved.
               </p>
             </div>
             <button
@@ -338,7 +341,7 @@ export const JobAnalysisView: React.FC = () => {
                   rows={2}
                   value={gapAnswers[q.id] || q.answer || ''}
                   onChange={(e) => handleGapAnswerChange(q.id, e.target.value)}
-                  placeholder="Enter specific, truthful context from Disney or prior projects..."
+                  placeholder="Enter specific, truthful context from your work or projects..."
                   className="w-full p-2.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
 
@@ -481,7 +484,7 @@ export const JobAnalysisView: React.FC = () => {
                   Experience Bullets Strategy:
                 </span>
                 <p className="text-slate-600 dark:text-slate-400">
-                  {tailoringPlan.disneyBulletsPlan.length} Disney bullets planned (prioritizing high-traffic WNBA and live-event reliability).
+                  {tailoringPlan.decisions?.filter(d=>d.action !== 'omit').length || 0} requirement selections supported by approved evidence.
                 </p>
               </div>
             </div>

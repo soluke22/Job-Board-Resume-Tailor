@@ -1,3 +1,5 @@
+import type { ArtifactProvenance, QuestionCategory } from './artifacts';
+import type { AssessmentMetadata, Requirement, Extraction } from './assessment';
 export type PrimaryRoleFamily =
   | 'frontend-product'
   | 'ui-platform-design-systems'
@@ -43,13 +45,15 @@ export type AtsVerificationStatus =
   | 'UNKNOWN'
   | 'UNSUPPORTED';
 
-export type FreshnessBand = 'NEW' | 'RECENT' | 'ESTABLISHED' | 'OLD';
+export type FreshnessBand = 'NEW' | 'RECENT' | 'ESTABLISHED' | 'OLD' | 'UNKNOWN';
 
 export type Verdict = 'Apply' | 'Borderline' | 'Skip';
 
 export type ApplicationPriority =
+  | 'UNASSESSED'
   | 'APPLY FIRST'
   | 'STRONG'
+  | 'STRONG WITH GAP'
   | 'CALIBRATED STRETCH'
   | 'LOW PRIORITY'
   | 'SKIP'
@@ -58,19 +62,9 @@ export type ApplicationPriority =
   | 'Low'
   | 'Do Not Apply';
 
-export type ApplicationStatus =
-  | 'DISCOVERED'
-  | 'SHORTLISTED'
-  | 'TAILORED'
-  | 'APPLIED'
-  | 'RECRUITER_SCREEN'
-  | 'HIRING_MANAGER'
-  | 'TECHNICAL'
-  | 'FINAL_ONSITE'
-  | 'OFFER'
-  | 'REJECTED'
-  | 'WITHDRAWN'
-  | 'ARCHIVED';
+export type { ApplicationStatus, StatusTransitionEvent, ApplicationSnapshot } from './application';
+import type { ApplicationStatus, StatusTransitionEvent, ApplicationSnapshot } from './application';
+export type { OutcomeAnalytics } from '../utils/outcomeAnalytics';
 
 export type WorkspaceMode = 'PUBLIC_DEMO' | 'PRIVATE_WORKSPACE';
 
@@ -115,6 +109,7 @@ export interface SearchProfile {
 export type EvidenceStrength = 'Strong' | 'Moderate' | 'Weak' | 'Missing';
 
 export type VerificationStatus =
+  | 'requires-review'
   | 'verified'
   | 'provisional'
   | 'session-unreviewed'
@@ -236,6 +231,12 @@ export interface ParsedJob {
 }
 
 export interface FitAssessment {
+  recommendation?: 'APPLY' | 'SELECTIVE_APPLY' | 'SKIP';
+  constraintBlockers?: string[];
+  preferenceConcerns?: string[];
+  unknownConstraints?: string[];
+  whyFits?: string[];
+  whyNot?: string[];
   qualificationFit: number; // 0 - 10
   evidenceCoverage: number; // 0 - 10
   applicationPriority: ApplicationPriority;
@@ -252,6 +253,7 @@ export interface FitAssessment {
 }
 
 export interface RequirementMatch {
+  relationship?: 'direct' | 'adjacent' | 'none';
   id: string;
   requirement: string;
   isHardRequirement: boolean;
@@ -275,6 +277,7 @@ export interface GapInterviewQuestion {
 }
 
 export interface TailoringPlan {
+  decisions?: { targetRequirementId: string; evidenceIds: string[]; action: 'keep' | 'rewrite' | 'omit' | 'reorder'; reason: string }[];
   professionalSummaryAngle: string;
   disneyBulletsPlan: {
     evidenceId: string;
@@ -347,6 +350,10 @@ export interface PageEstimate {
 }
 
 export interface TailoredResume {
+  claimLedger?: import('./provenance').ResumeClaim[];
+  basis?: import('./provenance').ResumeBasis;
+  readiness?: import('./provenance').ResumeReadiness;
+  readinessIssues?: string[];
   id: string;
   jobId: string;
   roleFamily: RoleFamily;
@@ -466,6 +473,7 @@ export interface InterviewProofClaim {
 }
 
 export interface InterviewProofPack {
+  provenance?: ArtifactProvenance;
   jobId: string;
   generatedAt: string;
   claims: InterviewProofClaim[];
@@ -473,6 +481,7 @@ export interface InterviewProofPack {
 }
 
 export interface RecruiterOutreach {
+  provenance?: ArtifactProvenance;
   jobId: string;
   company: string;
   roleTitle: string;
@@ -485,6 +494,7 @@ export interface RecruiterOutreach {
 }
 
 export interface ReferralContact {
+  provenance?: ArtifactProvenance;
   id: string;
   contactName: string;
   relationship: string;
@@ -497,18 +507,16 @@ export interface ReferralContact {
 }
 
 export interface ApplicationAnswer {
+  category?: QuestionCategory;
+  inputStatus?: string;
+  characterLimit?: number;
+  wordLimit?: number;
+  provenance?: ArtifactProvenance;
   id: string;
   question: string;
   answer: string;
   evidenceIds: string[];
   rationale?: string;
-}
-
-export interface StatusTransitionEvent {
-  from: string;
-  to: string;
-  timestamp: string;
-  note?: string;
 }
 
 export interface JobRecord {
@@ -523,6 +531,20 @@ export interface JobRecord {
   applyUrl: string;
   sourceUrl?: string;
   discoveryUrl?: string;
+  discoveryTitle?: string;
+  discoveryCompany?: string;
+  publicationDateSource?: string;
+  discoverySummary?: string;
+  discoverySourceUrls?: string[];
+  discoveryAliases?: string[];
+  canonicalContentStatus?: 'AVAILABLE' | 'UNAVAILABLE' | 'UNSUPPORTED';
+  canonicalContentSource?: string;
+  canonicalMetadata?: unknown;
+  assessmentStatus?: 'UNASSESSED' | 'ASSESSED' | 'STALE';
+  jdSource?: 'user-provided';
+  requirements?: Requirement[];
+  assessmentMetadata?: AssessmentMetadata;
+  assessmentFacts?: Extraction['facts'];
   description: string;
   location: string;
   secondaryLocations?: string[];
@@ -549,7 +571,7 @@ export interface JobRecord {
   searchQuery?: string;
 
   // Categorization & Fit
-  primaryRoleFamily: PrimaryRoleFamily;
+  primaryRoleFamily?: PrimaryRoleFamily;
   roleModifiers: RoleModifier[];
   seniority: 'Junior' | 'Mid' | 'Senior' | 'Staff' | 'Lead' | 'Unspecified' | string;
   hardRequirements: string[];
@@ -561,8 +583,8 @@ export interface JobRecord {
   softGaps: string[];
 
   // Scores & Priority
-  qualificationFit: number; // 0 - 10
-  evidenceCoverage: number; // 0 - 10
+  qualificationFit?: number; // absent until assessed
+  evidenceCoverage?: number; // absent until assessed
   applicationPriority: ApplicationPriority;
   priorityReason: string;
   applicationStatus: ApplicationStatus;
@@ -606,21 +628,8 @@ export interface JobRecord {
   referralContact?: ReferralContact;
   applicationAnswers?: ApplicationAnswer[];
   statusHistory?: StatusTransitionEvent[];
-}
-
-export interface OutcomeAnalytics {
-  totalApplications: number;
-  totalScreens: number;
-  totalTechnicalInterviews: number;
-  totalFinalInterviews: number;
-  totalOffers: number;
-  totalRejections: number;
-  conversionByFamily: Record<string, { total: number; interviews: number; rate: number }>;
-  conversionByModifier: Record<string, { total: number; interviews: number; rate: number }>;
-  conversionByChannel: Record<string, { total: number; interviews: number; rate: number }>;
-  conversionByFitBand: Record<string, { total: number; interviews: number; rate: number }>;
-  conversionByFreshness: Record<string, { total: number; interviews: number; rate: number }>;
-  smallSampleWarning: boolean;
+  applicationSnapshot?: ApplicationSnapshot;
+  historyQuarantine?: unknown[];
 }
 
 export interface AuditLogEntry {

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { X, Printer, Copy, Check, Download, FileCode, FileText } from 'lucide-react';
 import { TailoredResume, TailoredCoverLetter } from '../types';
+import { useApp } from '../context/AppContext';
+import { canExportFinal, canonicalResume } from '../utils/resumeReadiness';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -17,9 +19,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   coverLetter,
   activeMode
 }) => {
+  const { activeJob, prepareResumeExport } = useApp();
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
+  const [exportError,setExportError]=useState('');
 
   if (!isOpen) return null;
+  const ready=activeMode==='resume' && canExportFinal(resume,activeJob?.assessmentStatus);
+  if(!ready)return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><div className="bg-white dark:bg-slate-900 rounded-xl p-6 max-w-lg space-y-3"><h2>Final export unavailable</h2><p>{activeMode==='cover-letter'?'Cover letters are separate, uncertified drafts. Resume certification does not certify their claims.':`Resume ${activeJob?.assessmentStatus==='STALE'?'STALE':resume.readiness || 'DRAFT'}: ${resume.readinessIssues?.join('; ') || 'Validate current claims before final export.'}`}</p><button onClick={onClose}>Close</button></div></div>;
 
   const generatePlainText = () => {
     if (activeMode === 'cover-letter' && coverLetter) {
@@ -227,13 +233,23 @@ ${resume.education
 \\end{document}`;
   };
 
-  const handleCopy = (format: 'text' | 'md' | 'json' | 'latex', content: string) => {
+  const confirmCurrent = async () => {
+    try {
+      if(!activeJob || !ready)throw new Error('Validate the resume before final export');
+      const current=await prepareResumeExport(activeJob.id);
+      if(current?.readiness!=='READY' || canonicalResume(current)!==canonicalResume(resume))throw new Error('Resume or supporting records changed. Reload and validate before final export.');
+      return true;
+    }catch(error:any){setExportError(error.message || 'Final export validation unavailable');return false;}
+  };
+  const handleCopy = async (format: 'text' | 'md' | 'json' | 'latex', content: string) => {
+    if(!await confirmCurrent())return;
     navigator.clipboard.writeText(content);
     setCopiedFormat(format);
     setTimeout(() => setCopiedFormat(null), 2000);
   };
 
-  const handleDownload = (filename: string, content: string, mime: string) => {
+  const handleDownload = async (filename: string, content: string, mime: string) => {
+    if(!await confirmCurrent())return;
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -243,8 +259,10 @@ ${resume.education
     URL.revokeObjectURL(url);
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if(!await confirmCurrent())return;
+    document.body.dataset.resumeFinalPrint='true';
+    try{window.print();}finally{delete document.body.dataset.resumeFinalPrint;}
   };
 
   return (
@@ -268,6 +286,7 @@ ${resume.education
         </div>
 
         <div className="p-6 space-y-4 text-xs">
+          {exportError && <p role="alert">{exportError}</p>}
           {/* Primary Action: Print to PDF */}
           <div className="p-4 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-xl flex items-center justify-between">
             <div className="space-y-0.5">
@@ -276,7 +295,7 @@ ${resume.education
                 <span>Print / Save as PDF</span>
               </span>
               <p className="text-[11px] text-emerald-800/80 dark:text-emerald-300/80">
-                Uses print stylesheet tuned for an exact 8.5" x 11" one-page sheet.
+                Uses Letter print styling. Check the browser preview for actual page count.
               </p>
             </div>
             <button
@@ -313,7 +332,7 @@ ${resume.education
                   <span>{copiedFormat === 'text' ? 'Copied' : 'Copy'}</span>
                 </button>
                 <button
-                  onClick={() => handleDownload('solomon_resume.txt', generatePlainText(), 'text/plain')}
+                  onClick={() => handleDownload('resume.txt', generatePlainText(), 'text/plain')}
                   className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
                   title="Download"
                 >
@@ -342,7 +361,7 @@ ${resume.education
                   <span>{copiedFormat === 'md' ? 'Copied' : 'Copy'}</span>
                 </button>
                 <button
-                  onClick={() => handleDownload('solomon_resume.md', generateMarkdown(), 'text/markdown')}
+                  onClick={() => handleDownload('resume.md', generateMarkdown(), 'text/markdown')}
                   className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
                   title="Download"
                 >
@@ -371,7 +390,7 @@ ${resume.education
                   <span>{copiedFormat === 'latex' ? 'Copied' : 'Copy'}</span>
                 </button>
                 <button
-                  onClick={() => handleDownload('solomon_resume.tex', generateLatex(), 'application/x-latex')}
+                  onClick={() => handleDownload('resume.tex', generateLatex(), 'application/x-latex')}
                   className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
                   title="Download"
                 >
@@ -400,7 +419,7 @@ ${resume.education
                   <span>{copiedFormat === 'json' ? 'Copied' : 'Copy'}</span>
                 </button>
                 <button
-                  onClick={() => handleDownload('solomon_resume.json', JSON.stringify(resume, null, 2), 'application/json')}
+                  onClick={() => handleDownload('resume.json', JSON.stringify(resume, null, 2), 'application/json')}
                   className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
                   title="Download"
                 >

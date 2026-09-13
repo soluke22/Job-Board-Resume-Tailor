@@ -1,3 +1,4 @@
+import { currentFit } from '../utils/assessmentView';
 import React, { useState } from 'react';
 import {
   PlusCircle,
@@ -30,7 +31,7 @@ export const JobsView: React.FC = () => {
       job.title.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesVerdict =
-      verdictFilter === 'All' || job.fit?.verdict === verdictFilter;
+      verdictFilter === 'All' || currentFit(job)?.verdict === verdictFilter;
 
     const matchesFamily =
       familyFilter === 'All' || job.parsed?.classifiedFamily === familyFilter;
@@ -128,8 +129,8 @@ export const JobsView: React.FC = () => {
           </div>
         ) : (
           filteredJobs.map((job) => {
-            const verdict = job.fit?.verdict || 'Borderline';
-            const canTailor = job.fit?.canTailor ?? true;
+            const verdict = currentFit(job)?.verdict || 'Borderline';
+            const canTailor = currentFit(job)?.canTailor ?? true;
 
             return (
               <div
@@ -146,7 +147,7 @@ export const JobsView: React.FC = () => {
                         {job.parsed.classifiedFamily}
                       </span>
                     )}
-                    {job.fit && (
+                    {currentFit(job) && (
                       <span
                         className={`px-2.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider flex items-center space-x-1 ${
                           verdict === 'Apply'
@@ -169,31 +170,31 @@ export const JobsView: React.FC = () => {
                   </p>
 
                   <div className="flex items-center space-x-4 text-xs text-slate-500 flex-wrap">
-                    {job.fit ? (
+                    {currentFit(job) ? (
                       <>
                         <span>
-                          Initial Fit:{' '}
+                          Qualification Fit:{' '}
                           <strong className="text-slate-700 dark:text-slate-300">
-                            {job.fit.initialFitScore} / 10
+                            {currentFit(job).qualificationFit} / 10
                           </strong>
                         </span>
                         <span>
-                          Best Truthful Fit:{' '}
+                          Evidence Coverage:{' '}
                           <strong className="text-emerald-600 dark:text-emerald-400">
-                            {job.fit.tailoredFitScore} / 10
+                            {currentFit(job).evidenceCoverage} / 10
                           </strong>
                         </span>
                       </>
                     ) : (
-                      <span className="text-amber-500">Analysis pending</span>
+                      <span className="text-amber-500">{job.assessmentStatus === 'STALE' ? 'Previous assessment stale; reassess' : 'Analysis pending'}</span>
                     )}
                     <span>Status: {job.status}</span>
                     <span>Added: {job.dateAdded}</span>
                   </div>
 
-                  {job.fit?.verdictReason && (
+                  {currentFit(job)?.verdictReason && (
                     <p className="text-xs text-slate-600 dark:text-slate-400 pt-1 line-clamp-2">
-                      {job.fit.verdictReason}
+                      {currentFit(job).verdictReason}
                     </p>
                   )}
                 </div>

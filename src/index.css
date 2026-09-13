@@ -13,7 +13,6 @@
     color: black !important;
   }
 
-  header,
   nav,
   button,
   .print\:hidden {
@@ -35,4 +34,10 @@
     size: letter portrait;
     margin: 0.4in;
   }
+  body * { visibility: hidden; }
+  #resume-printable-area, #resume-printable-area *,
+  #cover-letter-printable-area, #cover-letter-printable-area * { visibility: visible; }
+  #resume-printable-area, #cover-letter-printable-area { position: absolute; left: 0; top: 0; }
+  body:not([data-resume-final-print="true"]) #resume-printable-area .print-draft-warning { display: block !important; }
+  body[data-resume-final-print="true"] #resume-printable-area .print-draft-warning { display: none !important; }
 }
