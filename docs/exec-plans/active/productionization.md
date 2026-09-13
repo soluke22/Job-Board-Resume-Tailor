@@ -5,35 +5,32 @@ Truthful discovery and evidence-grounded career workflows with durable owner-onl
 private storage and a separate synthetic demo. GitHub is canonical.
 
 ## Current Branch
-dev; Phase 6 began clean at freshly fetched dev == origin/dev ==
-b0be6da57359bb74b8f707302d93816ce41f98fe (published Phase 4.1, Phase 5 intact).
-Recovery found no Phase 6 commits, only the existing uncommitted implementation.
-User authorizes coherent Phase 6 checkpoints and normal fast-forward origin/dev push.
-No main, PR, Studio, deployment, external messages/submission or Phase 7.
+dev; Phase 7 began clean at freshly fetched dev == origin/dev ==
+e751f05e230239cd772b74372702493a770dac8f (published Phase 6).
+User authorizes coherent Phase 7 commits and normal fast-forward origin/dev push.
+No main, PR, Studio, deployment, external messages/submission or Phase 8.
 
 ## Current Phase / Scope and Acceptance
-Phase 6 — Proof packs + outreach + application answers, deterministic contract complete.
-Acceptance: [Phase 6 matrix](phase-6-acceptance.md). Current owner-resolved assessment,
-eligible evidence, exact READY Phase 5 proof ledger; calibrated recruiter/referral
-fit and explicit relationship context; question routing, strict structured output,
-revisioned server persistence, state/hash/staleness and copy fences. Parent owns all
-writes; one narrow read-only boundary reviewer. No Phase 7 implementation.
-Phase 4.1 [calibration](phase-4-1-calibration.md) and Phase 5
-[acceptance](phase-5-acceptance.md) remain intact with passing regression suites.
+Phase 7 — Application tracking + outcome analytics.
+Acceptance: [Phase 7 matrix](phase-7-acceptance.md). Parent owns writes: shared
+runtime/TS lifecycle history, atomic owner transitions/audit, immutable application
+snapshot, legacy normalization/quarantine, correction/idempotence, deterministic
+observed funnel/cohorts and truthful UI. Phase 4.1 scoring stays unchanged.
+Phase 4.1 [calibration](phase-4-1-calibration.md), Phase 5/6 acceptance remain intact.
 
 ## Current Status
-Phase 6 deterministic artifact contracts: verified. Focused 14/14, prior Phase
-4/4.1/5 regressions 29/29 within full npm test 83/83. Final release:check passes
-typecheck/build/harness/full tests/strict required-build privacy (zero findings).
-Standalone privacy/evidence validator, startup smoke 1/1 and diff checks pass.
-Reviewer directly rechecked two demonstrated sensitive-data defects: resolved;
-no remaining demonstrated defect in the bounded review. All private test data is
-synthetic. GEMINI_API_KEY absent; live proof/outreach/answer acceptance pending
-external configuration. Authenticated/deployed browser and earlier live gates remain.
-Phase 6 checkpoint 7031b58 published by normal fast-forward to origin/dev; fresh
-fetch verified clean dev == origin/dev at 7031b58bf8922d3c7edd7ccd26dca849318fb3f2.
-This documentation checkpoint records publication; final task report verifies its
-own publication without embedding a self-hash.
+Phase 7 deterministic contracts complete locally. Focused 12/12; full npm test
+95/95 and release:check (typecheck/build/harness/strict build privacy) pass.
+Standalone privacy zero findings, both synthetic evidence validators, built startup
+smoke 1/1, db:generate no drift and git diff --check pass. Final source check after
+last reason-source normalization passes all release gates. Reviewer directly
+verified all four demonstrated correction/overflow/legacy-date defects resolved;
+no remaining demonstrated defect in the bounded review. Public synthetic browser
+verified stages, form controls, insufficient-data labels and screen history retained
+after rejection/reload. Authenticated/deployed browser and Neon multi-connection
+behavior remain external gates. Client chunk is 639.41 kB (existing >500 kB warning;
+shared runtime history validation increases size). Normal dev publication pending.
+No Phase 8 implementation or scoring changes.
 
 Previous Phase 4.1/5 publication evidence (historical):
 
@@ -157,7 +154,7 @@ now preserve stored originals through imports without normalization/upsert.
 Import round-trip test also found review flags added to strict JD requirement shapes;
 source records remain structurally intact while imported assessment stays stale.
 All fixes have deterministic regression coverage. Reviewer directly rechecked all
-three original reproductions and focused 11/11 suite: resolved; no remaining defect
+three original reproductions and focused 12/12 suite: resolved; no remaining defect
 in this focused boundary review.
 
 ## Known Blockers / Remaining Limitations
@@ -199,10 +196,11 @@ checkpoint records implementation publication; final report verifies its publica
 Recovery baseline b0be6da (Phase 4.1 ac28e4f; Phase 5 c00c5e2/610a00f) remains intact.
 
 ## Next Exact Step
-Phase 7 — Application tracking + outcome analytics.
-Begin only on a new explicit continuation. This task stops after Phase 6 publication.
-Live synthetic Gemini and authenticated/deployed browser acceptance remain external
-gates. Release audit precedes dev/main PR, merged-main Studio verification and final
+Finish Phase 7 final local gates and normal dev publication, then stop.
+Next separately authorized phase: Phase 8 — Vercel-compatible architecture
+completion/live runtime acceptance. Do not begin Phase 8 in this task.
+Live authenticated/deployed browser and earlier provider/model gates remain external.
+Release audit precedes dev/main PR, merged-main Studio verification and final
 Vercel production; none is authorized in this task.
 
 ## Remaining Phases
@@ -310,3 +308,78 @@ Final source release composition: full npm test 83/83, typecheck/build/harness,
 strict required-build privacy zero. Startup smoke 1/1, standalone privacy/evidence
 validator and diff checks pass. Docs-only checkpoint validated with harness/diff
 checks and published next. No main/PR/Studio/deployment/external action/Phase 7.
+
+## Phase 7 authorized scope (2026-09-13)
+Baseline clean dev == freshly fetched origin/dev at e751f05. Before-edit mismatches and acceptance recorded in [Phase 7 matrix](phase-7-acceptance.md). Parent owns writes: shared lifecycle contract, owner server transitions, immutable application snapshot, conservative history analytics, corrections/idempotence, truthful UI and migration tests. No Phase 8, scoring mutation, main/PR/Studio/production deployment. Implementation underway; all completion gates and normal dev publication required.
+
+## Phase 7 completed contracts (2026-09-13)
+Shared strict runtime/TS status/event/snapshot/request contract replaces client
+status/notes versus persisted from/to/note mismatch. Recoverable destination-only
+legacy events get unknown predecessor and retained note/time; malformed/oversized
+history stays private quarantine. No SQL migration. Existing lifecycle survives
+ordinary saves and matching imports; new owner-selected backup history survives
+export/import and disk restart. Browser cannot initialize hiring history via normal
+workspace save or replace a stored lifecycle. Canonical server events have stable
+IDs, durable effective/recorded timestamps, request keys and optional observation
+metadata. Owner workspace row serializes transition/save transactions; event,
+application, audit and revision commit or roll back together. Audit summaries omit
+private notes/reasons. Retry/no-op writes do not append duplicate audit/history.
+
+Forward stages may skip interviews. Backward/terminal reopening requires reasoned
+append-only correction to an effective event; corrections can be corrected. Current
+state derives from effective chronological history with append order for ties.
+Older corrections preserve later terminal outcomes. Legacy state without established
+history can be corrected/confirmed explicitly without deleting a job or inventing
+application-time scores. First effective APPLIED supplies date; valid legacy date
+survives postapplication progression/correction/archive. Removing established
+APPLIED does not resurrect its date. At 5000 events new writes reject before commit.
+
+First new application captures immutable current assessment algorithm, fit/coverage,
+priority/recommendation/family/modifiers/fingerprint; stale or unassessed assessment
+is unknown. Snapshot keeps application-time publication freshness, verification,
+ATS/discovery source and actual selected application channel. Legacy application
+scores are never reconstructed from current fit. Current reassessment is separate;
+a corrected application instant that mismatches the stored snapshot is excluded
+from historical score segmentation. Rejection reasons distinguish employer/recruiter,
+owner observation/inference and unknown; absent text stays unknown. Manual outcome
+source never fabricates email/connector ingestion. WITHDRAWN is not rejection;
+OFFER is not acceptance; ARCHIVED preserves earlier observed outcomes.
+
+Shared deterministic engine counts each explicit effective destination once per
+application, no inferred hierarchy. Any interview is screen/hiring manager/technical/
+final. Application counts need APPLIED or valid legacy submission date, not current
+status. Interview/technical/offer rates use all recorded applications. Cohorts retain
+snapshot family, unique modifiers, fit band + priority + version, actual application
+channel, freshness, ATS and discovery source; unknown snapshots remain UNKNOWN /
+LEGACY. Each cohort returns n/outcome counts/rates and n<5 insufficient, 5..14 early,
+>=15 observed; none claims significance or causality. Medians require five valid
+nonnegative timestamp pairs. [start,end) weekly event activity withholds conversion
+rates. No Gemini, scoring coefficients, automatic learned labels or strategy tuning.
+
+Pipeline lists every supported status and real Phase 5/6 readiness, exposes history
+and separate current/application assessments, date/channel/note/source/rejection
+provenance and correction UX with async error/retry handling. Analytics/Dashboard
+consume shared counts. All hardcoded learned percentages/claims and false minimum
+bars removed; private empty and synthetic demo are explicit. Public browser
+APPLIED -> SCREEN -> REJECTED retained 1 application/1 interview/1 screen/1 rejection
+with n=1 insufficient; reload retained synthetic history. Full authenticated browser
+and deployed/live Neon transport are still external. No real private fixtures.
+
+Initial full runs exposed prior operation-count and intentional legacy-history
+replacement expectations; updated assertions preserve owner denial, collection/
+resume replacement, removal and rollback and now assert durable application history.
+One new date correction test expected ISO without milliseconds; canonical ISO value
+assertion fixed. Reviewer correction/overflow/legacy-date reproductions all directly
+verified resolved with regressions. No acceptance validator weakened.
+
+## Phase 7 final local validation
+Focused 12/12; final complete suite 95/95 (Phase 4/4.1/5/6 retained).
+Final release:check passes typecheck/build/harness/tests/strict required-build
+privacy zero findings. Standalone final privacy zero, both synthetic evidence
+validators pass, final built startup smoke 1/1, db:generate no drift/migration
+upgrade tests pass, git diff --check pass. Public synthetic browser stage/form/
+analytics/reload checks pass; authenticated/deployed/browser/mobile rendering and
+live Neon transport remain external, not inferred from local fixtures. Existing
+>500 kB client warning remains, now 639.41 kB with shared runtime validation.
+Boundary reviewer directly verified all four demonstrated defects resolved; no
+remaining demonstrated defect in the bounded Phase 7 review. Checkpoint/push next.

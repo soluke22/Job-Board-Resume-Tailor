@@ -132,18 +132,18 @@ test('real owner session reaches scoped workspace operations; repository outages
     return { revision: 0, profile: null, evidence: [], jobs: [], auditLog: [] };
   };
   const app = express(); app.use(express.json());
-  app.use('/api/workspace', createWorkspaceRouter({ read: operation, save: operation, import: operation } as any,
+  app.use('/api/workspace', createWorkspaceRouter({ read: operation, save: operation, import: operation, transition: operation } as any,
     createOwnerGuard(req => auth.api.getSession({ headers: fromNodeHeaders(req.headers), query: { disableCookieCache: true } }))));
   await serve(app, async url => {
     const headers = { Cookie: cookie(session!.token), Origin: config.BETTER_AUTH_URL, 'Content-Type': 'application/json' };
-    for (const [method, path] of [['GET', 'data'], ['POST', 'data'], ['POST', 'import'], ['GET', 'export'], ['GET', 'audit-log']]) {
+    for (const [method, path] of [['GET', 'data'], ['POST', 'data'], ['POST', 'import'], ['GET', 'export'], ['GET', 'audit-log'], ['GET', 'analytics'], ['POST', 'application-transition']]) {
       const response = await fetch(url + '/api/workspace/' + path, { method, headers });
       assert.equal(response.status, 200); assert.match(response.headers.get('cache-control')!, /private.*no-store/);
       assert.doesNotMatch(await response.text(), /Jordan Taylor/);
     }
-    assert.equal(calls.length, 5);
+    assert.equal(calls.length, 8, 'includes pre-save owner read, analytics and transition authority');
     unavailable = true;
-    for (const path of ['data', 'export', 'audit-log']) {
+    for (const path of ['data', 'export', 'audit-log', 'analytics']) {
       const response = await fetch(url + '/api/workspace/' + path, { headers });
       assert.equal(response.status, 503); assert.deepEqual(await response.json(), { error: 'Private storage unavailable' });
     }

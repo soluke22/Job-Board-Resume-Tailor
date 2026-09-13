@@ -62,19 +62,9 @@ export type ApplicationPriority =
   | 'Low'
   | 'Do Not Apply';
 
-export type ApplicationStatus =
-  | 'DISCOVERED'
-  | 'SHORTLISTED'
-  | 'TAILORED'
-  | 'APPLIED'
-  | 'RECRUITER_SCREEN'
-  | 'HIRING_MANAGER'
-  | 'TECHNICAL'
-  | 'FINAL_ONSITE'
-  | 'OFFER'
-  | 'REJECTED'
-  | 'WITHDRAWN'
-  | 'ARCHIVED';
+export type { ApplicationStatus, StatusTransitionEvent, ApplicationSnapshot } from './application';
+import type { ApplicationStatus, StatusTransitionEvent, ApplicationSnapshot } from './application';
+export type { OutcomeAnalytics } from '../utils/outcomeAnalytics';
 
 export type WorkspaceMode = 'PUBLIC_DEMO' | 'PRIVATE_WORKSPACE';
 
@@ -529,13 +519,6 @@ export interface ApplicationAnswer {
   rationale?: string;
 }
 
-export interface StatusTransitionEvent {
-  from: string;
-  to: string;
-  timestamp: string;
-  note?: string;
-}
-
 export interface JobRecord {
   // Canonical identity & ATS
   id: string;
@@ -645,21 +628,8 @@ export interface JobRecord {
   referralContact?: ReferralContact;
   applicationAnswers?: ApplicationAnswer[];
   statusHistory?: StatusTransitionEvent[];
-}
-
-export interface OutcomeAnalytics {
-  totalApplications: number;
-  totalScreens: number;
-  totalTechnicalInterviews: number;
-  totalFinalInterviews: number;
-  totalOffers: number;
-  totalRejections: number;
-  conversionByFamily: Record<string, { total: number; interviews: number; rate: number }>;
-  conversionByModifier: Record<string, { total: number; interviews: number; rate: number }>;
-  conversionByChannel: Record<string, { total: number; interviews: number; rate: number }>;
-  conversionByFitBand: Record<string, { total: number; interviews: number; rate: number }>;
-  conversionByFreshness: Record<string, { total: number; interviews: number; rate: number }>;
-  smallSampleWarning: boolean;
+  applicationSnapshot?: ApplicationSnapshot;
+  historyQuarantine?: unknown[];
 }
 
 export interface AuditLogEntry {

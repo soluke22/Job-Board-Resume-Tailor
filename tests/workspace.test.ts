@@ -121,7 +121,7 @@ test('durable workspace survives database reopen; owner scope, concurrency and i
     const replaced = await repo.read('owner-a');
     assert.equal(replaced.jobs[0].atsJobId, undefined, 'omitted scalar does not resurrect old SQL content');
     assert.equal(replaced.jobs[0].versionHistory, undefined);
-    assert.equal(replaced.jobs[0].statusHistory, undefined);
+    assert.deepEqual(replaced.jobs[0].statusHistory, job().statusHistory, 'lifecycle survives attempted browser replacement');
     assert.equal((await repo.read('owner-b')).jobs[0].versionHistory.length, 1);
     await repo.save('owner-a', { jobs: [] }, 7);
     for (const table of [schema.jobs, schema.fitAssessments, schema.resumeVersions, schema.applicationEvents, schema.applications]) {

@@ -97,7 +97,7 @@ test('grounding provenance and measured request budget use configured preference
 test('identity hierarchy and history-safe canonical refresh', async () => {
   const verify = async () => ({status: 'LISTED' as const, isListed: true, lastVerifiedAt: '2026-09-12', canonicalUrl: fixture.canonicalUrl, rawDetails: {rawContent: 'JD'}});
   const [a] = await buildDiscoveredJobs([fixture], [], [], verify);
-  const applied = {...a, id: 'existing', applicationStatus: 'APPLIED' as const, firstSeenAt: '2026-01-01', notes: 'keep', statusHistory: [{from: 'DISCOVERED', to: 'APPLIED', timestamp: '2026-01-02'}]};
+  const applied = {...a, id: 'existing', applicationStatus: 'APPLIED' as const, firstSeenAt: '2026-01-01', notes: 'keep', statusHistory: [{from: 'DISCOVERED' as const, to: 'APPLIED' as const, timestamp: '2026-01-02'}]};
   const merged = mergeDiscoveredJobs([applied], [{...a, description: 'better JD'}]);
   assert.equal(merged.newJobs.length, 0); assert.equal(merged.jobs[0].id, 'existing');
   assert.equal(merged.jobs[0].applicationStatus, 'APPLIED'); assert.equal(merged.jobs[0].firstSeenAt, '2026-01-01');

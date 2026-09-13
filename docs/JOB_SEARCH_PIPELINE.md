@@ -290,3 +290,81 @@ Proof explanation is not new evidence, outreach confidence is not qualification,
 model-written motivation is not user motivation, relationship labels do not establish
 history, and an application answer is not an unsupported personal attestation.
 READY does not send or submit content.
+
+## Phase 7 application history and observed outcomes
+
+Private lifecycle requests accept jobId, targetStatus, requestId and optional event
+facts, never replacement history. The server locks the owner workspace row, loads
+the persisted job, validates and commits status, event, audit and revision together.
+Forward stages may skip intermediate interviews. Backward changes and terminal
+reopening require an explicit correction. OFFER is observed, not accepted.
+ARCHIVED is organization state, not rejection; prior outcomes remain in history.
+
+Shared runtime/TypeScript events use from, to, timestamp, optional note, stable id,
+recordedAt, kind and requestId. Repeating current status is a no-op unless adding a
+note/reason observation. Retries of a persisted request do not append events/audits;
+reuse for different facts is rejected. At 5000 events new writes fail before commit.
+Corrections append supersedesEventId + correctionReason. The original stays stored;
+superseded destinations are excluded from analytics. Corrections can be corrected. Legacy current state with no established transition
+history can be explicitly corrected/confirmed with a reason; this records the old
+state in from but never backfills a historical fit snapshot.
+Current state is the latest effective timestamp (append order breaks ties), so an
+older correction cannot silently reopen a later rejection. Backdated normal events
+before existing progression are rejected; explicit corrections support dated fixes.
+Dates may be supplied; absent dates use server now. Future timestamps are rejected.
+
+First effective APPLIED supplies appliedDate. A trustworthy legacy submission date
+is preserved through postapplication progression/correction and archiving; an
+explicit correction to preapplication state may clear it. Its server-captured immutable snapshot
+retains assessed algorithm/fit/coverage/priority/recommendation/family/modifiers and
+fingerprint only when the persisted assessment is current. Unassessed/stale fit is
+UNKNOWN, never promoted. Publication freshness is measured at the supplied applied
+instant; unknown publication stays UNKNOWN. Discovery source, ATS provider,
+verification and selected application channel stay separate. Referral drafts never
+establish a referral. Current reassessment never overwrites the snapshot. If a
+correction changes the effective application instant, a mismatching original
+snapshot remains audit history but is excluded from segmentation; no score backfill.
+Legacy applications never receive application-time scores from current assessments.
+
+Rejection reasonText is optional; reasonSource is employer-provided,
+recruiter-provided, user-observed, user-inferred or unknown. A rejection without a
+reason remains unknown. Outcome source is manual/email/recruiter/portal/other/unknown,
+entered manually; this phase introduces no connector or email ingestion.
+
+One shared server-safe engine computes owner history analytics for API, storage,
+AnalyticsView and Dashboard. An explicit effective APPLIED destination (or valid
+legacy appliedDate for submission only) establishes an application. Each job counts
+once per explicitly recorded screen, hiring manager, technical, final, offer,
+rejection or withdrawal. Any interview is one of the four interview destinations;
+offer alone does not fabricate an interview. Each conversion numerator counts
+applications that reached that event, denominator is all recorded applications,
+including rejection/withdrawal/archive. Zero denominator returns zero. No stage
+hierarchy manufactures absent events. Weekly [start,end) event activity is supported
+by the pure engine; window mode withholds conversion rates because event activity
+is not a submission-cohort denominator. No weekly-report product is added.
+
+Cohorts use matching application-time snapshots: family, modifiers (once per unique
+tag), qualification bands (<7, 7–<8.8, 8.8–10) plus priority and algorithm, selected
+application channel, publication freshness, ATS and discovery source. Missing
+historical assessment is UNKNOWN / LEGACY; legacy explicit application-channel
+observations remain usable. Each cohort returns n, interview/technical/offer/rejection/
+withdrawal counts, rates and sampleState. n<5 INSUFFICIENT_SAMPLE, 5–14 EARLY_SIGNAL,
+>=15 OBSERVED; no statistical significance is claimed. UI withholds percentages for
+tiny segments. Time-to-event medians require at least five valid nonnegative pairs;
+unknown timestamps never create durations. These are observations, not strategy
+recommendations or scoring labels. No Gemini or automatic Phase 4.1 tuning.
+
+Legacy status/notes destination events normalize to from:null/to/note with their
+actual valid timestamp. Canonical events retain their shape. Malformed events are
+retained in private historyQuarantine, excluded from analytics; overflow tails stay
+in a quarantine envelope. No unknown predecessor/stage/date is invented. This is
+JSON contract normalization; no SQL migration. Reads, saves and imports normalize;
+server transitions durably retain quarantine. Ordinary browser writes preserve
+stored lifecycle fields; new browser histories require explicit owner import.
+Imports of matching job IDs preserve stored history/snapshots; new selected owner
+imports retain historical events/snapshots as owner-reported backup data, never as
+candidate evidence. Export/import and disk restart have synthetic coverage.
+
+current status ≠ historical funnel; rejection ≠ known reason; outcome ≠ causal
+scoring signal; current score ≠ application-time score; ATS provider ≠ application
+channel; archived ≠ rejected; small sample ≠ reliable conclusion.
