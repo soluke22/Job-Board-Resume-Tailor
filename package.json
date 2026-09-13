@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "harness:check": "node scripts/harness-check.mjs",
     "privacy:scan": "node scripts/privacy-scan.mjs",
+    "runtime:check": "node scripts/runtime-check.mjs",
     "release:check": "node scripts/release-check.mjs"
   },
   "dependencies": {
@@ -49,6 +50,6 @@
     "vite": "^6.2.3"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": "24.x"
   }
 }

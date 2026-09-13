@@ -362,6 +362,8 @@ for (const [path, operation] of [['generate-proof-pack','proof'],['generate-outr
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Unknown API route' }));
 app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
-  res.status(error?.type === 'entity.too.large' ? 413 : 400).json({ error: 'Invalid request' });
+  if (res.headersSent) { res.destroy(); return; }
+  const status = error?.type === 'entity.too.large' ? 413 : error instanceof SyntaxError ? 400 : 500;
+  res.status(status).json({ error: status === 500 ? 'Request failed' : 'Invalid request' });
 });
 export default app;

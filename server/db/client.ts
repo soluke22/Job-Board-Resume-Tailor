@@ -6,7 +6,7 @@ import * as schema from './schema';
 
 neonConfig.webSocketConstructor = ws;
 export function createDatabaseBoundary(configuration = () => process.env.DATABASE_URL,
-  createPool: (url: string) => Pool = url => new Pool({ connectionString: url, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 10_000 })) {
+  createPool: (url: string) => Pool = url => new Pool({ connectionString: url, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 10_000 }), closeTimeoutMs = 5_000) {
   let database: ReturnType<typeof drizzle<typeof schema>> | undefined;
   let pool: Pool | undefined;
   let closed = false;
@@ -28,7 +28,14 @@ export function createDatabaseBoundary(configuration = () => process.env.DATABAS
       closed = true;
       const previous = pool;
       pool = undefined; database = undefined;
-      await previous?.end();
+      if (!previous) return;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([previous.end(), new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error('Database cleanup timed out')), closeTimeoutMs);
+          timer.unref();
+        })]);
+      } finally { clearTimeout(timer); }
     },
   };
 }
