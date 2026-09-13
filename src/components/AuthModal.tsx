@@ -11,12 +11,11 @@ export const AuthModal: React.FC = () => {
     authSession,
     login,
     logout,
+    signOutPending,
     error,
     clearError
   } = useApp();
 
-  const [email, setEmail] = useState('solomonlucasthornton@gmail.com');
-  const [tokenInput, setTokenInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -29,7 +28,7 @@ export const AuthModal: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const success = await login(email, tokenInput);
+      const success = await login();
       if (!success) {
         setLoginError('Authentication denied. Only authorized owner email can access private workspace.');
       }
@@ -46,8 +45,7 @@ export const AuthModal: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await logout();
-    setIsAuthModalOpen(false);
+    if (await logout()) setIsAuthModalOpen(false);
   };
 
   return (
@@ -69,7 +67,7 @@ export const AuthModal: React.FC = () => {
                 Workspace Security & Access
               </h2>
               <p className="text-xs text-slate-400">
-                Single-owner verified privacy and mode switcher
+                Public demo and private workspace
               </p>
             </div>
           </div>
@@ -85,7 +83,7 @@ export const AuthModal: React.FC = () => {
                 <div>
                   <div className="font-semibold text-emerald-400">Authenticated Owner Active</div>
                   <div className="text-slate-300 mt-0.5">
-                    Logged in as <span className="text-white font-mono">{authSession.userEmail}</span>. Full access to private candidate records, search queries, and local backups.
+                    Logged in as <span className="text-white font-mono">{authSession.userEmail}</span>. Access to private candidate records, search queries, and authorized exports.
                   </div>
                 </div>
               </>
@@ -128,39 +126,8 @@ export const AuthModal: React.FC = () => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Authorized Owner Email
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Passkey / Session Token (Optional for Owner)
-                </label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    value={tokenInput}
-                    onChange={(e) => setTokenInput(e.target.value)}
-                    placeholder="Enter passkey if configured"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Access fails closed if email does not match the configured owner allowlist.
-                </p>
-              </div>
+              <p className="text-sm text-slate-300">Continue with the workspace owner's verified Google account.</p>
+              {signOutPending && <button type="button" onClick={handleLogout} className="w-full py-2 text-red-300">Retry server sign-out</button>}
 
               {(loginError || error) && (
                 <div className="p-3 rounded-xl bg-red-950/60 border border-red-800 text-red-200 text-xs flex items-center space-x-2">
@@ -179,11 +146,11 @@ export const AuthModal: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || signOutPending}
                   className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium shadow-lg shadow-emerald-900/30 flex items-center justify-center space-x-1.5 transition cursor-pointer disabled:opacity-50"
                 >
                   <Lock className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Verifying...' : 'Unlock Workspace'}</span>
+                  <span>{isSubmitting ? 'Verifying...' : 'Continue with Google'}</span>
                 </button>
               </div>
             </form>
@@ -192,8 +159,8 @@ export const AuthModal: React.FC = () => {
 
         {/* Footer info */}
         <div className="px-6 py-3.5 bg-slate-950/60 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
-          <span>Security: Single-Owner Air-Gapped Sandbox</span>
-          <span className="text-emerald-400 font-mono">v2.0-secure</span>
+          <span>Owner-only private workspace</span>
+          <span className="text-emerald-400 font-mono">Google sign-in</span>
         </div>
       </div>
     </div>

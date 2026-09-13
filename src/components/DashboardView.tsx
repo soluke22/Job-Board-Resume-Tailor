@@ -29,6 +29,7 @@ import { AddJobModal } from './AddJobModal';
 export const DashboardView: React.FC = () => {
   const {
     jobs,
+    analytics,
     evidence,
     projects,
     skills,
@@ -59,6 +60,8 @@ export const DashboardView: React.FC = () => {
   const applyCount = jobs.filter((j) => currentFit(j)?.verdict === 'Apply').length;
   const borderlineCount = jobs.filter((j) => currentFit(j)?.verdict === 'Borderline').length;
   const skipCount = jobs.filter((j) => currentFit(j)?.verdict === 'Skip').length;
+
+  const outcomeSummary = `${analytics.totalApplications} applications · ${analytics.totalAnyInterviews} reached interviews · ${analytics.totalOffers} offers · ${analytics.totalRejections} rejections · ${analytics.totalWithdrawals} withdrawals`;
 
   const displayName = profile.name || 'Candidate';
 
@@ -115,6 +118,7 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <p className="text-sm text-slate-400">Observed history: {outcomeSummary}</p>
       {/* 1. Executive Identity & Command Header */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">

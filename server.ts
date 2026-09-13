@@ -1,26 +1,22 @@
+import { createArtifactHandler } from './server/artifactRoutes';
 import { z } from 'zod';
 import { AssessmentError } from './server/assessment';
 import { createAssessmentHandler } from './server/assessmentRoutes';
 import { createResumeHandler } from './server/resumeRoutes';
 import express, { Request, Response, NextFunction } from 'express';
-import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
-import { installAuth, requireWorkspaceOwner } from './server/auth';
+import { installAuth, requireWorkspaceOwner, privateNoStore } from './server/auth';
+import { assertBoundedJson } from './server/inputBounds';
+import { reserveProviderCall, ProviderBudgetExceeded, isBudgetedExternalPath } from './server/providerBudget';
 import { installPrivateFiles } from './server/privateFiles';
 import { createWorkspaceRouter } from './server/workspaceRoutes';
 import { redactAiPayload } from './server/privacy';
-import { detectAtsProvider, verifyPostingAts } from './server/atsAdapters';
+import { verifyPostingAts } from './server/atsAdapters';
 import { executeDiscoveryRequest, validateDiscoveryInput } from './server/discovery';
 import { mergeDiscoveredJobs } from './src/utils/jobIdentity';
 import { safeFetchText } from './server/safeFetch';
-import {
 
-  calculateFreshnessBand,
-
-
-} from './server/searchEngine';
-import { JobRecord, SearchProfile } from './src/types';
 
 dotenv.config();
 
@@ -29,11 +25,20 @@ app.disable('x-powered-by');
 app.use((_req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('X-Frame-Options', 'DENY'); next(); });
 installAuth(app);
 installPrivateFiles(app);
+app.use('/api', privateNoStore);
 app.use(express.json({ limit: '3mb' }));
+app.use('/api', (req, res, next) => {
+  try { assertBoundedJson(req.body); next(); } catch { res.status(400).json({ error: 'Invalid request complexity' }); }
+});
 app.use('/api/workspace', createWorkspaceRouter());
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 // All remaining application APIs handle private data or invoke private services.
 app.use('/api', requireWorkspaceOwner);
+app.use('/api', async (req, res, next) => {
+  if (!isBudgetedExternalPath(req.path)) { next(); return; }
+  try { await reserveProviderCall(res.locals.ownerId, 'external'); next(); }
+  catch (error) { res.status(error instanceof ProviderBudgetExceeded ? 429 : 503).json({ error: 'External operation budget unavailable or exceeded; retry later' }); }
+});
 
 // Lazy initialization of GoogleGenAI
 function getGeminiClient(req: Request, alreadyMinimized = false): GoogleGenAI | null {
@@ -50,23 +55,15 @@ function getGeminiClient(req: Request, alreadyMinimized = false): GoogleGenAI | 
     }
   });
   const generate = client.models.generateContent.bind(client.models);
-  if (!alreadyMinimized) client.models.generateContent = (params: any) => generate(redactAiPayload(params, req.body?.candidateProfile));
+  client.models.generateContent = async (params: any) => {
+    await reserveProviderCall(req.res!.locals.ownerId, 'ai');
+    const bounded = { ...params, config: { ...params.config, httpOptions: { ...params.config?.httpOptions, timeout: 30000 } } };
+    return generate(alreadyMinimized ? bounded : redactAiPayload(bounded, req.body?.candidateProfile));
+  };
   return client;
 }
 
 const MODEL_NAME = 'gemini-3.8-flash';
-
-// Helper to safely extract JSON from Gemini response
-function extractCleanJson(text: string): any {
-  let cleaned = text.trim();
-  // Strip markdown code fences if present
-  if (cleaned.startsWith('```json')) {
-    cleaned = cleaned.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-  } else if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
-  }
-  return JSON.parse(cleaned);
-}
 
 // ==========================================
 // 0. Fetch Job Posting from URL
@@ -129,70 +126,9 @@ app.post('/api/match-evidence', assessmentHandler);
 // ==========================================
 // 3. Gap Interview Questions
 // ==========================================
-app.post('/api/gap-interview', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { fit, evidenceMatches, parsedJob } = req.body;
-
-    // Per spec: Only ask questions if projected fit is 8.0 or higher, a hard requirement has weak/missing evidence,
-    // and it could plausibly have been covered by undocumented past work.
-    if (!fit || fit.tailoredFitScore < 8.0) {
-      res.json({ questions: [] });
-      return;
-    }
-
-    const candidateGaps = (evidenceMatches || []).filter(
-      (m: any) => m.isHardRequirement && (m.strength === 'Weak' || m.strength === 'Missing')
-    );
-
-    if (candidateGaps.length === 0) {
-      res.json({ questions: [] });
-      return;
-    }
-
-    const ai = getGeminiClient(req);
-    if (!ai) {
-      res.status(503).json({
-        error:
-          'Gemini API key is not configured. Studio fails closed to prevent unverified hallucinations.'
-      });
-      return;
-    }
-
-    const prompt = `The candidate is interviewing for ${parsedJob.roleTitle} at ${parsedJob.company}.
-Their tailored fit score is ${fit.tailoredFitScore}/10 (8.0+).
-Generate up to 3 targeted, respectful interview questions for the candidate about specific gaps in hard requirements that could plausibly have been covered by undocumented past work in prior work or personal projects.
-Do NOT suggest inventing anything.
-NO em dashes.
-
-Gaps:
-${JSON.stringify(candidateGaps)}
-
-Return JSON:
-{
-  "questions": [
-    {
-      "id": string,
-      "requirement": string,
-      "question": string,
-      "contextRationale": string
-    }
-  ]
-}`;
-
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ text: prompt }],
-      config: {
-        responseMimeType: 'application/json'
-      }
-    });
-
-    const json = extractCleanJson(response.text || '{}');
-    res.json(json);
-  } catch (error: any) {
-    console.error('Private operation failed');
-    res.status(500).json({ error: 'Failed to generate gap questions' });
-  }
+// No UI caller remains. Fence arbitrary client gap context.
+app.post('/api/gap-interview', (_req, res) => {
+  res.status(410).json({ error: 'Legacy gap generation is unavailable; use reviewed evidence and current assessment' });
 });
 
 // ==========================================
@@ -254,11 +190,11 @@ Return JSON:
       model: MODEL_NAME,
       contents: [{ text: prompt }],
       config: {
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json', httpOptions: { timeout: 30000 }
       }
     });
 
-    const generated = extractCleanJson(response.text || '{}');
+    const generated = z.object({ paragraphs: z.array(z.string().max(6000)).min(3).max(4), evidenceThemesUsed: z.array(z.string().max(500)).max(20) }).strict().parse(JSON.parse(response.text || ''));
     const candidateName =
       candidateProfile?.name ||
       candidateProfile?.fullName ||
@@ -349,272 +285,20 @@ app.post('/api/discover-jobs', async (req: Request, res: Response): Promise<void
   }
 });
 
-// ==========================================
-// 13. Generate Interview Proof Pack
-// ==========================================
-app.post('/api/generate-proof-pack', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { tailoredResume, candidateEvidence, parsedJob } = req.body;
-    const ai = getGeminiClient(req);
-
-    if (!ai) {
-      res.status(503).json({
-        error: 'Gemini API key is not configured. Studio fails closed to prevent unverified hallucinations.'
-      });
-      return;
-    }
-
-    const bullets: any[] = [];
-    (tailoredResume?.experience || []).forEach((e: any) => {
-      (e.bullets || []).forEach((b: any) => bullets.push({ context: e.employer, text: b.text, id: b.id }));
-    });
-    (tailoredResume?.projects || []).forEach((p: any) => {
-      (p.bullets || []).forEach((b: any) => bullets.push({ context: p.name, text: b.text, id: b.id }));
-    });
-
-    const prompt = `You are a technical interview preparation specialist creating an Interview Proof Pack for a software engineering candidate.
-Target Role: ${parsedJob?.roleTitle || 'Frontend Engineer'} at ${parsedJob?.company || 'Target Company'}
-
-For each resume bullet below, formulate:
-1. Technical context (architecture, trade-offs, underlying technologies)
-2. Likely skeptical follow-up question an engineering manager or staff engineer will ask
-3. Defensible, truthful explanation that avoids exaggeration and grounds the claim in realistic day-to-day engineering
-4. A concise STAR story (Situation, Task, Action, Result)
-
-CRITICAL RULES:
-- STRICTLY NO EM DASHES OR EN DASHES ANYWHERE.
-- Zero exaggeration. If the candidate was a contributor, do not claim they led the entire initiative.
-- Return JSON:
-{
-  "claims": [
-    {
-      "id": string,
-      "resumeBulletText": string,
-      "underlyingEvidenceIds": string[],
-      "technicalContext": string,
-      "likelyFollowUpQuestion": string,
-      "defensibleExplanation": string,
-      "starStory": {
-        "situation": string,
-        "task": string,
-        "action": string,
-        "result": string
-      }
-    }
-  ],
-  "prepNotes": string[]
+// Phase 6 certified downstream artifacts use the Phase 4/5 strict adapter.
+for (const [path, operation] of [['generate-proof-pack','proof'],['generate-outreach','outreach'],['generate-answers','answers'],['generate-referral','referral']] as const) {
+  app.post(`/api/${path}`, createArtifactHandler(operation, (req) => async (schema, system, data) => {
+    const ai=getGeminiClient(req,true);
+    if(!ai)throw new AssessmentError('Gemini is not configured; no artifact produced');
+    const response=await ai.models.generateContent({model:MODEL_NAME,contents:JSON.stringify(data),config:{systemInstruction:system,responseMimeType:'application/json',responseJsonSchema:geminiJsonSchema(schema),thinkingConfig:{thinkingLevel:ThinkingLevel.MEDIUM},httpOptions:{timeout:30000}}});
+    return schema.parse(JSON.parse(response.text || ''));
+  }));
 }
-
-Resume Bullets:
-${JSON.stringify(bullets.slice(0, 8))}`;
-
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ text: prompt }],
-      config: {
-        responseMimeType: 'application/json'
-      }
-    });
-
-    const json = extractCleanJson(response.text || '{}');
-    const proofPack = {
-      jobId: parsedJob?.id || 'job-active',
-      generatedAt: new Date().toISOString(),
-      claims: (json.claims || []).map((c: any) => ({
-        ...c,
-        technicalContext: (c.technicalContext || '').replace(/[—–]/g, ', '),
-        likelyFollowUpQuestion: (c.likelyFollowUpQuestion || '').replace(/[—–]/g, ', '),
-        defensibleExplanation: (c.defensibleExplanation || '').replace(/[—–]/g, ', ')
-      })),
-      prepNotes: (json.prepNotes || []).map((n: string) => n.replace(/[—–]/g, ', '))
-    };
-
-    res.json({ proofPack });
-  } catch (error: any) {
-    console.error('Private operation failed');
-    res.status(500).json({ error: 'Failed to generate proof pack' });
-  }
-});
-
-// ==========================================
-// 14. Generate Recruiter Outreach & Referral Message
-// ==========================================
-app.post('/api/generate-outreach', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { parsedJob, candidateProfile, tailoredResume } = req.body;
-    const ai = getGeminiClient(req);
-
-    if (!ai) {
-      res.status(503).json({
-        error: 'Gemini API key is not configured. Studio fails closed to prevent unverified hallucinations.'
-      });
-      return;
-    }
-
-    const prompt = `Write high-conversion, professional recruiter outreach messages for:
-Company: ${parsedJob.company}
-Role: ${parsedJob.roleTitle}
-Candidate: ${candidateProfile?.name || 'Candidate'}
-
-Generate:
-1. linkedInMessage: Under 300 characters. Direct, polite, highlighting verified React/TypeScript alignment.
-2. emailSubject: Clear, professional subject line.
-3. emailBody: 2-3 concise paragraphs. Highlights specific technical evidence, why this company's product is exciting, and invites a 15-minute introductory conversation.
-4. concreteImpact: 1 sentence stating concrete impact from candidate's verified background.
-5. whyCandidateRelevant: 1 sentence summarizing why candidate is directly qualified.
-
-CRITICAL RULES:
-- STRICTLY NO EM DASHES OR EN DASHES ANYWHERE.
-- Zero buzzwords (e.g. no "supercharged", "rockstar", "ninja", "results-driven").
-- Return JSON matching schema:
-{
-  "linkedInMessage": string,
-  "emailSubject": string,
-  "emailBody": string,
-  "concreteImpact": string,
-  "whyCandidateRelevant": string
-}`;
-
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ text: prompt }],
-      config: {
-        responseMimeType: 'application/json'
-      }
-    });
-
-    const json = extractCleanJson(response.text || '{}');
-    const outreach = {
-      jobId: parsedJob.id || 'job-outreach',
-      company: parsedJob.company,
-      roleTitle: parsedJob.roleTitle,
-      linkedInMessage: (json.linkedInMessage || '').replace(/[—–]/g, ', '),
-      emailSubject: (json.emailSubject || '').replace(/[—–]/g, ', '),
-      emailBody: (json.emailBody || '').replace(/[—–]/g, ', '),
-      concreteImpact: (json.concreteImpact || '').replace(/[—–]/g, ', '),
-      whyCandidateRelevant: (json.whyCandidateRelevant || '').replace(/[—–]/g, ', '),
-      generatedAt: new Date().toISOString()
-    };
-
-    res.json({ outreach });
-  } catch (error: any) {
-    console.error('Private operation failed');
-    res.status(500).json({ error: 'Failed to generate outreach' });
-  }
-});
-
-// ==========================================
-// 15. Generate Grounded Application Answers
-// ==========================================
-app.post('/api/generate-answers', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { questions, parsedJob, candidateEvidence } = req.body;
-    const ai = getGeminiClient(req);
-
-    if (!ai) {
-      res.status(503).json({
-        error: 'Gemini API key is not configured. Studio fails closed to prevent unverified hallucinations.'
-      });
-      return;
-    }
-
-    const prompt = `Formulate natural, concise, and specific application portal answers for the role of ${
-      parsedJob.roleTitle
-    } at ${parsedJob.company}.
-Questions:
-${JSON.stringify(questions || ['Why are you interested in this role?', 'Describe a challenging technical project you worked on.'])}
-
-Candidate Evidence Context:
-${JSON.stringify((candidateEvidence || []).slice(0, 5))}
-
-CRITICAL RULES:
-- STRICTLY NO EM DASHES OR EN DASHES.
-- Keep answers under 150 words each.
-- Ground answers directly in verified candidate work.
-- Return JSON:
-{
-  "answers": [
-    {
-      "id": string,
-      "question": string,
-      "answer": string,
-      "evidenceIds": string[],
-      "rationale": string
-    }
-  ]
-}`;
-
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ text: prompt }],
-      config: {
-        responseMimeType: 'application/json'
-      }
-    });
-
-    const json = extractCleanJson(response.text || '{}');
-    const sanitized = (json.answers || []).map((a: any) => ({
-      ...a,
-      answer: (a.answer || '').replace(/[—–]/g, ', ')
-    }));
-
-    res.json({ answers: sanitized });
-  } catch (error: any) {
-    console.error('Private operation failed');
-    res.status(500).json({ error: 'Failed to generate answers' });
-  }
-});
-
-// ==========================================
-// 16. Generate Referral Request Message
-// ==========================================
-app.post('/api/generate-referral', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { contactName, relationship, company, roleTitle, jobUrl } = req.body;
-    const ai = getGeminiClient(req);
-
-    if (!ai) {
-      res.status(503).json({
-        error: 'Gemini API key is not configured. Studio fails closed to prevent unverified hallucinations.'
-      });
-      return;
-    }
-
-    const prompt = `Write a polite, natural, and low-pressure referral request to a contact.
-Contact: ${contactName} (${relationship})
-Target Company: ${company}
-Target Role: ${roleTitle}
-Job Link: ${jobUrl}
-
-CRITICAL RULES:
-- STRICTLY NO EM DASHES OR EN DASHES.
-- Concise: approx 3-4 sentences.
-- Acknowledge their time, specify the exact role and why candidate is a direct fit, and offer to share the resume.
-- Return JSON:
-{
-  "referralMessage": string
-}`;
-
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ text: prompt }],
-      config: {
-        responseMimeType: 'application/json'
-      }
-    });
-
-    const json = extractCleanJson(response.text || '{}');
-    res.json({
-      referralMessage: (json.referralMessage || '').replace(/[—–]/g, ', ')
-    });
-  } catch (error: any) {
-    console.error('Private operation failed');
-    res.status(500).json({ error: 'Failed to generate referral request' });
-  }
-});
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Unknown API route' }));
 app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
-  res.status(error?.type === 'entity.too.large' ? 413 : 400).json({ error: 'Invalid request' });
+  if (res.headersSent) { res.destroy(); return; }
+  const status = error?.type === 'entity.too.large' ? 413 : error instanceof SyntaxError ? 400 : 500;
+  res.status(status).json({ error: status === 500 ? 'Request failed' : 'Invalid request' });
 });
 export default app;
