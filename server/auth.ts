@@ -120,4 +120,3 @@ export function installAuth(app: Express, authProvider = getAuth) {
     } catch { if (!res.headersSent) res.status(503).json({ error: 'Private authentication is unavailable' }); }
   });
 }
-

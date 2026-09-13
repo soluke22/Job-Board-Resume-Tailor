@@ -77,4 +77,3 @@ test('Better Auth persisted sessions are revoked on sign-out (isolated memory da
   await auth.api.signOut({ headers });
   assert.equal(await auth.api.getSession({ headers }),null);
 });
-
