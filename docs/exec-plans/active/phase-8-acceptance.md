@@ -5,9 +5,13 @@ Scope: retain Vite static client and one Node Express Function; certify routing,
 lifecycle/concurrency, configuration, build and all existing deterministic gates.
 No Phase 9, main/PR/Studio, production deployment or remote resource mutation.
 Provider contracts verified by the requested read-only docs researcher and parent
-installed-SDK inspection. Result: **PARTIAL**, not an architectural incompatibility.
-Local adapter/configuration passes; exact platform path routing/output and largest
-JSON responses still need runtime evidence before beginning Phase 9.
+installed-SDK inspection. Final deferred-gate status:
+**PARTIAL — code/runtime contract accepted locally; external Vercel/provider acceptance deferred until a Vercel project and isolated staging resources exist.**
+The deterministic/local Vercel-compatible contract is verified. Missing project
+setup is deferred external configuration, not a demonstrated architecture defect.
+The previous requirement to resolve platform gates before Phase 9 is superseded by
+the user's deferral instruction. Next: **Phase 9 — Security/privacy/release audit**,
+on separate authorization; not begun in this continuation.
 
 | Requirement | Current behavior | Official provider contract | Status | Required fix / evidence |
 | --- | --- | --- | --- | --- |
@@ -16,7 +20,7 @@ JSON responses still need runtime evidence before beginning Phase 9.
 | Node version | 24.x; local 24.19.0, host 25 excluded | Supported 24.x; engines overrides dashboard [4] | Pass | Explicit test/runtime-check major invariant |
 | Client build/assets | dist/client/index.html + hashed JS/CSS | Vite static build; configured output [1][5] | Pass | Final 3 files, 706107 bytes; client JS 639.41 kB warning retained; synthetic server-env sentinel build scan passes |
 | SPA deep links | Root/dashboard/other route fallback; excludes API/assets | SPA rewrite to index.html [6] | Pass locally / Unverified live | Bare /api exclusion fixed; preview root/assets/deep links pending |
-| API/nested paths | /api/:path* -> /api; adapter never edits req.url | Internal rewrites; exact Express incoming URL not specified [6][7] | Unverified platform | Synthetic methods/query/nested paths pass; must prove actual rewrite before Phase 9 |
+| API/nested paths | /api/:path* -> /api; adapter never edits req.url | Internal rewrites; exact Express incoming URL not specified [6][7] | Pending external project setup | Synthetic methods/query/nested paths pass; actual rewrite preservation deferred, not a demonstrated defect |
 | Express lifecycle | finish/close/error/abort/290s deadline; listeners removed | Node response lifecycle, Function duration [2][8] | Pass locally | Synthetic normal/throw/close/abort/error/timeout/stream tests; close once |
 | Concurrent invocation | ALS DB; auth WeakMap per DB | Fluid concurrent instance reuse [2][8] | Pass locally | Interleaved two owners/data/errors/artifacts; late DB work rejects |
 | Duration | 300s; adapter 290s; AI 30s/call, Blob 15s, DB connect 10s/close 5s | Fluid default/Hobby maximum 300s [8] | Pass configured / Unverified workload | Sequential 12-claim proof batches justify >30s; large live proof completion not certified |
@@ -51,12 +55,15 @@ verification/live authentication claimed). Neither fix weakened provider asserti
 
 | Provider gate | Status | Evidence |
 | --- | --- | --- |
-| Vercel build contract (actual provider output) | PENDING_EXTERNAL_CONFIG | Local Node/npm/Vite/config/adapter verified; no CLI/link; Function/routes/size pending |
-| Vercel preview runtime | PENDING_EXTERNAL_CONFIG | No authorized linked preview; original route/body-limit behavior unresolved |
-| Google OAuth | PENDING_EXTERNAL_CONFIG | Production options/cookies/hooks tested synthetically; no live registered callback |
-| Neon live persistence | PENDING_EXTERNAL_CONFIG | Local PGlite transaction/restart/upgrade + synthetic Pool isolation; no live transport |
-| Private Blob live persistence | PENDING_EXTERNAL_CONFIG | Installed SDK resolver and mediated synthetic faults/streams; no live store/OIDC grant |
-| Gemini live generation | PENDING_EXTERNAL_CONFIG | No live key/request; prior strict structured synthetic tests retained |
+| Deterministic/local Vercel-compatible contract | VERIFIED | Prior Node 24/npm/build/adapter and 105/105 tests accepted; not rerun for this documentation-only deferral |
+| Actual Vercel generated build/Function output | PENDING_EXTERNAL_CONFIG | Pending external project setup; no .vercel/project.json; CLI probing incomplete at prior usage cutoff |
+| Actual Vercel routing/path preservation | PENDING_EXTERNAL_CONFIG | Pending external project setup; no actual platform proof claimed |
+| Deployed SPA/deep-link acceptance | PENDING_EXTERNAL_CONFIG | Pending external project setup; no deployment performed |
+| Largest-response provider acceptance | PENDING_EXTERNAL_CONFIG | Pending external project setup; synthetic/local acceptance is not provider-limit proof |
+| Google OAuth live acceptance | PENDING_EXTERNAL_CONFIG | Pending stable staging configuration |
+| Neon live acceptance | PENDING_EXTERNAL_CONFIG | Pending non-production resource configuration |
+| Private Blob live acceptance | PENDING_EXTERNAL_CONFIG | Pending non-production Vercel configuration |
+| Gemini live acceptance | PENDING_EXTERNAL_CONFIG | Pending key/configuration |
 
 ## Official contracts (checked 2026-09-13)
 

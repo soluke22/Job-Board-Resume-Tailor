@@ -8,6 +8,8 @@ private storage and a separate synthetic demo. GitHub is canonical.
 dev; Phase 8 began clean at freshly fetched dev == origin/dev ==
 bec000ba171c2eb40342e518727af058fda6f880 (Phase 7 documentation publication).
 Authorized coherent Phase 8 commits and normal fast-forward dev push only.
+Deferral continuation recovered clean dev == origin/dev == b2d5d40; only this plan
+and the Phase 8 acceptance matrix may change. No renewed platform investigation.
 No main, PR, Studio, production deployment, remote migration or Phase 9.
 
 ## Current Phase / Scope and Acceptance
@@ -17,10 +19,16 @@ Retain Vite/Express; parent owns writes; requested read-only docs researcher ver
 official provider contracts. No framework migration or prior business-contract redesign.
 
 ## Current Status
-Phase 8 PARTIAL: local implementation/configuration/runtime acceptance passes;
-actual Vercel rewrite path preservation, generated single-Function output/route table/
-bundle size and largest JSON response behavior remain unresolved platform gates
-before Phase 9. No demonstrated architecture incompatibility or live success claimed.
+**PARTIAL — code/runtime contract accepted locally; external Vercel/provider acceptance deferred until a Vercel project and isolated staging resources exist.**
+Deterministic/local Vercel-compatible contract: verified by the prior accepted gates.
+Actual generated Vercel build/Function output, routing/path preservation, deployed
+SPA/deep links and largest-response provider acceptance: pending external project setup.
+Google OAuth: pending stable staging configuration. Neon: pending non-production
+resource configuration. Private Blob: pending non-production Vercel configuration.
+Gemini: pending key/configuration. See the [deferred-gate matrix](phase-8-acceptance.md).
+No .vercel/project.json exists; CLI probing was incomplete at the prior usage cutoff.
+These are deferred external configuration, not a demonstrated architecture defect.
+No live success claimed; no code changes or new platform probing in this deferral.
 Node 24.19.0 certification; Node 24.x deployment pin; npm/package-lock only; obsolete
 Bun lock removed and recoverable from Git. Explicit npm ci/build/output settings.
 SPA fallback excludes bare/nested API and assets; adapter forwards supplied path and
@@ -44,10 +52,11 @@ both evidence validators, built startup smoke and diff check pass. Publication
 recorded in the checkpoint below; plan encoding normalized from four legacy dash bytes.
 
 ## Next Exact Step
-Resolve Phase 8 actual Vercel routing/output/maximum JSON response gates using an
-explicitly authorized linked nonproduction project; run the documented preview
-matrix without production resources. Then, only on separate continuation:
-**Phase 9 — Security/privacy/release audit.** Do not begin it in this task.
+**Phase 9 — Security/privacy/release audit**
+Do not begin it in this turn. The user's deferral instruction supersedes the earlier
+requirement to resolve actual Phase 8 platform gates first. Deferred acceptance
+requires a future explicitly authorized Vercel project and isolated staging resources;
+do not create/link/deploy or change architecture to compensate for their absence.
 
 ## Historical Phase 7 Branch
 dev; Phase 7 began clean at freshly fetched dev == origin/dev ==
