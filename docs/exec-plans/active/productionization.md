@@ -1,5 +1,46 @@
 # Productionization execution plan
 
+## Evidence review usability fix scope (2026-09-14)
+
+Predecessor/canonical main: 6da65a3f78f798aece45994b4420625dfb0c0bf9.
+Dev fast-forwarded from a clean tree after stashing acceptance notes and the
+unrelated .gitignore change. Live Gemini acceptance is paused; no provider calls,
+production configuration, remote database mutations or deployment in this fix.
+
+PRODUCT_DEFECT / EVIDENCE_REVIEW_WORKFLOW_MISSING: manual creation says verified
+but saves session-unreviewed; imports require review; no approval UI/function/route.
+Ordinary saves also need to fence request-supplied trust. Implement a narrow
+owner-scoped persisted-record approval action, exact inspected-content/revision
+checks, accurate card states and a review dialog. Material claim-field edits
+demote approval; enabled alone preserves it. Reuse canonical invalidation.
+Acceptance: focused eligibility/import/edit/approval/persistence/denial/conflict/
+invalidation tests, full Node24 lint/tests/build/privacy/harness/release audit;
+scoped dev commit and dev-to-main PR for review, without merge or deployment.
+
+Implemented: accurate Add Evidence wording, Needs review/Verified/Disabled text,
+inspectable complete claim metadata and explicit approval dialog; owner-only
+persisted ID/revision/content-hash route and atomic approval/audit. Ordinary saves
+cannot create/promote trusted evidence or keep trust after claim edits. Imports
+remain review-required. No edit UI existed; AppContext edit mutations and server
+saves now demote material edits. Enabled alone preserves approval. Canonical
+fingerprints/snapshot inspection and existing client readiness helpers fence stale
+assessment/resume/Phase 6 outputs. Eligibility predicate remains unchanged.
+
+Validation: five grouped new review tests and existing Phase 4/5/6 suites pass;
+full npm test 120/120, zero skipped. Initial full run had a native ESM child
+timeout; isolated smoke and complete rerun passed unchanged (no validator relaxed).
+Node24.21.0 lint/typecheck, build, harness, strict privacy/public build scan and
+runtime/client/secret markers pass. Source-vs-lock dependencies/engines match.
+Read-only security specialist found no demonstrated defects. React review checked
+state, approval error handling, disabled actions and import-safe rendering.
+Final composed npm run release:check passed: 120/120 tests, typecheck/build,
+harness, strict privacy scan (zero findings) and runtime/client checks.
+
+Next: review dev-to-main PR, merge only after approval, verify canonical main in
+AI Studio, then deploy via the established release workflow. Production still has
+the old UI until that workflow completes; normal-UI approval/reload and live Gemini
+acceptance remain pending. Owner session/configuration/Neon production untouched.
+
 ## Phase 12 authorized staging runtime fix
 Scope: repair only relative import resolution in the Node-executed Function graph
 on dev. Live canonical main 0f0acdd51238cf7e9a692291bb5c2e58e2e0d818 fails with

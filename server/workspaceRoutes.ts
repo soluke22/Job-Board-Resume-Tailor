@@ -3,7 +3,7 @@ import { Router, type RequestHandler } from 'express';
 import { requireWorkspaceOwner } from './auth.js';
 import { workspaceRepository, WorkspaceConflict, WorkspaceValidationError } from './workspaceRepository.js';
 
-export function createWorkspaceRouter(repository: Pick<typeof workspaceRepository, 'read' | 'save' | 'import'> & Partial<Pick<typeof workspaceRepository, 'transition'>> = workspaceRepository, guard: RequestHandler = requireWorkspaceOwner) {
+export function createWorkspaceRouter(repository: Pick<typeof workspaceRepository, 'read' | 'save' | 'import'> & Partial<Pick<typeof workspaceRepository, 'transition' | 'approveEvidence'>> = workspaceRepository, guard: RequestHandler = requireWorkspaceOwner) {
   const router = Router();
   router.use(guard);
   router.use((_req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); });
@@ -33,6 +33,10 @@ export function createWorkspaceRouter(repository: Pick<typeof workspaceRepositor
     return repository.save(owner, req.body?.data, req.body?.revision);
   }));
   router.post('/import', respond((req, owner) => repository.import(owner, req.body?.data, req.body?.revision)));
+  router.post('/evidence-approval', respond((req, owner) => {
+    if (!repository.approveEvidence) throw new WorkspaceValidationError('Evidence approval unavailable');
+    return repository.approveEvidence(owner, req.body);
+  }));
   router.get('/export', respond((_req, owner) => repository.read(owner)));
   router.get('/audit-log', async (_req, res) => {
     try { res.json({ logs: (await repository.read(res.locals.ownerId)).auditLog }); }

@@ -178,7 +178,7 @@ test('actual installed route inventory protects all application, workspace and p
   assert.equal(privateRoutes.length, 22); // 16 application APIs including validation/export + 6 guarded file methods
   assert.ok(privateRoutes.some((route:any)=>route.path==='/api/validate-resume'));
   await serve(app, async url => {
-    for (const route of [...privateRoutes, { method: 'post', path: '/api/workspace/data' }, ...['data', 'import', 'export', 'audit-log'].map(path => ({ method: path === 'import' ? 'post' : 'get', path: '/api/workspace/' + path }))]) {
+    for (const route of [...privateRoutes, { method: 'post', path: '/api/workspace/data' }, { method: 'post', path: '/api/workspace/evidence-approval' }, ...['data', 'import', 'export', 'audit-log'].map(path => ({ method: path === 'import' ? 'post' : 'get', path: '/api/workspace/' + path }))]) {
       const response = await fetch(url + route.path.replace(':id', 'synthetic'), { method: route.method.toUpperCase(), headers: { Origin: config.BETTER_AUTH_URL } });
       assert.equal(response.status, 401, route.path);
       assert.match(response.headers.get('cache-control')!, /private.*no-store/);

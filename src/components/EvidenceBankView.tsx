@@ -13,9 +13,23 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { EvidenceItem, RoleFamily } from '../types';
+import { evidenceClaimFields, evidenceReviewStatus, isEvidenceReviewed } from '../utils/evidenceReview';
+
+export function EvidenceReviewBadge({ item, canReview, onReview }: { item: EvidenceItem; canReview: boolean; onReview: () => void }) {
+  return <div className="flex items-center justify-between gap-2 text-xs">
+    <span>{evidenceReviewStatus(item)}</span>
+    {!isEvidenceReviewed(item) && canReview && <button type="button" className="font-medium underline" onClick={onReview}>Review &amp; approve</button>}
+  </div>;
+}
+const reviewLabels: Record<string, string> = { rawEvidence: 'Evidence statement', employer: 'Employer', role: 'Role', period: 'Period', technologies: 'Technologies',
+  responsibilities: 'Responsibilities', outcomes: 'Outcomes', supportedVerbs: 'Supported actions', supportedMetrics: 'Supported metrics', context: 'Context',
+  sourceType: 'Source type', sourceLocation: 'Source location', source: 'Source', notes: 'Notes', strength: 'Strength', roleFamilyRelevance: 'Relevant roles' };
 
 export const EvidenceBankView: React.FC = () => {
-  const { evidence, toggleEvidenceItem, deleteEvidenceItem, addEvidenceItem } = useApp();
+  const { evidence, toggleEvidenceItem, deleteEvidenceItem, addEvidenceItem, approveEvidenceItem, workspaceMode } = useApp();
+  const [reviewing, setReviewing] = useState<EvidenceItem | null>(null);
+  const [approving, setApproving] = useState(false);
+  const [reviewError, setReviewError] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [strengthFilter, setStrengthFilter] = useState<string>('All');
@@ -35,7 +49,7 @@ export const EvidenceBankView: React.FC = () => {
     const matchesSearch =
       item.rawEvidence.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.technologies.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      item.employer.toLowerCase().includes(searchQuery.toLowerCase());
+      (item.employer || '').toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStrength =
       strengthFilter === 'All' || item.strength === strengthFilter;
@@ -52,6 +66,7 @@ export const EvidenceBankView: React.FC = () => {
       sourceType: 'manual-entry',
       sourceLocation: 'Candidate Manual Entry',
       verificationStatus: 'session-unreviewed',
+      requiresUserReview: true,
       employer: newEmployer,
       role: newRole,
       period: 'Self-reported',
@@ -82,7 +97,7 @@ export const EvidenceBankView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <h1 className="text-xl font-semibold text-slate-900 dark:text-white tracking-tight">
-              Verified Candidate Evidence Bank
+              Candidate Evidence Bank
             </h1>
             <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-xs font-semibold">
               {evidence.length} Records
@@ -98,7 +113,7 @@ export const EvidenceBankView: React.FC = () => {
           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg shadow-xs transition-colors flex items-center space-x-1.5 self-start sm:self-auto cursor-pointer"
         >
           <PlusCircle className="w-4 h-4" />
-          <span>Add Verified Evidence</span>
+          <span>Add Evidence</span>
         </button>
       </div>
 
@@ -182,6 +197,7 @@ export const EvidenceBankView: React.FC = () => {
             </div>
 
             {/* Raw Evidence Text */}
+            <EvidenceReviewBadge item={item} canReview={workspaceMode === 'PRIVATE_WORKSPACE'} onReview={() => { setReviewing(structuredClone(item)); setReviewError(''); }} />
             <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
               "{item.rawEvidence}"
             </p>
@@ -231,13 +247,34 @@ export const EvidenceBankView: React.FC = () => {
         ))}
       </div>
 
+      {reviewing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="evidence-review-title" className="bg-white dark:bg-slate-900 rounded-xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto space-y-4">
+            <h2 id="evidence-review-title">Review evidence</h2>
+            <p className="text-sm">Inspect the statement and its scope. Approve only facts you can support. Approval makes enabled evidence available for assessment and generation.</p>
+            <dl className="text-sm space-y-2">
+              {evidenceClaimFields.map(field => <div key={field}><dt className="font-semibold">{reviewLabels[field]}</dt><dd className="whitespace-pre-wrap break-words">{Array.isArray(reviewing[field]) ? (reviewing[field] as string[]).join(', ') || 'Unspecified' : String(reviewing[field] || 'Unspecified')}</dd></div>)}
+            </dl>
+            {reviewError && <p role="alert">{reviewError}</p>}
+            <div className="flex gap-4">
+              <button type="button" disabled={approving} onClick={() => setReviewing(null)}>Cancel</button>
+              <button type="button" disabled={approving} onClick={async () => {
+                setApproving(true); setReviewError('');
+                try { await approveEvidenceItem(reviewing); setReviewing(null); }
+                catch (error) { setReviewError(error instanceof Error ? error.message : 'Approval failed. Review again before retrying.'); }
+                finally { setApproving(false); }
+              }}>{approving ? 'Approving…' : 'Approve evidence'}</button>
+            </div>
+          </section>
+        </div>
+      )}
       {/* Add Custom Evidence Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg shadow-xl overflow-hidden my-8">
             <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
-                Add Verified Evidence Record
+                Add Evidence Record
               </h2>
               <button
                 onClick={() => setIsAddModalOpen(false)}
