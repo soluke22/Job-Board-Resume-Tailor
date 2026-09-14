@@ -2,6 +2,7 @@ import { effectiveEvents, normalizeHistory, transitionRequestSchema, type Transi
 import type { ApplicationQuestion } from '../types/artifacts';
 import { invalidateJobArtifacts, invalidateEditedArtifacts } from '../utils/artifactReadiness';
 import { invalidateEditedResume } from '../utils/resumeReadiness';
+import { evidenceReviewContent, preserveEvidenceReview, unreviewedEvidence } from '../utils/evidenceReview';
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { mergeDiscoveredJobs } from '../utils/jobIdentity';
 import {
@@ -148,6 +149,7 @@ interface AppContextType {
   // Candidate Data Management
   saveMasterResume: (resume: TailoredResume) => void;
   addEvidenceItem: (item: EvidenceItem) => void;
+  approveEvidenceItem: (item: EvidenceItem) => Promise<void>;
   updateEvidenceItem: (item: EvidenceItem) => void;
   toggleEvidenceItem: (id: string) => void;
   deleteEvidenceItem: (id: string) => void;
@@ -361,6 +363,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const setEvidence = (newEvidence: EvidenceItem[]) => {
+    newEvidence = newEvidence.map(item => preserveEvidenceReview(item, evidence.find(previous => previous.id === item.id)));
     if (JSON.stringify(newEvidence) !== JSON.stringify(evidence)) setJobs(jobs.map(j=>invalidateJobArtifacts(j.fit?{...j,assessmentStatus:'STALE'}:j,'Assessment source changed; reassess and regenerate before use')));
     setEvidenceState(newEvidence);
     storageService.saveEvidence(newEvidence, workspaceMode);
@@ -607,6 +610,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           sourceLocation: 'Gap Interview session',
           context: 'Full-time',
           verificationStatus: 'session-unreviewed',
+          requiresUserReview: true,
           rawEvidence: ans,
           technologies: target.parsed?.technologies || [],
           responsibilities: [ans],
@@ -616,8 +620,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           strength: 'Moderate',
           roleFamilyRelevance: [target.primaryRoleFamily || 'frontend-product'],
           source: `Gap Interview response for ${target.company} (${q?.relatedRequirement || 'General'})`,
-          enabled: true,
-          lastVerifiedAt: new Date().toISOString()
+          enabled: true
         });
       }
     });
@@ -739,13 +742,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Evidence & Entities
   const addEvidenceItem = (item: EvidenceItem) => {
-    const updated = [item, ...evidence];
+    const updated = [unreviewedEvidence(item), ...evidence];
     setEvidence(updated);
   };
 
   const updateEvidenceItem = (item: EvidenceItem) => {
-    const updated = evidence.map((e) => (e.id === item.id ? item : e));
+    const updated = evidence.map((e) => (e.id === item.id ? preserveEvidenceReview(item, e) : e));
     setEvidence(updated);
+  };
+
+  const approveEvidenceItem = async (reviewed: EvidenceItem): Promise<void> => {
+    const started = epoch.current;
+    await persistCurrent();
+    const before = JSON.stringify(storageService.privateSnapshot());
+    const current = storageService.getEvidence('PRIVATE_WORKSPACE').find(e => e.id === reviewed.id);
+    if (!current || evidenceReviewContent(current) !== evidenceReviewContent(reviewed)) throw new Error('Evidence changed. Review the current record before approving.');
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(evidenceReviewContent(reviewed)));
+    const contentHash = Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
+    const result = await apiService.approveEvidence(reviewed.id, revision.current, contentHash);
+    if (started !== epoch.current) throw new Error('Session changed. Sign in and review again.');
+    if (before !== JSON.stringify(storageService.privateSnapshot())) {
+      ready.current = false;
+      throw new Error('Local edits occurred during approval. Reload required; local edits were preserved.');
+    }
+    adopt(result);
   };
 
   const toggleEvidenceItem = (id: string) => {
@@ -881,6 +901,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsAuthModalOpen,
         saveMasterResume,
         addEvidenceItem,
+        approveEvidenceItem,
         updateEvidenceItem,
         toggleEvidenceItem,
         deleteEvidenceItem,

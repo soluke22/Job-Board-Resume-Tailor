@@ -4,6 +4,9 @@ import { inspectArtifact, preserveArtifact } from './artifactProvenance.js';
 import { and, eq, notInArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
+import { evidenceReviewContent, preserveEvidenceReview } from '../src/utils/evidenceReview.js';
+import type { EvidenceItem } from '../src/types/index.js';
 import { getDb } from './db/client.js';
 import * as s from './db/schema.js';
 import { workspaceInput } from './db/workspaceValidation.js';
@@ -15,6 +18,10 @@ export { workspaceInput } from './db/workspaceValidation.js';
 export type WorkspaceInput = z.infer<typeof workspaceInput>;
 export class WorkspaceConflict extends Error {}
 export class WorkspaceValidationError extends Error {}
+export const evidenceApprovalSchema = z.object({ evidenceId: z.string().min(1).max(200),
+  revision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+  contentHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
+export const evidenceReviewHash = (evidence: EvidenceItem) => createHash('sha256').update(evidenceReviewContent(evidence)).digest('hex');
 type EntityTable = typeof s.evidenceItems;
 // The adapter intentionally exposes only Drizzle's shared transaction surface, allowing
 // the same repository and migrations to run against real PostgreSQL in integration tests.
@@ -104,7 +111,7 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
     if (!ownerId) throw new WorkspaceValidationError('Owner identity required');
     return database().transaction(tx => snapshot(tx, ownerId), { isolationLevel: 'repeatable read', accessMode: 'read only' });
   }
-  async function save(ownerId: string, raw: unknown, revision: number, importing = false, assessedJobId?: string, resumeJobId?: string, artifactJobId?: string, artifactKey?: string) {
+  async function save(ownerId: string, raw: unknown, revision: number, importing = false, assessedJobId?: string, resumeJobId?: string, artifactJobId?: string, artifactKey?: string, approvedEvidenceId?: string) {
     if (!ownerId) throw new WorkspaceValidationError('Owner identity required');
     try { assertBoundedJson(raw); } catch { throw new WorkspaceValidationError('Invalid workspace complexity'); }
     const parsed = workspaceInput.safeParse(raw);
@@ -114,6 +121,8 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       await tx.insert(s.workspaces).values({ ownerId }).onConflictDoNothing();
       const changed = await tx.update(s.workspaces).set({ revision: sql`${s.workspaces.revision} + 1`, updatedAt: new Date() }).where(and(eq(s.workspaces.ownerId, ownerId), eq(s.workspaces.revision, revision))).returning();
       if (!changed.length) throw new WorkspaceConflict('Workspace changed. Reload before saving.');
+      const previousEvidence = (await tx.select().from(s.evidenceItems).where(eq(s.evidenceItems.ownerId, ownerId)))
+        .map((row: any) => ({ ...decode(s.evidenceItems, row).data, id: row.id }) as EvidenceItem);
       const provenance = { source: 'owner-confirmed-import', importedAt: new Date().toISOString(), status: 'requires-review' };
       const reviewImported = (value: unknown, depth = 0): any => {
         if (depth > 100) throw new WorkspaceValidationError('Import nesting exceeds supported limit');
@@ -133,7 +142,14 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       for (const [key, table] of Object.entries(collections)) {
         if (!(key in input)) continue;
         const entries = input[key] as Record<string, unknown>[];
-        for (const entry of entries) await upsert(tx, table, ownerId, entry.id as string, normalize(entry, key === 'evidence'));
+        for (const entry of entries) {
+          let record = normalize(entry, key === 'evidence');
+          if (key === 'evidence' && !importing) {
+            record = preserveEvidenceReview(entry as unknown as EvidenceItem, previousEvidence.find((e: EvidenceItem) => e.id === entry.id));
+            if (entry.id === approvedEvidenceId) record = { ...record, verificationStatus: 'verified', requiresUserReview: false, lastVerifiedAt: new Date().toISOString() };
+          }
+          await upsert(tx, table, ownerId, entry.id as string, record);
+        }
         // Explicit collection saves replace that collection; imports merge selected records.
         if (!importing) await tx.delete(table).where(and(eq(table.ownerId, ownerId), entries.length ? notInArray(table.id, entries.map(e => e.id as string)) : undefined));
       }
@@ -233,7 +249,7 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
         }
       }
       const id = randomUUID();
-      await upsert(tx, s.auditEvents, ownerId, id, { id, eventType: importing ? 'FILE_IMPORTED' : 'WORKSPACE_SAVED', actorId: ownerId, recordId: 'workspace', timestamp: new Date().toISOString(), summary: importing ? 'Owner confirmed selected workspace import' : 'Workspace saved' });
+      await upsert(tx, s.auditEvents, ownerId, id, { id, eventType: importing ? 'FILE_IMPORTED' : approvedEvidenceId ? 'EVIDENCE_APPROVED' : 'WORKSPACE_SAVED', actorId: ownerId, recordId: approvedEvidenceId || 'workspace', timestamp: new Date().toISOString(), summary: importing ? 'Owner confirmed selected workspace import' : approvedEvidenceId ? 'Owner explicitly approved reviewed evidence' : 'Workspace saved' });
       return snapshot(tx, ownerId);
     });
   }
@@ -268,6 +284,16 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       return snapshot(tx,ownerId);
     });
   }
-  return { read, save, transition, saveArtifact:(ownerId:string,input:unknown,revision:number,jobId:string,key:string)=>save(ownerId,input,revision,false,undefined,undefined,jobId,key), saveAssessment: (ownerId: string, input: unknown, revision: number, jobId:string) => save(ownerId,input,revision,false,jobId), saveResume:(ownerId:string,input:unknown,revision:number,jobId:string)=>save(ownerId,input,revision,false,undefined,jobId), import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
+  async function approveEvidence(ownerId: string, raw: unknown) {
+    const request = evidenceApprovalSchema.safeParse(raw);
+    if (!request.success) throw new WorkspaceValidationError('Only a persisted evidence ID, revision and reviewed content hash are accepted');
+    const workspace = await read(ownerId);
+    if (workspace.revision !== request.data.revision) throw new WorkspaceConflict('Workspace changed. Review the current evidence before approving.');
+    const evidence = workspace.evidence.find((e: EvidenceItem) => e.id === request.data.evidenceId);
+    if (!evidence) throw new WorkspaceValidationError('Evidence not found in owner workspace');
+    if (evidenceReviewHash(evidence) !== request.data.contentHash) throw new WorkspaceConflict('Evidence changed. Review the current evidence before approving.');
+    return save(ownerId, { evidence: workspace.evidence }, workspace.revision, false, undefined, undefined, undefined, undefined, evidence.id);
+  }
+  return { read, save, approveEvidence, transition, saveArtifact:(ownerId:string,input:unknown,revision:number,jobId:string,key:string)=>save(ownerId,input,revision,false,undefined,undefined,jobId,key), saveAssessment: (ownerId: string, input: unknown, revision: number, jobId:string) => save(ownerId,input,revision,false,jobId), saveResume:(ownerId:string,input:unknown,revision:number,jobId:string)=>save(ownerId,input,revision,false,undefined,jobId), import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
 }
 export const workspaceRepository = createWorkspaceRepository();

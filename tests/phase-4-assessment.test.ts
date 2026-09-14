@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { assessJob, assessmentSource, assessmentMetadata, eligibleEvidence, isCurrent, retrieveEvidence, scoreAssessment, sourceRequirements, validateMatches, constraints, ALGORITHM_VERSION } from '../server/assessment';
 import { extractionSchema, semanticMatchesSchema } from '../src/types/assessment';
 import type { EvidenceItem, JobRecord, SearchProfile } from '../src/types';
-import { persistenceDb, syntheticJob, syntheticEvidence } from './helpers/persistence';
+import { persistenceDb, syntheticJob, syntheticEvidence, approveAllEvidence } from './helpers/persistence';
 import { createWorkspaceRepository } from '../server/workspaceRepository';
 import { createAssessmentHandler } from '../server/assessmentRoutes';
 
@@ -100,6 +100,7 @@ test('real owner repository certification, caller forgery, stale history and HTT
   try {
     await repo.save('owner-a',{jobs:[persisted],evidence:[{...syntheticEvidence('e'),...evidence(),sourceType:'manual-entry'}],searchProfile:profile},0);
     await repo.save('owner-b',{jobs:[],evidence:[{...syntheticEvidence('other'),rawEvidence:'React'}]},0);
+    await approveAllEvidence(repo, 'owner-a');
     let calls=0;
     const handler=createAssessmentHandler(()=>async()=>{calls++;return calls===1?extracted:matching();},repo);
     const invoke=async(body:any,owner='owner-a')=>{

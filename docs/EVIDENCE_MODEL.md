@@ -1,5 +1,28 @@
 # Candidate evidence and resume provenance
 
+## Explicit owner evidence review
+Manual entry starts session-unreviewed with requiresUserReview=true. Imports keep
+their provenance and require review; neither enabling nor ordinary workspace saves
+can promote them. Evidence Bank shows Verified, Needs review or Disabled in text.
+Review & approve opens the complete statement and claim-bearing metadata; the
+owner explicitly confirms approval. The owner-only evidence-approval route accepts
+only an existing evidence ID, workspace revision and SHA-256 of inspected claim
+fields. It resolves persisted owner records, rejects changed content/revisions,
+and atomically saves verified, requiresUserReview=false, lastVerifiedAt and an
+EVIDENCE_APPROVED audit event. No request-supplied evidence can become trusted.
+
+Material changes to rawEvidence, employer, role, period, technologies,
+responsibilities, outcomes, supportedVerbs, supportedMetrics, context, sourceType,
+sourceLocation, source, notes, strength or roleFamilyRelevance demote evidence to
+requires-review, set requiresUserReview=true and remove lastVerifiedAt. Enabled
+alone preserves review status; disabled evidence remains ineligible. No evidence
+edit UI is introduced; these rules apply to existing AppContext mutations and
+server persistence, including direct ordinary saves. Assessment eligibility is
+unchanged. Approval changes eligible-evidence fingerprints; material edits remove
+eligible support. Canonical snapshot inspection invalidates assessments, resumes
+and Phase 6 artifacts; client evidence mutations immediately fence copy/export.
+Historic certified versions and import provenance remain historical records.
+
 ## Current contracts
 Phase 4 assessments and Phase 5 resumes resolve authenticated-owner persisted
 records. Eligible evidence is owned, enabled, verified and has no unresolved
