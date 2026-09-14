@@ -4,7 +4,7 @@ import { DEFAULT_BLANK_MASTER_RESUME } from '../src/data/privateSeedTemplate';
 import { assessmentMetadata } from '../server/assessment';
 import { assembleResume, buildPlan, currentJob, evidenceSentences, generateResume, generationSchema, inspectResume, revalidateResume, validateClaim, TAILORING_VERSION } from '../server/resumeProvenance';
 import { invalidateEditedResume, canExportFinal } from '../src/utils/resumeReadiness';
-import { persistenceDb, syntheticEvidence, syntheticJob } from './helpers/persistence';
+import { persistenceDb, syntheticEvidence, syntheticJob, approveAllEvidence } from './helpers/persistence';
 import { createWorkspaceRepository } from '../server/workspaceRepository';
 import { createResumeHandler } from '../server/resumeRoutes';
 import type { ResumeClaim } from '../src/types/provenance';
@@ -136,6 +136,7 @@ test('Phase 5 repository and routes: owner-only generation, forged certification
   try{
     const {w,job,output}=fixture();
     let saved=await repository.save('owner-a',{masterResume:w.masterResume,evidence:w.evidence,jobs:[{...job,assessmentStatus:'STALE'}]},0);
+    saved = await approveAllEvidence(repository, 'owner-a');
     saved=await repository.saveAssessment('owner-a',{jobs:[job]},saved.revision,job.id);
     async function invoke(op:'generate'|'validate'|'regenerate'|'evaluate'|'plan'|'export',body:any,model:any=async()=>output,ownerId='owner-a') {
       let status=200,result:any;const res:any={locals:{ownerId},set(){},status(n:number){status=n;return this;},json(v:any){result=v;return this;}};
