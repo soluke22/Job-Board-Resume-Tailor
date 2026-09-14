@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { DEFAULT_BLANK_MASTER_RESUME } from '../src/data/privateSeedTemplate';
 import { assessmentMetadata, fingerprint } from '../server/assessment';
-import { assembleResume, factualClaims } from '../server/resumeProvenance';
+import { assembleResume, factualClaims, resumeBasis } from '../server/resumeProvenance';
 import { ARTIFACT_VERSION, generateProof, generateMessage, generateAnswers, classifyQuestion, enforceLimits, inspectArtifact, preserveArtifact, proofSchema } from '../server/artifactProvenance';
 import { createArtifactHandler } from '../server/artifactRoutes';
 import { createWorkspaceRepository } from '../server/workspaceRepository';
 import { canCopyArtifact, invalidateJobArtifacts, invalidateEditedArtifacts } from '../src/utils/artifactReadiness';
-import { persistenceDb, syntheticEvidence, syntheticJob } from './helpers/persistence';
+import { persistenceDb, syntheticEvidence, syntheticJob, approveAllEvidence } from './helpers/persistence';
 
 function fixture(count=15) {
   const evidence=Array.from({length:count},(_,i)=>({...syntheticEvidence(`e${i}`,`Implemented Node.js module ${i}.`),employer:'Acme',role:'Engineer',period:'2024',technologies:['Node.js']}));
@@ -167,6 +167,8 @@ test('Phase 6 owner repository resolves sources, persists revisioned artifacts, 
   const {pg,db}=await persistenceDb();const repo=createWorkspaceRepository(()=>db as any);
   try {
     const {w,job}=fixture(1);let data=await repo.save('owner-a',{profile:w.profile,masterResume:w.masterResume,evidence:w.evidence,jobs:[{...job,tailoredResume:undefined,assessmentStatus:'STALE'}]},0);
+    data = await approveAllEvidence(repo, 'owner-a'); w.evidence = data.evidence;
+    job.tailoredResume.basis = resumeBasis(w, job);
     data=await repo.saveAssessment('owner-a',{jobs:[{...job,tailoredResume:undefined}]},data.revision,job.id);
     data=await repo.saveResume('owner-a',{jobs:[job]},data.revision,job.id);
     async function invoke(op:'proof'|'outreach'|'answers'|'referral',body:any,model:any=selectModel,ownerId='owner-a'){
@@ -189,7 +191,10 @@ test('Phase 6 owner repository resolves sources, persists revisioned artifacts, 
     data=await repo.save('owner-a',{jobs:[edited]},data.revision);assert.equal(data.jobs[0].recruiterOutreach.provenance.validationStatus,'NEEDS_REVIEW');
     const forged=structuredClone(data.jobs[0]);forged.applicationAnswers[0].answer='Owned AWS.';forged.applicationAnswers[0].provenance.validationStatus='READY';
     data=await repo.save('owner-a',{jobs:[forged]},data.revision);assert.equal(data.jobs[0].applicationAnswers[0].provenance.validationStatus,'NEEDS_REVIEW');
-    data=await repo.save('owner-a',{evidence:w.evidence.map((e:any)=>({...e,enabled:false}))},data.revision);
+    data=await repo.save('owner-a',{evidence:w.evidence.map((e:any)=>({...e,rawEvidence:'Materially changed Node.js claim.'}))},data.revision);
+    assert.equal(data.evidence[0].verificationStatus,'requires-review');
+    assert.equal(data.jobs[0].tailoredResume.readiness,'STALE');
+    assert.equal(data.jobs[0].assessmentStatus,'STALE');
     assert.equal(data.jobs[0].proofPack.provenance.validationStatus,'STALE');assert.equal(data.jobs[0].applicationAnswers[0].provenance.validationStatus,'STALE');
     assert.equal((await invoke('outreach',{jobId:job.id})).status,422);
   }finally{await pg.close();}

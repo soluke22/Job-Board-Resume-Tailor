@@ -3,6 +3,14 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 import * as schema from '../../server/db/schema';
 import { DEFAULT_BLANK_MASTER_RESUME } from '../../src/data/privateSeedTemplate';
+import { evidenceReviewHash } from '../../server/workspaceRepository';
+export async function approveAllEvidence(repo: any, ownerId: string) {
+  let workspace = await repo.read(ownerId);
+  for (const evidence of workspace.evidence) workspace = await repo.approveEvidence(ownerId, {
+    evidenceId: evidence.id, revision: workspace.revision, contentHash: evidenceReviewHash(evidence),
+  });
+  return workspace;
+}
 
 export async function persistenceDb(path?: string) {
   const pg = new PGlite(path);

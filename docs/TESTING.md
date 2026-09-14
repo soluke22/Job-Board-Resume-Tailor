@@ -1,5 +1,18 @@
 # Testing
 
+## Evidence owner review coverage
+`node --import tsx --test tests/evidence-review.test.ts` exercises manual and
+imported review states, enable/disable eligibility, every material claim-field
+edit, explicit persisted approval and client hydration/reload, ordinary-save trust
+forgery, owner isolation, strict HTTP bodies, inspected-content hashes, stale and
+concurrent revisions, budget-free validation failures, and audit rollback.
+React static rendering covers Needs review / Review & approve and Verified after
+actual repository approval, using the existing node:test harness without a new
+UI framework. Phase 4/5/6 persistence fixtures now explicitly approve evidence;
+Phase 6 tests material-edit demotion and dependent assessment/resume/proof/answer
+staleness. Real canonical auth inventory denies unauthenticated approval POST.
+Production browser approval/reload acceptance remains a post-merge/deploy gate.
+
 ## Current state and commands
 Use Node 24.x and npm ci with package-lock.json. Obsolete bun.lock was removed in Phase 8.
 The committed node:test suite runs through tsx; PGlite tests workspace contracts.

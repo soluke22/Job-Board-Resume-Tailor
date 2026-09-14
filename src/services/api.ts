@@ -68,6 +68,11 @@ export async function workspaceRequest(path: string, init?: RequestInit): Promis
 }
 const jsonRequest = (data: any) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 export const apiService = {
+  async approveEvidence(evidenceId: string, revision: number, contentHash: string): Promise<any> {
+    const res = await privateFetch('/api/workspace/evidence-approval', jsonRequest({ evidenceId, revision, contentHash }));
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Evidence approval failed'); }
+    return res.json();
+  },
   async transitionApplication(request: import('../types/application').TransitionRequest): Promise<any> {
     const res=await privateFetch('/api/workspace/application-transition',jsonRequest(request));
     if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error || 'Application transition failed');}
