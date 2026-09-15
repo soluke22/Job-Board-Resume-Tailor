@@ -1,5 +1,170 @@
 # Productionization execution plan
 
+## AI Studio canonical-main import acceptance (2026-09-15)
+
+Owner completed GitHub connection. AI Studio's import dialog explicitly states
+imports do not stay synced. Selected the listed soluke22/Job-Board-Resume-Tailor
+main entry; AI Studio reported Successfully imported 156 files from GitHub and
+created app d1ba3882-10e2-4b0d-a4af-f89540b1ce32. Existing stale shared app was
+not modified or deleted. EXISTING_APP_NOT_SYNCABLE / replacement required.
+
+Exact Git SHA is not exposed. SOURCE_EQUIVALENCE_VERIFIED against canonical main
+befa1282232e0fca880d78485c58ce34d2ff1308 by source markers: Add Evidence,
+Needs review, Review &amp; approve and Verified; approveEvidenceItem;
+evidenceReviewContent/evidenceReviewHash/contentHash; private approval API;
+persisted-ID/revision validation; owner-scoped server repository approval;
+preserveEvidenceReview/unreviewedEvidence and review-required imports. ATS source
+has Ashby/Greenhouse/Lever supported adapters and slice(0,3) verification scope.
+Assessment phase4.1-v3 present. AI Studio converted package-manager host state
+(package-lock omitted and bun.lock shown); no application source rewrite requested
+or accepted and no push control used.
+
+Public demo PASS in embedded and direct preview: synthetic Jordan Taylor fixture,
+current Add Evidence and Verified render. Added one explicitly synthetic public
+preview-only record to exercise new state; Needs review rendered. Review & approve
+source/control is present and correctly private-owner-gated, so it is not exposed
+in public demo. Private mode PASS fail-closed: Workspace Security & Access retained
+Public Demo Mode Active, no private data, and requires verified owner Google login.
+No provider credentials/secrets entered. App build successful. Host debug reports
+HMR websocket disconnects and a nonfatal duplicate React key warning
+(PUBLIC_DEMO0); the app remains rendered and this key comes from unchanged App.tsx,
+not PR3. No PR3 runtime failure demonstrated.
+
+AI Studio verification PASS WITH HOST LIMITATION: exact SHA unavailable, import is
+a non-syncing replacement, AI Studio substitutes package-manager host state, and
+private approval UI cannot be exercised without production owner auth. Production
+settings weakened NO. No GitHub/Vercel/Neon mutation, AI source generation, real
+career data or Gemini invocation. Remaining blocker NONE. Ready production Gemini
+acceptance YES; Gemini calls remain0. Replacement URL:
+https://aistudio.google.com/apps/d1ba3882-10e2-4b0d-a4af-f89540b1ce32
+
+
+## AI Studio canonical-main update attempt (2026-09-15)
+
+Scope: prefer in-place update of saved app 6e455b3c-588b-4598-a6d9-9d02b1ac8869;
+otherwise preserve it and freshly import soluke22/Job-Board-Resume-Tailor main at
+befa1282232e0fca880d78485c58ce34d2ff1308. No manual file copying, AI rewrite,
+GitHub/Vercel/Neon mutation or Gemini invocation.
+
+Finding: EXISTING_APP_NOT_SYNCABLE. The shared saved app is read-only, says Remix
+to make this app your own, and exposes only ZIP download under source export. It
+has no GitHub refresh/sync/re-import or replace-source control. Old app untouched.
+New app workflow exposes Import from GitHub and requires Sign in to GitHub. The
+button was invoked through accessibility and semantic controls, both hidden and
+visible, but no OAuth window/tab opened and the import dialog remained unchanged.
+Fresh import cannot continue until the owner completes the GitHub connection in
+the visible browser. Connection text warns the resulting editor can also push to
+the selected repository; no authorization or repository selection has occurred.
+No replacement app exists yet. Gemini calls remain0. Next exact step: owner clicks
+Sign in to GitHub and completes the required GitHub authorization, then import only
+canonical main and verify PR3 source/render contracts.
+
+
+## Saved AI Studio access retry (2026-09-15)
+
+Retry scope: open shared app 6e455b3c-588b-4598-a6d9-9d02b1ac8869 after
+owner access change; inspect source/render against canonical main
+befa1282232e0fca880d78485c58ce34d2ff1308. No replacement/remix, GitHub,
+production, provider, configuration or real-data mutations. No Gemini calls.
+
+Result: ACCESSIBLE through the shared-app warning. AI Studio labels it as an app
+from another developer and permits read-only source/preview inspection. Exact Git
+SHA is not exposed. Source is stale and not equivalent to canonical main: rendered
+Evidence Bank says Add Verified Evidence and has no Needs review, Review & approve
+or distinct review-status UI. Source search has no /api/workspace/evidence-approval,
+evidenceReviewContent or evidenceReviewHash, and the visible EvidenceBankView uses
+only add/toggle/delete actions. PR3 evidence-review checkpoint therefore fails.
+
+Public synthetic demo PASS: Jordan Taylor fixture loads without provider access or
+startup failure; no real/private career data observed. Private boundary PASS: mode
+switch opens Workspace Security & Access, retains Public Demo Mode Active and
+requires the owner's verified Google account; no private workspace is exposed.
+Embedded preview works, so no iframe host limitation applies. ATS provider scope
+PASS: imported adapter contract/search confirms supported Ashby, Greenhouse and
+Lever adapters (other detected ATS labels remain unsupported/fail-closed per the
+canonical contract). Assessment algorithm PASS: phase4.1-v3 is present in imported
+server/tests source. Production settings weakened: NO.
+
+AI Studio verification FAIL due to stale saved-app source, not external access and
+not a production defect. Remaining blocker: update the existing saved app from
+canonical GitHub main without changing GitHub/production, then repeat source/UI
+render checks. Ready to resume production Gemini acceptance: NO. Gemini calls0.
+
+
+## Saved AI Studio verification attempt (2026-09-14)
+
+Scope: inspect saved app 6e455b3c-588b-4598-a6d9-9d02b1ac8869 against canonical
+main befa1282232e0fca880d78485c58ce34d2ff1308; refresh only through normal
+GitHub import/update if stale. Acceptance requires source equivalence, PR3 review
+UI, public synthetic demo, fail-closed private boundary, ATS scope and algorithm.
+No different app unless irrecoverably broken; no Gemini calls or production edits.
+
+Result: supplied https://ai.studio/apps/6e455b3c-588b-4598-a6d9-9d02b1ac8869
+redirects to aistudio.google.com with the same app ID and displays Page not found.
+Go to Build works. Signed-in My apps shows No apps yet and Allow Drive access.
+The actual Allow Drive access button was clicked; no authorization dialog, new tab
+or app appeared. No permission grant was completed. This does not establish that
+the saved app is irrecoverably broken, so no replacement app was created.
+
+AI Studio source freshness/render/demo/private boundary remain UNVERIFIED;
+verification FAIL (access blocker), not a demonstrated CareerOS defect or iframe
+HOST_LIMITATION. Production evidence-review remains PASS from prior acceptance.
+No production security setting weakened; no source/configuration/database edits,
+no real data created and no Gemini invocation. Next exact step: recover access to
+this saved app (working accessible app link or owner-resolved AI Studio Drive
+access), then inspect source and run Phase11 host regression. Ready Gemini: NO.
+
+
+## PR3 merge and production review acceptance (2026-09-14)
+
+PR3 final audit PASS: open main<-dev, one expected commit, exact head
+0796b34cfb06440bee5492b6c87786ed98cf5df3, base6da65a3f78f798aece45994b4420625dfb0c0bf9,
+MERGEABLE/CLEAN, Vercel preview success, no review requests or unresolved threads.
+Complete diff A-L reviewed: eligibility unchanged, ordinary saves cannot promote
+trust, persisted owner ID/revision/content hash approval, transactional audit,
+material-edit demotion, toggles preserve review, imports require approval and
+canonical invalidation remains fail closed. No demonstrated source defect.
+Fresh Node24.21.0 release:check PASS: typecheck/build/harness, 120/120 tests, zero
+skipped, strict privacy scan zero findings, runtime/client credential markers.
+Source/lock contracts and working/PR diff whitespace checks pass.
+
+Before merge, tracked worktree clean; pending acceptance notes/ignore change
+preserved in a named stash. Ignored .env.local and .vercel state relocated to a
+private temporary backup without reading contents. No such state remained in
+repo at merge. No additional source changes or validator weakening.
+Merged with exact-head guard at2026-09-14T20:38:47Z; dev retained.
+Main befa1282232e0fca880d78485c58ce34d2ff1308 has parents
+6da65a3f78f798aece45994b4420625dfb0c0bf9 and0796b34cfb06440bee5492b6c87786ed98cf5df3.
+Tree b8843195130a5c2d8ddea47b3f353d7791f0eed4 exactly equals audited head tree.
+Origin/local main verified; no unexpected post-merge commit. Stayed on dev.
+
+Automatic Vercel production dpl_79Ag6bvJ8qu2KMo1nw44VecA8t7s READY, Git SHA
+befa1282232e0fca880d78485c58ce34d2ff1308, Node24.x, canonical alias
+https://job-board-resume-tailor.vercel.app. No duplicate/manual deployment.
+Vercel connector scope denied metadata; authorized existing CLI/API read fallback
+verified it. Health200, owner auth/session200 and workspace/data200; session active.
+
+Normal production UI PASS: Add Evidence -> synthetic Review Co./Frontend Engineer
+statement -> Needs review; DB confirms session-unreviewed/requiresUserReview=true,
+eligible0. Review dialog exposes complete claim metadata; explicit approval200.
+DB verified=true, requiresUserReview=false, lastVerifiedAt present, approval audit1.
+Verified card rendered before and after reload. No material edit UI; live edit
+demotion NOT_APPLICABLE, covered by server tests. UI deleted test record; DB
+evidence0/jobs0, revision6, verified owner1/Google account1/unexpired session1,
+approval audit1 retained by design. AI reservations0; Gemini never invoked.
+Bounded20m/100-row deployment log scan returned13 rows: no5xx, invocation failures
+or scanned credential/raw-provider-payload markers. Observability remains bounded.
+
+Production evidence-review acceptance PASS. AI Studio checkpoint UNVERIFIED /
+AI_STUDIO_APP_ACCESS_REQUIRED: signed-in My apps asks Allow Drive access, no app
+available. No access granted or auth weakened. Existing Drive metadata searches
+did not identify CareerOS app; no unrelated file contents read. Asked for direct
+existing app URL. Cannot classify in-host source/render verification as passed.
+Next exact step: open the established AI Studio app against NEW canonical main,
+verify Evidence Bank/manual review/status/public demo and host auth limitations.
+Ready to resume Gemini acceptance: NO until this checkpoint is completed.
+Owner tab retained; stop before Gemini. These are post-merge local audit notes.
+
 ## Evidence review usability fix scope (2026-09-14)
 
 Predecessor/canonical main: 6da65a3f78f798aece45994b4420625dfb0c0bf9.
