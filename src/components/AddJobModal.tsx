@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Sparkles, Loader2, FileText, Link2, Building, Briefcase, Download } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { canStartJobWorkflow, useApp } from '../context/AppContext';
 import { apiService } from '../services/api';
 
 interface AddJobModalProps {
@@ -9,7 +9,7 @@ interface AddJobModalProps {
 }
 
 export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => {
-  const { addJob, analyzeJob } = useApp();
+  const { createAndAnalyzeJob } = useApp();
 
   const [company, setCompany] = useState('');
   const [title, setTitle] = useState('');
@@ -19,6 +19,13 @@ export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingUrl, setIsFetchingUrl] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+  const submitGuard = useRef(false);
+
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !isLoading && !isFetchingUrl) onClose(); };
+    window.addEventListener('keydown', escape); return () => window.removeEventListener('keydown', escape);
+  }, [isLoading, isFetchingUrl, onClose]);
 
   if (!isOpen) return null;
 
@@ -27,6 +34,7 @@ export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => 
       setErrorMessage('Please enter a valid URL starting with http:// or https://');
       return;
     }
+    if (isFetchingUrl || isLoading) return;
     setIsFetchingUrl(true);
     setErrorMessage(null);
     try {
@@ -47,25 +55,29 @@ export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canStartJobWorkflow(isFetchingUrl, isLoading)) return;
     if (!rawDescription.trim()) {
       setErrorMessage('Please provide a job description to analyze.');
       return;
     }
 
+    if (submitGuard.current) return;
+    submitGuard.current = true;
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const createdJob = await addJob(rawDescription, sourceUrl, company, title, userProvided);
-      await analyzeJob(createdJob.id);
-      onClose();
+      const outcome = await createAndAnalyzeJob(rawDescription, sourceUrl, company, title, userProvided, pendingJobId || undefined);
+      if (outcome.kind === 'analysis-failed') { setPendingJobId(outcome.jobId); setErrorMessage(`Job saved, but analysis failed. Retry analysis. ${outcome.message}`); return; }
+      setPendingJobId(null); onClose();
       // Reset form
       setCompany('');
       setTitle('');
       setSourceUrl('');
       setRawDescription('');
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to analyze job.');
+      setErrorMessage(err.message || 'Job creation was not saved.');
     } finally {
+      submitGuard.current = false;
       setIsLoading(false);
     }
   };
@@ -131,10 +143,10 @@ Notice: This position is pure low-level storage engine architecture and contains
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden my-8">
+      <div role="dialog" aria-modal="true" aria-labelledby="add-job-title" className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden my-8">
         <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+            <h2 id="add-job-title" className="text-lg font-semibold text-slate-900 dark:text-white">
               Add Job for Fit Analysis
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -143,7 +155,7 @@ Notice: This position is pure low-level storage engine architecture and contains
           </div>
           <button
             onClick={onClose}
-            disabled={isLoading}
+            disabled={isLoading || isFetchingUrl}
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -180,7 +192,7 @@ Notice: This position is pure low-level storage engine architecture and contains
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {errorMessage && (
-            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300">
+            <div role="alert" aria-live="assertive" className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300">
               {errorMessage}
             </div>
           )}
@@ -276,14 +288,14 @@ Notice: This position is pure low-level storage engine architecture and contains
               <button
                 type="button"
                 onClick={onClose}
-                disabled={isLoading}
+                disabled={isLoading || isFetchingUrl}
                 className="px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || isFetchingUrl}
                 className="px-5 py-2 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg transition-colors flex items-center space-x-2 cursor-pointer shadow-xs"
               >
                 {isLoading ? (
@@ -294,7 +306,7 @@ Notice: This position is pure low-level storage engine architecture and contains
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>Analyze Fit</span>
+                    <span>{pendingJobId ? 'Retry analysis' : 'Analyze Fit'}</span>
                   </>
                 )}
               </button>

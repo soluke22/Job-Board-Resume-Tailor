@@ -1,5 +1,38 @@
 # Productionization execution plan
 
+## Daily-workflow UX correctness scope (2026-09-20)
+
+Authorized baseline: clean `dev` and `origin/dev` at `41a3e96`; `origin/main`
+remains `befa128`. Scope is the final bounded client workflow correction for Add
+Job + Analyze, Quick Grab readiness/enabled-content/clipboard truthfulness, durable
+Search Preferences and Master Resume saves, acknowledged-mutation supersession,
+and basic modal/async correctness in files already touched. One builder owns
+in-scope discovery, implementation, deterministic tests, debugging and synthetic
+local UX smoke. Sol owns architecture, protected-boundary decisions, final diff
+review, integration gates and the single local checkpoint commit.
+
+Acceptance: reuse only the existing `storageService` snapshot and revisioned
+`persistCurrent` queue; use existing `canExportFinal` and existing invalidation/
+provenance contracts; creation must durably acknowledge one stable job before
+analysis and preserve that same job for partial-success retry; explicit saves must
+publish only acknowledged, nonsuperseded state; Quick Grab must fence non-ready
+tailored content and exclude every disabled bullet; clipboard success must follow
+the fulfilled API promise. Protected storage/API/evidence-review/server files and
+`tests/evidence-review.test.ts` stay unchanged unless Sol first approves a
+demonstrated necessity. Required Node 24 install, focused behavioral tests, full
+release gates, diff review and supported synthetic smoke must pass. No main, push,
+PR, deployment, dependency upgrade or live-resource action.
+
+Result: PASS. The builder completed one consolidated correction cycle and Sol
+accepted the final actual diff with no remaining blocker/high correctness defect.
+Node 24.19.0 clean-install validation passed: focused workspace/job/Quick Grab/
+evidence suites 22/22, full and release suites 137/137, typecheck, build, harness,
+privacy, runtime and whitespace checks. Protected security-baseline files remain
+unchanged. No browser surface was available, so interactive synthetic smoke remains
+explicitly unavailable; deterministic workflow tests cover the supported local
+substitute. Next exact step: independent diff review, then Vercel dev-preview
+acceptance only after the local checkpoint is intentionally published to `dev`.
+
 ## Workspace persistence UX checkpoint (2026-09-20)
 
 Result: PASS. From the preserved builder-harness baseline `00616df`, one bounded

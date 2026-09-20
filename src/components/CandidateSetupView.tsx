@@ -1,25 +1,35 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createSynchronousSubmitGuard, shouldAdoptCandidateDraft, useApp } from '../context/AppContext';
+import { createSynchronousSubmitGuard, durableUiLabel, shouldAdoptCandidateDraft, useApp } from '../context/AppContext';
 import { previewImport, readLegacyWorkspace, selectedImport, type ImportChoice } from '../services/legacyImport';
 import { PrivateFilesView } from './PrivateFilesView';
 
 export const CandidateSetupView: React.FC = () => {
-  const { profile, saveProfile, searchProfile, updateSearchProfile, workspaceMode, authSession, importWorkspaceJson, exportWorkspaceJson, setCurrentView, syncStatus } = useApp();
+  const { profile, saveProfile, searchProfile, saveSearchProfile, workspaceMode, authSession, importWorkspaceJson, exportWorkspaceJson, setCurrentView, syncStatus } = useApp();
   const [draft, setDraft] = useState(profile);
   const adoptedProfile = useRef(profile);
   const [preferences, setPreferences] = useState(JSON.stringify(searchProfile, null, 2));
+  const adoptedPreferences = useRef(JSON.stringify(searchProfile, null, 2));
   const [choices, setChoices] = useState<ImportChoice[]>([]);
   const [selected, setSelected] = useState(new Set<string>());
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPreferences, setSavingPreferences] = useState(false);
+  const [preferencesSaveState, setPreferencesSaveState] = useState<'clean' | 'dirty' | 'saving' | 'saved' | 'failed'>('clean');
   const profileSubmitting = useRef(createSynchronousSubmitGuard());
+  const preferencesSubmitting = useRef(createSynchronousSubmitGuard());
   const privateMode = workspaceMode === 'PRIVATE_WORKSPACE' && authSession.isOwner;
   const profileIsDirty = !shouldAdoptCandidateDraft(draft, profile);
+  const preferencesIsDirty = preferences !== JSON.stringify(searchProfile, null, 2);
   useEffect(() => {
     if (shouldAdoptCandidateDraft(draft, adoptedProfile.current)) setDraft(profile);
     adoptedProfile.current = profile;
   }, [draft, profile]);
+  useEffect(() => {
+    const canonical = JSON.stringify(searchProfile, null, 2);
+    if (preferences === adoptedPreferences.current) { setPreferences(canonical); setPreferencesSaveState('clean'); }
+    adoptedPreferences.current = canonical;
+  }, [preferences, searchProfile]);
   const preview = (items: ImportChoice[]) => { setChoices(items); setSelected(new Set()); setMessage(items.length ? 'Select individual records to import. Nothing has been uploaded.' : 'No legacy records found.'); };
   const exportData = async () => {
     try {
@@ -55,8 +65,14 @@ export const CandidateSetupView: React.FC = () => {
     <section className={box}>
       <h2 className="font-semibold">Search preferences</h2>
       <p className="text-sm text-slate-500">Set role families, locations, technologies and compensation constraints. Blank values stay unspecified.</p>
-      <textarea aria-label="Search preferences JSON" className={input + ' font-mono h-48'} value={preferences} onChange={event => setPreferences(event.target.value)} />
-      <button className="text-emerald-600 font-medium" onClick={() => { try { const value = JSON.parse(preferences); if (!Array.isArray(value.preferredRoleFamilies) || !Array.isArray(value.technologyStrengths)) throw new Error('Expected a complete search profile object.'); updateSearchProfile(value); setMessage('Preferences queued for saving.'); } catch (err: any) { setMessage(err.message); } }}>Save search preferences</button>
+      <textarea aria-label="Search preferences JSON" className={input + ' font-mono h-48'} value={preferences} onChange={event => { setPreferences(event.target.value); setPreferencesSaveState('dirty'); }} />
+      <button disabled={savingPreferences} className="text-emerald-600 font-medium disabled:opacity-40" onClick={async () => {
+        if (!preferencesSubmitting.current.acquire()) return;
+        setSavingPreferences(true); setPreferencesSaveState('saving'); setMessage('');
+        try { const value = JSON.parse(preferences); if (!Array.isArray(value.preferredRoleFamilies) || !Array.isArray(value.technologyStrengths)) throw new Error('Expected a complete search profile object.'); await saveSearchProfile(value); setPreferencesSaveState('saved'); setMessage(privateMode ? 'Search preferences saved privately.' : 'Demo search preferences updated.'); }
+        catch (err: any) { setPreferencesSaveState('failed'); setMessage(err.message || 'Search preferences were not saved. Reload required.'); }
+        finally { preferencesSubmitting.current.release(); setSavingPreferences(false); }
+      }}>{savingPreferences ? 'Saving…' : 'Save search preferences'}</button><span role="status" aria-live="polite" className="ml-3 text-xs">{durableUiLabel(preferencesSaveState === 'clean' && preferencesIsDirty ? 'dirty' : preferencesSaveState, privateMode)}</span>
     </section>
     <section className={box}>
       <h2 className="font-semibold">Master resume and evidence</h2>
