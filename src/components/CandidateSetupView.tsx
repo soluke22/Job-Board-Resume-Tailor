@@ -1,17 +1,24 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { previewImport, readLegacyWorkspace, selectedImport, type ImportChoice } from '../services/legacyImport';
 import { PrivateFilesView } from './PrivateFilesView';
 
 export const CandidateSetupView: React.FC = () => {
-  const { profile, setProfile, searchProfile, updateSearchProfile, workspaceMode, authSession, importWorkspaceJson, exportWorkspaceJson, setCurrentView, syncStatus } = useApp();
+  const { profile, saveProfile, searchProfile, updateSearchProfile, workspaceMode, authSession, importWorkspaceJson, exportWorkspaceJson, setCurrentView, syncStatus } = useApp();
   const [draft, setDraft] = useState(profile);
+  const adoptedProfile = useRef(profile);
   const [preferences, setPreferences] = useState(JSON.stringify(searchProfile, null, 2));
   const [choices, setChoices] = useState<ImportChoice[]>([]);
   const [selected, setSelected] = useState(new Set<string>());
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const privateMode = workspaceMode === 'PRIVATE_WORKSPACE' && authSession.isOwner;
+  const profileIsDirty = JSON.stringify(draft) !== JSON.stringify(profile);
+  useEffect(() => {
+    if (JSON.stringify(draft) === JSON.stringify(adoptedProfile.current)) setDraft(profile);
+    adoptedProfile.current = profile;
+  }, [draft, profile]);
   const preview = (items: ImportChoice[]) => { setChoices(items); setSelected(new Set()); setMessage(items.length ? 'Select individual records to import. Nothing has been uploaded.' : 'No legacy records found.'); };
   const exportData = async () => {
     try {
@@ -31,11 +38,18 @@ export const CandidateSetupView: React.FC = () => {
   return <div className="max-w-5xl mx-auto p-6 space-y-6">
     <h1 className="text-xl font-semibold">{privateMode ? 'Set Up Private Workspace' : 'Public Demo Setup'}</h1>
     <p className="text-sm text-slate-500">{privateMode ? 'Start with your own records. Your private workspace contains no preloaded candidate history.' : 'Explore synthetic demo records. Sign in to configure or import a private workspace.'}</p>
-    <form className={box} onSubmit={event => { event.preventDefault(); setProfile(draft); setMessage('Profile queued for saving. Check the workspace save status.'); }}>
+    <form className={box} onSubmit={async event => {
+      event.preventDefault();
+      if (savingProfile) return;
+      setSavingProfile(true); setMessage('');
+      try { await saveProfile(draft); setMessage(privateMode ? 'Profile saved privately.' : 'Demo profile updated.'); }
+      catch (err: any) { setMessage(err.message || 'Profile was not saved. Reload required.'); }
+      finally { setSavingProfile(false); }
+    }}>
       <h2 className="font-semibold">Candidate profile</h2>
       <div className="grid sm:grid-cols-2 gap-3">{(['name', 'title', 'email', 'phone', 'location', 'workAuthorization'] as const).map(field => <label key={field} className="text-sm">{field}<input className={input} value={draft[field] || ''} onChange={event => setDraft({ ...draft, [field]: event.target.value })} /></label>)}</div>
       <label className="block text-sm">Professional summary<textarea className={input} value={draft.masterSummary} onChange={event => setDraft({ ...draft, masterSummary: event.target.value })} /></label>
-      <button className="text-emerald-600 font-medium">Save profile</button><span className="ml-3 text-xs">{syncStatus}</span>
+      <button disabled={savingProfile} className="text-emerald-600 font-medium disabled:opacity-40">{savingProfile ? 'Saving…' : 'Save profile'}</button><span className="ml-3 text-xs">{savingProfile ? 'Saving…' : profileIsDirty ? 'Unsaved changes' : syncStatus}</span>
     </form>
     <section className={box}>
       <h2 className="font-semibold">Search preferences</h2>

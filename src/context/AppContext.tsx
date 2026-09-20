@@ -147,8 +147,9 @@ interface AppContextType {
   setIsAuthModalOpen: (open: boolean) => void;
 
   // Candidate Data Management
+  saveProfile: (profile: CandidateProfile) => Promise<void>;
   saveMasterResume: (resume: TailoredResume) => void;
-  addEvidenceItem: (item: EvidenceItem) => void;
+  addEvidenceItem: (item: EvidenceItem) => Promise<void>;
   approveEvidenceItem: (item: EvidenceItem) => Promise<void>;
   updateEvidenceItem: (item: EvidenceItem) => void;
   toggleEvidenceItem: (id: string) => void;
@@ -354,6 +355,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if(JSON.stringify(newProfile)!==JSON.stringify(profile))setJobs(jobs.map(j=>invalidateJobArtifacts(j,'Profile changed; reload or regenerate before use')));
     setProfileState(newProfile);
     storageService.saveProfile(newProfile, workspaceMode);
+  };
+
+  const saveProfile = async (newProfile: CandidateProfile): Promise<void> => {
+    setProfile(newProfile);
+    await persistCurrent();
   };
 
   const updateSearchProfile = (newSearchProfile: SearchProfile) => {
@@ -741,9 +747,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Evidence & Entities
-  const addEvidenceItem = (item: EvidenceItem) => {
+  const addEvidenceItem = async (item: EvidenceItem): Promise<void> => {
     const updated = [unreviewedEvidence(item), ...evidence];
-    setEvidence(updated);
+    // Keep the pending record out of the rendered bank until the revisioned
+    // workspace save acknowledges it. The memory snapshot is only staged so the
+    // existing queue can persist it; a failure restores the prior local view and
+    // leaves the workspace reload-required rather than fabricating success.
+    storageService.saveEvidence(updated, workspaceMode);
+    try {
+      await persistCurrent();
+      setEvidence(updated);
+    } catch (error) {
+      if (storageService.getWorkspaceMode() === workspaceMode) storageService.saveEvidence(evidence, workspaceMode);
+      throw error;
+    }
   };
 
   const updateEvidenceItem = (item: EvidenceItem) => {
@@ -899,6 +916,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsAtsGuardsOpen,
         isAuthModalOpen,
         setIsAuthModalOpen,
+        saveProfile,
         saveMasterResume,
         addEvidenceItem,
         approveEvidenceItem,

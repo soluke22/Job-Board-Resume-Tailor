@@ -1,5 +1,36 @@
 # Productionization execution plan
 
+## Workspace persistence UX checkpoint (2026-09-20)
+
+Result: PASS. From the preserved builder-harness baseline `00616df`, one bounded
+builder implemented explicit durable-save UX for Candidate Setup and Evidence
+Bank. Candidate profile drafts now follow adopted data only while clean and show
+truthful clean/dirty/saving/failure states. Manual evidence and approval use
+synchronous duplicate-submit guards, retain dialogs through acknowledgement, and
+publish only adopted durable results. Manual evidence remains review-required;
+approval retains the existing persisted ID/revision/SHA-256 server protocol. Main
+workspace and Quick Data Grab remount keys are distinctly namespaced.
+
+Changed implementation scope is limited to `src/App.tsx`,
+`src/components/CandidateSetupView.tsx`,
+`src/components/EvidenceBankView.tsx`, `src/context/AppContext.tsx`, and the new
+`tests/workspace-ux.test.ts`. The protected storage/API/evidence-review/server
+baseline and `tests/evidence-review.test.ts` are byte-identical to `00616df`.
+No second queue, endpoint, component fetch, client-created Verified state,
+automatic ambiguous-failure recovery or auth/private-readiness weakening was
+introduced.
+
+Node 24.19.0 validation: focused workspace UX 3/3; complete suite 123/123 with
+zero failures or skips; typecheck, build, harness, privacy scan, runtime check,
+release:check and diff checks pass; strict privacy reports zero findings. Synthetic
+local Evidence Bank smoke saved one manual record, increased the count exactly
+once, rendered Needs review and closed only after acknowledgement. No duplicate-key
+console capture was available in the smoke environment; the distinct key contract
+is covered by focused source validation. Existing Rollup annotation and >500 kB
+bundle warnings remain non-blocking. No live resources, deployment or remote branch
+were touched. Next exact step: independent review, then publish the local dev
+checkpoint to a dev preview when separately authorized; do not modify main.
+
 ## Bounded implementation builder harness (2026-09-20)
 
 Scope: reconcile the unpushed AI Studio documentation checkpoint onto canonical
