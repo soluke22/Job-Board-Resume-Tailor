@@ -1,5 +1,24 @@
 # Productionization execution plan
 
+## Bounded implementation builder harness (2026-09-20)
+
+Scope: reconcile the unpushed AI Studio documentation checkpoint onto canonical
+`origin/main`, add one bounded write-capable builder role, document Sol/builder
+ownership, and create the workspace-persistence UX worker contract. No UX
+implementation, production source, remote branch, deployment or live-resource
+change is authorized. Acceptance: supported custom-agent TOML and harness checks,
+existing specialist/domain-skill preservation, no production-source diff, one
+local checkpoint commit, and an explicit current-host discovery/restart result.
+
+Result: PASS. Reconciled `dev` at `f443681` with `origin/main` as ancestor and
+preserved the original `f18085c` tip at `backup/pre-builder-f18085c`. Builder
+TOML parsing, harness integrity and diff checks pass; existing domain skills and
+read-only specialist TOMLs are unchanged; no production source changed. The
+current host's already-loaded role registry does not expose `builder`; fully
+restart/reopen Codex before using it. Next exact step: after restart, delegate the
+workspace persistence UX brief to one builder; Sol reviews the actual diff and
+runs acceptance before integration.
+
 ## AI Studio canonical-main import acceptance (2026-09-15)
 
 Owner completed GitHub connection. AI Studio's import dialog explicitly states

@@ -24,13 +24,20 @@ complex/cross-system problem; requested Astra Light maps to supported low
 effort and must be disclosed. Never default Astra or stronger escalation.
 | Specialist | Model | Effort |
 | --- | --- | --- |
+| builder | gpt-5.6-terra | medium |
 | code-mapper | gpt-5.6-terra | medium |
 | docs-researcher | gpt-5.6-luna | medium |
 | test-triager | gpt-5.6-terra | medium |
 | security-reviewer | gpt-5.6-sol | high |
-All read-only, no recursive delegation. Parent plus at most two helpers; no
-duplicate repository-wide analysis or overlapping writes. Mapper only when
-ownership unclear; reviewer only after meaningful diff; reuse findings/docs.
+The builder is the one bounded write-capable implementation worker. Sol owns
+architecture, contracts, scope, security decisions, acceptance and integration;
+the builder owns only assigned discovery, edits, tests, debugging and routine UI
+QA. Code-mapper, docs-researcher, test-triager and security-reviewer remain
+read-only. Use one writer by default, never delegate recursively, and do not
+invoke specialists ritualistically. Do not poll a healthy builder. Review its
+actual diff instead of trusting its report; default to one consolidated correction
+cycle. Mapper only when ownership is unclear; reviewer only after a meaningful
+diff; reuse findings and durable documentation.
 
 ## Supported configuration
 npm CLI 0.111.0 differs from desktop binary 0.153.4. Installed CLI static
@@ -38,8 +45,9 @@ inspection plus [official custom-agent docs](https://learn.chatgpt.com/docs/agen
 supports .codex/agents/*.toml: name, description, developer_instructions, model,
 model_reasoning_effort and sandbox_mode. Project config sets Sol Medium and
 legacy agents.max_threads=2 conservatively. Installed CLI counting semantics
-are unverified locally; policy remains parent plus at most two helpers. Newer docs use
-max_concurrent_threads_per_session=2 excluding parent; retain legacy compatibility.
+are unverified locally; policy remains parent plus one builder or narrow read-only
+helpers, with one writer. Newer docs use max_concurrent_threads_per_session=2
+excluding parent; retain legacy compatibility.
 No unsupported default_subagent_* keys. Current host exposes requested IDs;
 other account/host availability is conditional. Trust/security policy may ignore
 repo configuration; restart if discovery stale. Files do not switch live parent.
@@ -57,6 +65,12 @@ rather than silently substitute. Browsing/MCP requires available capability.
 | Dashboard card | None; repo-context only if unclear | Mapper only if needed | Terra Medium or AI Studio for isolated UI | Type/build/UI smoke |
 | Final security review | release-validation | Sol High security-reviewer | Sol High review | Release composition and manual security gates |
 Rows load only applicable domain knowledge; TESTING distinguishes missing suites.
+
+For substantial implementation, Sol may hand one complete contract to `builder`.
+The builder makes routine in-scope decisions and runs the complete code/fix/test
+loop without committing or touching remote or production state. Sol inspects the
+diff, resolves architecture/security/acceptance questions, and integrates only
+after the requested evidence passes.
 
 ## Maintenance and resilience
 AGENTS routes/global invariants; skills procedures; docs durable knowledge;

@@ -5,7 +5,13 @@ import { resolve, dirname } from 'node:path';
 import assert from 'node:assert/strict';
 import { validateEvidence } from './validate-evidence.mjs';
 const skills = ['repo-context','workspace-security','ats-verification','job-ranking','evidence-provenance','resume-tailoring','vercel-deployment','release-validation'];
-const agents = { 'code-mapper':['terra','medium'], 'docs-researcher':['luna','medium'], 'test-triager':['terra','medium'], 'security-reviewer':['sol','high'] };
+const agents = {
+ builder: ['terra','medium','workspace-write'],
+ 'code-mapper': ['terra','medium','read-only'],
+ 'docs-researcher': ['luna','medium','read-only'],
+ 'test-triager': ['terra','medium','read-only'],
+ 'security-reviewer': ['sol','high','read-only'],
+};
 const router = await readFile('AGENTS.md','utf8');
 assert(router.split('\n').length <= 100, 'Router exceeds 100 lines');
 for(const skill of skills) {
@@ -17,10 +23,12 @@ for(const skill of skills) {
  for(const path of text.match(/docs\/[A-Za-z0-9_./-]+\.md/g)||[]) await access(path);
 }
 assert.deepEqual((await readdir('.codex/agents')).filter(n=>n.endsWith('.toml')).sort(),Object.keys(agents).map(n=>n+'.toml').sort());
-for(const [name,[model,effort]]of Object.entries(agents)) {
+for(const [name,[model,effort,sandbox]]of Object.entries(agents)) {
  const text = await readFile('.codex/agents/'+name+'.toml','utf8');
- for(const expected of ['name = "'+name+'"','model = "gpt-5.6-'+model+'"','model_reasoning_effort = "'+effort+'"','sandbox_mode = "read-only"','developer_instructions = "']) assert(text.includes(expected),name+': missing '+expected);
+ for(const expected of ['name = "'+name+'"','model = "gpt-5.6-'+model+'"','model_reasoning_effort = "'+effort+'"','sandbox_mode = "'+sandbox+'"','developer_instructions = "']) assert(text.includes(expected),name+': missing '+expected);
 }
+const builder = await readFile('.codex/agents/builder.toml','utf8');
+for(const expected of ['implementation worker, not the orchestrator','modify only explicitly assigned paths','Do not spawn subagents','Do not commit, merge, push, deploy, or touch production','complete the in-scope test/code/fix loop']) assert(builder.includes(expected),'builder: missing '+expected);
 const config = await readFile('.codex/config.toml','utf8');
 assert(config.includes('max_threads = 2')); assert(config.includes('model = "gpt-5.6-sol"'));
 const plan = await readFile('docs/exec-plans/active/productionization.md','utf8');
