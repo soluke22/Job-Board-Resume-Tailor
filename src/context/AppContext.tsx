@@ -50,14 +50,16 @@ export type AcknowledgedWorkspaceMutation<T> = {
   publish: (staged: T) => void;
   restore: (staged: T) => void;
 };
+export type AcknowledgementOutcome = { kind: 'saved' } | { kind: 'superseded' };
 
 // The storage write is staged solely for the existing revisioned queue. React
 // state is published only after that queue acknowledges the exact stage.
-export async function acknowledgeWorkspaceMutation<T>(mutation: AcknowledgedWorkspaceMutation<T>): Promise<void> {
+export async function acknowledgeWorkspaceMutation<T>(mutation: AcknowledgedWorkspaceMutation<T>): Promise<AcknowledgementOutcome> {
   const staged = mutation.stage();
   try {
     await mutation.persist();
-    if (mutation.isCurrent(staged)) mutation.publish(staged);
+    if (mutation.isCurrent(staged)) { mutation.publish(staged); return { kind: 'saved' }; }
+    return { kind: 'superseded' };
   } catch (error) {
     if (mutation.isCurrent(staged)) mutation.restore(staged);
     throw error;
@@ -80,6 +82,20 @@ export function createSynchronousSubmitGuard() {
   };
 }
 
+export type DurableUiState = 'clean' | 'dirty' | 'saving' | 'saved' | 'failed';
+export const durableUiLabel = (state: DurableUiState, privateMode: boolean) => state === 'clean' ? '' : state === 'dirty' ? 'Unsaved changes' : state === 'saving' ? 'Saving…' : state === 'saved' ? privateMode ? 'Saved privately' : 'Saved in demo' : 'Not saved — reload required';
+export const shouldAdoptSerializedDraft = (draft: unknown, adopted: unknown) => JSON.stringify(draft) === JSON.stringify(adopted);
+export async function clipboardOutcome(write: (text: string) => Promise<void>, text: string): Promise<'copied' | 'failed'> { try { await write(text); return 'copied'; } catch { return 'failed'; } }
+
+export type JobWorkflowOutcome = { kind: 'analyzed'; jobId: string } | { kind: 'analysis-failed'; jobId: string; message: string };
+export async function runJobWorkflow(create: () => Promise<JobRecord>, analyze: (jobId: string) => Promise<void>, existingJobId?: string): Promise<JobWorkflowOutcome> {
+  const jobId = existingJobId || (await create()).id;
+  try { await analyze(jobId); return { kind: 'analyzed', jobId }; }
+  catch (error: any) { return { kind: 'analysis-failed', jobId, message: error?.message || 'Job analysis failed' }; }
+}
+export const canStartJobWorkflow = (isFetching: boolean, isWorking: boolean) => !isFetching && !isWorking;
+export const planJobCreation = (currentJobs: JobRecord[], job: JobRecord) => [job, ...currentJobs];
+
 export function planProfilePersistence(previousProfile: CandidateProfile, nextProfile: CandidateProfile, previousJobs: JobRecord[]) {
   return {
     profile: nextProfile,
@@ -97,6 +113,14 @@ export function planEvidenceAddition(currentEvidence: EvidenceItem[], item: Evid
       ? currentJobs
       : currentJobs.map(job => invalidateJobArtifacts(job.fit ? { ...job, assessmentStatus: 'STALE' } : job, 'Assessment source changed; reassess and regenerate before use'))
   };
+}
+
+export function planSearchProfilePersistence(nextProfile: SearchProfile, currentProfile: SearchProfile, currentJobs: JobRecord[]) {
+  return { searchProfile: nextProfile, jobs: JSON.stringify(nextProfile) === JSON.stringify(currentProfile) ? currentJobs : currentJobs.map(job => invalidateJobArtifacts(job.fit ? { ...job, assessmentStatus: 'STALE' } : job, 'Assessment source changed; reassess and regenerate before use')) };
+}
+
+export function planMasterResumePersistence(nextResume: TailoredResume, currentResume: TailoredResume, currentJobs: JobRecord[]) {
+  return { masterResume: nextResume, jobs: JSON.stringify(nextResume) === JSON.stringify(currentResume) ? currentJobs : currentJobs.map(job => invalidateJobArtifacts(job, 'Master resume changed; revalidate sources before use')) };
 }
 
 interface AppContextType {
@@ -149,6 +173,7 @@ interface AppContextType {
     title?: string,
     userProvided?: boolean
   ) => Promise<JobRecord>;
+  createAndAnalyzeJob: (rawDescription: string, sourceUrl?: string, company?: string, title?: string, userProvided?: boolean, existingJobId?: string) => Promise<{ kind: 'analyzed'; jobId: string } | { kind: 'analysis-failed'; jobId: string; message: string }>;
   deleteJob: (id: string) => void;
   updateJob: (job: JobRecord) => void;
   logOutcome: (
@@ -204,7 +229,8 @@ interface AppContextType {
 
   // Candidate Data Management
   saveProfile: (profile: CandidateProfile) => Promise<void>;
-  saveMasterResume: (resume: TailoredResume) => void;
+  saveSearchProfile: (profile: SearchProfile) => Promise<void>;
+  saveMasterResume: (resume: TailoredResume) => Promise<void>;
   addEvidenceItem: (item: EvidenceItem) => Promise<void>;
   approveEvidenceItem: (item: EvidenceItem) => Promise<void>;
   updateEvidenceItem: (item: EvidenceItem) => void;
@@ -422,7 +448,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const previousJobs = storageService.getJobs(workspaceMode);
     const staged = planProfilePersistence(previousProfile, newProfile, previousJobs);
     const snapshot = () => JSON.stringify({ profile: storageService.getProfile(workspaceMode), jobs: storageService.getJobs(workspaceMode) });
-    await acknowledgeWorkspaceMutation({
+    const outcome = await acknowledgeWorkspaceMutation({
       stage: () => {
         storageService.saveProfile(staged.profile, workspaceMode);
         storageService.saveJobs(staged.jobs, workspaceMode);
@@ -440,12 +466,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         storageService.saveJobs(previousJobs, workspaceMode);
       }
     });
+    if (outcome.kind === 'superseded') throw new Error('Profile save was superseded by newer workspace changes. Reload required.');
   };
 
   const updateSearchProfile = (newSearchProfile: SearchProfile) => {
     if (JSON.stringify(newSearchProfile) !== JSON.stringify(searchProfile)) setJobs(jobs.map(j=>invalidateJobArtifacts(j.fit?{...j,assessmentStatus:'STALE'}:j,'Assessment source changed; reassess and regenerate before use')));
     setSearchProfileState(newSearchProfile);
     storageService.saveSearchProfile(newSearchProfile, workspaceMode);
+  };
+
+  const saveSearchProfile = async (newSearchProfile: SearchProfile): Promise<void> => {
+    if (workspaceMode !== 'PRIVATE_WORKSPACE') { updateSearchProfile(newSearchProfile); return; }
+    const previousProfile = storageService.getSearchProfile(workspaceMode), previousJobs = storageService.getJobs(workspaceMode);
+    const staged = planSearchProfilePersistence(newSearchProfile, previousProfile, previousJobs);
+    const snapshot = () => JSON.stringify({ searchProfile: storageService.getSearchProfile(workspaceMode), jobs: storageService.getJobs(workspaceMode) });
+    const outcome = await acknowledgeWorkspaceMutation({
+      stage: () => { storageService.saveSearchProfile(staged.searchProfile, workspaceMode); storageService.saveJobs(staged.jobs, workspaceMode); return snapshot(); }, persist: persistCurrent,
+      isCurrent: value => snapshot() === value,
+      publish: () => { setSearchProfileState(staged.searchProfile); setJobsState(staged.jobs); setAnalyticsState(storageService.getAnalytics(workspaceMode)); },
+      restore: () => { storageService.saveSearchProfile(previousProfile, workspaceMode); storageService.saveJobs(previousJobs, workspaceMode); }
+    });
+    if (outcome.kind === 'superseded') throw new Error('Search preferences save was superseded by newer workspace changes. Reload required.');
   };
 
   const setEvidence = (newEvidence: EvidenceItem[]) => {
@@ -479,10 +520,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAnalyticsState(storageService.getAnalytics(workspaceMode));
   };
 
-  const saveMasterResume = (resume: TailoredResume) => {
-    if(JSON.stringify(resume)!==JSON.stringify(masterResume))setJobs(jobs.map(j=>invalidateJobArtifacts(j,'Master resume changed; revalidate sources before use')));
-    setMasterResumeState(resume);
-    storageService.saveMasterResume(resume, workspaceMode);
+  const saveMasterResume = async (resume: TailoredResume): Promise<void> => {
+    if (workspaceMode !== 'PRIVATE_WORKSPACE') { setMasterResumeState(resume); storageService.saveMasterResume(resume, workspaceMode); return; }
+    const previousResume = storageService.getMasterResume(workspaceMode), previousJobs = storageService.getJobs(workspaceMode);
+    const staged = planMasterResumePersistence(resume, previousResume, previousJobs);
+    const snapshot = () => JSON.stringify({ masterResume: storageService.getMasterResume(workspaceMode), jobs: storageService.getJobs(workspaceMode) });
+    const outcome = await acknowledgeWorkspaceMutation({
+      stage: () => { storageService.saveMasterResume(staged.masterResume, workspaceMode); storageService.saveJobs(staged.jobs, workspaceMode); return snapshot(); }, persist: persistCurrent,
+      isCurrent: value => snapshot() === value,
+      publish: () => { setMasterResumeState(staged.masterResume); setJobsState(staged.jobs); setAnalyticsState(storageService.getAnalytics(workspaceMode)); },
+      restore: () => { storageService.saveMasterResume(previousResume, workspaceMode); storageService.saveJobs(previousJobs, workspaceMode); }
+    });
+    if (outcome.kind === 'superseded') throw new Error('Master resume save was superseded by newer workspace changes. Reload required.');
   };
 
   const openJobDetail = (id: string) => {
@@ -553,7 +602,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ): Promise<JobRecord> => {
     const effectiveUrl = sourceUrl || '';
     const newJob: JobRecord = {
-      id: `job-${Date.now()}`,
+      id: `job-${crypto.randomUUID()}`,
       atsProvider: 'company-careers',
       company: company || 'Pending Analysis',
       title: title || 'Target Role',
@@ -589,11 +638,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       softGaps: []
     };
 
-    const updated = [newJob, ...jobs];
-    setJobs(updated);
+    const currentJobs = storageService.getJobs(workspaceMode);
+    const updated = planJobCreation(currentJobs, newJob);
+    if (workspaceMode === 'PRIVATE_WORKSPACE') {
+      const snapshot = () => JSON.stringify(storageService.getJobs(workspaceMode));
+      const outcome = await acknowledgeWorkspaceMutation({
+        stage: () => { storageService.saveJobs(updated, workspaceMode); return snapshot(); }, persist: persistCurrent,
+        isCurrent: value => snapshot() === value,
+        publish: () => { setJobsState(updated); setAnalyticsState(storageService.getAnalytics(workspaceMode)); },
+        restore: () => storageService.saveJobs(currentJobs, workspaceMode)
+      });
+      if (outcome.kind === 'superseded') throw new Error('Job creation was superseded by newer workspace changes. Reload required.');
+    } else setJobs(updated);
     setActiveJobId(newJob.id);
     setCurrentView('job-detail');
     return newJob;
+  };
+
+  const createAndAnalyzeJob = async (rawDescription: string, sourceUrl?: string, company?: string, title?: string, userProvided = true, existingJobId?: string) => {
+    return runJobWorkflow(() => addJob(rawDescription, sourceUrl, company, title, userProvided), analyzeJob, existingJobId);
   };
 
   const deleteJob = (id: string) => {
@@ -651,8 +714,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Tailoring Workflow
   const analyzeJob = async (jobId: string) => {
-    const target = jobs.find((j) => j.id === jobId);
-    if (!target) return;
+    const target = storageService.getJobs(workspaceMode).find((j) => j.id === jobId);
+    if (!target) throw new Error('The saved job is no longer available. Reload required.');
 
     setIsAnalyzing(true);
     setError(null);
@@ -670,6 +733,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err: any) {
       console.error('Job analysis failed:');
       setError(err.message || 'Job analysis failed');
+      throw err;
     } finally {
       setIsAnalyzing(false);
     }
@@ -832,7 +896,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const previousJobs = storageService.getJobs(workspaceMode);
     const staged = planEvidenceAddition(previousEvidence, item, previousJobs);
     const snapshot = () => JSON.stringify({ evidence: storageService.getEvidence(workspaceMode), jobs: storageService.getJobs(workspaceMode) });
-    await acknowledgeWorkspaceMutation({
+    const outcome = await acknowledgeWorkspaceMutation({
       stage: () => {
         storageService.saveEvidence(staged.evidence, workspaceMode);
         storageService.saveJobs(staged.jobs, workspaceMode);
@@ -850,6 +914,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         storageService.saveJobs(previousJobs, workspaceMode);
       }
     });
+    if (outcome.kind === 'superseded') throw new Error('Evidence save was superseded by newer workspace changes. Reload required.');
   };
 
   const updateEvidenceItem = (item: EvidenceItem) => {
@@ -981,6 +1046,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         discoverJobs,
         verifyAtsStatus,
         addJob,
+        createAndAnalyzeJob,
         deleteJob,
         updateJob,
         logOutcome,
@@ -1006,6 +1072,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthModalOpen,
         setIsAuthModalOpen,
         saveProfile,
+        saveSearchProfile,
         saveMasterResume,
         addEvidenceItem,
         approveEvidenceItem,
