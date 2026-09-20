@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { createSynchronousSubmitGuard, shouldAdoptCandidateDraft, useApp } from '../context/AppContext';
 import { previewImport, readLegacyWorkspace, selectedImport, type ImportChoice } from '../services/legacyImport';
 import { PrivateFilesView } from './PrivateFilesView';
 
@@ -13,10 +13,11 @@ export const CandidateSetupView: React.FC = () => {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const profileSubmitting = useRef(createSynchronousSubmitGuard());
   const privateMode = workspaceMode === 'PRIVATE_WORKSPACE' && authSession.isOwner;
-  const profileIsDirty = JSON.stringify(draft) !== JSON.stringify(profile);
+  const profileIsDirty = !shouldAdoptCandidateDraft(draft, profile);
   useEffect(() => {
-    if (JSON.stringify(draft) === JSON.stringify(adoptedProfile.current)) setDraft(profile);
+    if (shouldAdoptCandidateDraft(draft, adoptedProfile.current)) setDraft(profile);
     adoptedProfile.current = profile;
   }, [draft, profile]);
   const preview = (items: ImportChoice[]) => { setChoices(items); setSelected(new Set()); setMessage(items.length ? 'Select individual records to import. Nothing has been uploaded.' : 'No legacy records found.'); };
@@ -40,11 +41,11 @@ export const CandidateSetupView: React.FC = () => {
     <p className="text-sm text-slate-500">{privateMode ? 'Start with your own records. Your private workspace contains no preloaded candidate history.' : 'Explore synthetic demo records. Sign in to configure or import a private workspace.'}</p>
     <form className={box} onSubmit={async event => {
       event.preventDefault();
-      if (savingProfile) return;
+      if (!profileSubmitting.current.acquire()) return;
       setSavingProfile(true); setMessage('');
       try { await saveProfile(draft); setMessage(privateMode ? 'Profile saved privately.' : 'Demo profile updated.'); }
       catch (err: any) { setMessage(err.message || 'Profile was not saved. Reload required.'); }
-      finally { setSavingProfile(false); }
+      finally { profileSubmitting.current.release(); setSavingProfile(false); }
     }}>
       <h2 className="font-semibold">Candidate profile</h2>
       <div className="grid sm:grid-cols-2 gap-3">{(['name', 'title', 'email', 'phone', 'location', 'workAuthorization'] as const).map(field => <label key={field} className="text-sm">{field}<input className={input} value={draft[field] || ''} onChange={event => setDraft({ ...draft, [field]: event.target.value })} /></label>)}</div>

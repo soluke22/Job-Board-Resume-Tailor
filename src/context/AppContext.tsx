@@ -43,6 +43,62 @@ export type AppView =
   | 'candidate-setup'
   | 'settings';
 
+export type AcknowledgedWorkspaceMutation<T> = {
+  stage: () => T;
+  persist: () => Promise<void>;
+  isCurrent: (staged: T) => boolean;
+  publish: (staged: T) => void;
+  restore: (staged: T) => void;
+};
+
+// The storage write is staged solely for the existing revisioned queue. React
+// state is published only after that queue acknowledges the exact stage.
+export async function acknowledgeWorkspaceMutation<T>(mutation: AcknowledgedWorkspaceMutation<T>): Promise<void> {
+  const staged = mutation.stage();
+  try {
+    await mutation.persist();
+    if (mutation.isCurrent(staged)) mutation.publish(staged);
+  } catch (error) {
+    if (mutation.isCurrent(staged)) mutation.restore(staged);
+    throw error;
+  }
+}
+
+export function shouldAdoptCandidateDraft(draft: CandidateProfile, adoptedProfile: CandidateProfile): boolean {
+  return JSON.stringify(draft) === JSON.stringify(adoptedProfile);
+}
+
+export function createSynchronousSubmitGuard() {
+  let acquired = false;
+  return {
+    acquire() {
+      if (acquired) return false;
+      acquired = true;
+      return true;
+    },
+    release() { acquired = false; }
+  };
+}
+
+export function planProfilePersistence(previousProfile: CandidateProfile, nextProfile: CandidateProfile, previousJobs: JobRecord[]) {
+  return {
+    profile: nextProfile,
+    jobs: JSON.stringify(previousProfile) === JSON.stringify(nextProfile)
+      ? previousJobs
+      : previousJobs.map(job => invalidateJobArtifacts(job, 'Profile changed; reload or regenerate before use'))
+  };
+}
+
+export function planEvidenceAddition(currentEvidence: EvidenceItem[], item: EvidenceItem, currentJobs: JobRecord[]) {
+  const evidence = [unreviewedEvidence(item), ...currentEvidence];
+  return {
+    evidence,
+    jobs: JSON.stringify(evidence) === JSON.stringify(currentEvidence)
+      ? currentJobs
+      : currentJobs.map(job => invalidateJobArtifacts(job.fit ? { ...job, assessmentStatus: 'STALE' } : job, 'Assessment source changed; reassess and regenerate before use'))
+  };
+}
+
 interface AppContextType {
   // Views & Mode
   currentView: AppView;
@@ -358,8 +414,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const saveProfile = async (newProfile: CandidateProfile): Promise<void> => {
-    setProfile(newProfile);
-    await persistCurrent();
+    if (workspaceMode !== 'PRIVATE_WORKSPACE') {
+      setProfile(newProfile);
+      return;
+    }
+    const previousProfile = storageService.getProfile(workspaceMode);
+    const previousJobs = storageService.getJobs(workspaceMode);
+    const staged = planProfilePersistence(previousProfile, newProfile, previousJobs);
+    const snapshot = () => JSON.stringify({ profile: storageService.getProfile(workspaceMode), jobs: storageService.getJobs(workspaceMode) });
+    await acknowledgeWorkspaceMutation({
+      stage: () => {
+        storageService.saveProfile(staged.profile, workspaceMode);
+        storageService.saveJobs(staged.jobs, workspaceMode);
+        return snapshot();
+      },
+      persist: persistCurrent,
+      isCurrent: stagedSnapshot => snapshot() === stagedSnapshot,
+      publish: () => {
+        setProfileState(staged.profile);
+        setJobsState(staged.jobs);
+        setAnalyticsState(storageService.getAnalytics(workspaceMode));
+      },
+      restore: () => {
+        storageService.saveProfile(previousProfile, workspaceMode);
+        storageService.saveJobs(previousJobs, workspaceMode);
+      }
+    });
   };
 
   const updateSearchProfile = (newSearchProfile: SearchProfile) => {
@@ -748,19 +828,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Evidence & Entities
   const addEvidenceItem = async (item: EvidenceItem): Promise<void> => {
-    const updated = [unreviewedEvidence(item), ...evidence];
-    // Keep the pending record out of the rendered bank until the revisioned
-    // workspace save acknowledges it. The memory snapshot is only staged so the
-    // existing queue can persist it; a failure restores the prior local view and
-    // leaves the workspace reload-required rather than fabricating success.
-    storageService.saveEvidence(updated, workspaceMode);
-    try {
-      await persistCurrent();
-      setEvidence(updated);
-    } catch (error) {
-      if (storageService.getWorkspaceMode() === workspaceMode) storageService.saveEvidence(evidence, workspaceMode);
-      throw error;
-    }
+    const previousEvidence = storageService.getEvidence(workspaceMode);
+    const previousJobs = storageService.getJobs(workspaceMode);
+    const staged = planEvidenceAddition(previousEvidence, item, previousJobs);
+    const snapshot = () => JSON.stringify({ evidence: storageService.getEvidence(workspaceMode), jobs: storageService.getJobs(workspaceMode) });
+    await acknowledgeWorkspaceMutation({
+      stage: () => {
+        storageService.saveEvidence(staged.evidence, workspaceMode);
+        storageService.saveJobs(staged.jobs, workspaceMode);
+        return snapshot();
+      },
+      persist: persistCurrent,
+      isCurrent: stagedSnapshot => snapshot() === stagedSnapshot,
+      publish: () => {
+        setEvidenceState(staged.evidence);
+        setJobsState(staged.jobs);
+        setAnalyticsState(storageService.getAnalytics(workspaceMode));
+      },
+      restore: () => {
+        storageService.saveEvidence(previousEvidence, workspaceMode);
+        storageService.saveJobs(previousJobs, workspaceMode);
+      }
+    });
   };
 
   const updateEvidenceItem = (item: EvidenceItem) => {

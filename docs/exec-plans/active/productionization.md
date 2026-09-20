@@ -31,6 +31,22 @@ bundle warnings remain non-blocking. No live resources, deployment or remote bra
 were touched. Next exact step: independent review, then publish the local dev
 checkpoint to a dev preview when separately authorized; do not modify main.
 
+Independent review correction: PASS. The explicit private profile action now stages
+the current storage-backed profile and exactly invalidated jobs, acknowledges that
+complete snapshot through the existing queue, then publishes React state. Manual
+evidence follows the same pattern for current storage-backed evidence plus assessed-
+job/artifact invalidation. Unsuperseded failures restore staged storage without
+publishing phantom state; durable failure remains reload-required. Candidate submit
+uses a synchronous guard. Behavioral tests cover acknowledgement ordering, failure,
+supersession, current-storage evidence, dependent assessment/artifact staleness,
+clean/dirty draft adoption and same-frame submission. Protected security files and
+the evidence-review suite remain unchanged. Node 24.19.0 focused tests pass 12/12
+(workspace UX 7/7, evidence review 5/5); full and release suites pass 127/127 with
+zero failures/skips; typecheck, build, harness, normal/strict privacy zero, runtime
+and diff checks pass. Correction commit is local only; no deployment or live-resource
+action. Next exact step: independent review of the correction commit before any
+separately authorized push or preview publication.
+
 ## Bounded implementation builder harness (2026-09-20)
 
 Scope: reconcile the unpushed AI Studio documentation checkpoint onto canonical
