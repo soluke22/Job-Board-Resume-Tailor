@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Database,
   Search,
@@ -34,6 +34,10 @@ export const EvidenceBankView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [strengthFilter, setStrengthFilter] = useState<string>('All');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const addSubmitting = useRef(false);
+  const approvalSubmitting = useRef(false);
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState('');
 
   // New evidence form state
   const [newEmployer, setNewEmployer] = useState('');
@@ -57,9 +61,9 @@ export const EvidenceBankView: React.FC = () => {
     return matchesSearch && matchesStrength;
   });
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRawEvidence.trim()) return;
+    if (!newRawEvidence.trim() || addSubmitting.current) return;
 
     const newItem: EvidenceItem = {
       id: `evidence-custom-${Date.now()}`,
@@ -83,11 +87,20 @@ export const EvidenceBankView: React.FC = () => {
       enabled: true
     };
 
-    addEvidenceItem(newItem);
-    setIsAddModalOpen(false);
-    setNewRawEvidence('');
-    setNewMetrics('');
-    setNewOutcomes('');
+    addSubmitting.current = true;
+    setAdding(true); setAddError('');
+    try {
+      await addEvidenceItem(newItem);
+      setIsAddModalOpen(false);
+      setNewRawEvidence('');
+      setNewMetrics('');
+      setNewOutcomes('');
+    } catch (error) {
+      setAddError(error instanceof Error ? error.message : 'Evidence was not saved. Reload required.');
+    } finally {
+      addSubmitting.current = false;
+      setAdding(false);
+    }
   };
 
   return (
@@ -259,10 +272,12 @@ export const EvidenceBankView: React.FC = () => {
             <div className="flex gap-4">
               <button type="button" disabled={approving} onClick={() => setReviewing(null)}>Cancel</button>
               <button type="button" disabled={approving} onClick={async () => {
+                if (approvalSubmitting.current) return;
+                approvalSubmitting.current = true;
                 setApproving(true); setReviewError('');
                 try { await approveEvidenceItem(reviewing); setReviewing(null); }
                 catch (error) { setReviewError(error instanceof Error ? error.message : 'Approval failed. Review again before retrying.'); }
-                finally { setApproving(false); }
+                finally { approvalSubmitting.current = false; setApproving(false); }
               }}>{approving ? 'Approving…' : 'Approve evidence'}</button>
             </div>
           </section>
@@ -278,6 +293,7 @@ export const EvidenceBankView: React.FC = () => {
               </h2>
               <button
                 onClick={() => setIsAddModalOpen(false)}
+                disabled={adding}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
               >
                 <X className="w-4 h-4" />
@@ -373,17 +389,20 @@ export const EvidenceBankView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
+                  disabled={adding}
                   className="px-4 py-2 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
+                  disabled={adding}
                   className="px-5 py-2 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors cursor-pointer"
                 >
-                  Save Evidence
+                  {adding ? 'Saving…' : 'Save Evidence'}
                 </button>
               </div>
+              {addError && <p role="alert">{addError}</p>}
             </form>
           </div>
         </div>
