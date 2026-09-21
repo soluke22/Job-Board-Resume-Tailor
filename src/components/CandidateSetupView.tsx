@@ -4,7 +4,7 @@ import { previewImport, readLegacyWorkspace, selectedImport, type ImportChoice }
 import { PrivateFilesView } from './PrivateFilesView';
 
 export const CandidateSetupView: React.FC = () => {
-  const { profile, saveProfile, searchProfile, saveSearchProfile, workspaceMode, authSession, importWorkspaceJson, exportWorkspaceJson, setCurrentView, syncStatus } = useApp();
+  const { profile, saveProfile, searchProfile, saveSearchProfile, resetPublicDemo, workspaceMode, authSession, importWorkspaceJson, exportWorkspaceJson, setCurrentView, syncStatus } = useApp();
   const [draft, setDraft] = useState(profile);
   const adoptedProfile = useRef(profile);
   const [preferences, setPreferences] = useState(JSON.stringify(searchProfile, null, 2));
@@ -17,6 +17,7 @@ export const CandidateSetupView: React.FC = () => {
   const [savingPreferences, setSavingPreferences] = useState(false);
   const [preferencesSaveState, setPreferencesSaveState] = useState<'clean' | 'dirty' | 'saving' | 'saved' | 'failed'>('clean');
   const [preferencesValidationError, setPreferencesValidationError] = useState('');
+  const [confirmDemoReset, setConfirmDemoReset] = useState(false);
   const profileSubmitting = useRef(createSynchronousSubmitGuard());
   const preferencesSubmitting = useRef(createSynchronousSubmitGuard());
   const privateMode = workspaceMode === 'PRIVATE_WORKSPACE' && authSession.isOwner;
@@ -83,6 +84,17 @@ export const CandidateSetupView: React.FC = () => {
       <div className="flex gap-4 flex-wrap">{(['master-resume', 'evidence-bank', 'projects', 'skills', 'pipeline'] as const).map(view => <button className="text-emerald-600" key={view} onClick={() => setCurrentView(view)}>{view.replaceAll('-', ' ')}</button>)}</div>
       <p className="text-sm text-slate-500">Import a workspace JSON to populate master resume sections, evidence, projects or previous application history. PDF files are stored as source documents; they are not automatically parsed into claims.</p>
     </section>
+    {workspaceMode === 'PUBLIC_DEMO' && <section className={box}>
+      <h2 className="font-semibold">Public Demo data</h2>
+      <p className="text-sm text-slate-500">Restore the original synthetic candidate, preferences, evidence, jobs and master resume. This does not change private workspace or sign-in data.</p>
+      {!confirmDemoReset ? <button type="button" className="text-amber-600 font-medium" onClick={() => setConfirmDemoReset(true)}>Reset Public Demo</button> : <div role="group" aria-label="Confirm Public Demo reset" className="space-y-2">
+        <p className="text-sm">Reset Public Demo? Your current demo-only edits and synthetic jobs will be removed. Private workspace data stays untouched.</p>
+        <div className="flex gap-4">
+          <button type="button" className="text-rose-600 font-medium" onClick={() => { try { resetPublicDemo(); } catch (err: any) { setMessage(err.message || 'Public Demo reset failed. Try again.'); } }}>Confirm Reset Public Demo</button>
+          <button type="button" className="text-slate-500" onClick={() => setConfirmDemoReset(false)}>Cancel</button>
+        </div>
+      </div>}
+    </section>}
     {privateMode && <section className={box}>
       <h2 className="font-semibold">Import Existing Local Workspace</h2>
       <button className="text-emerald-600" onClick={() => { try { preview(readLegacyWorkspace(localStorage, authSession.isOwner)); } catch (err: any) { setMessage(err.message); } }}>Inspect legacy browser records</button>

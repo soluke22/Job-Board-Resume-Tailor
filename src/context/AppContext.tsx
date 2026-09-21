@@ -285,7 +285,7 @@ interface AppContextType {
   importWorkspaceJson: (jsonString: string) => Promise<{ success: boolean; message: string }>;
   exportWorkspaceJson: () => Promise<string>;
   clearWorkspace: () => void;
-  resetAllData: () => void;
+  resetPublicDemo: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -1035,18 +1035,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     reloadDataForMode('PRIVATE_WORKSPACE');
   };
 
-  const resetAllData = () => {
-    if (workspaceMode === 'PUBLIC_DEMO') {
-      localStorage.removeItem('caos_demo_profile');
-      localStorage.removeItem('caos_demo_evidence');
-      localStorage.removeItem('caos_demo_projects');
-      localStorage.removeItem('caos_demo_skills');
-      localStorage.removeItem('caos_demo_jobs');
-      localStorage.removeItem('caos_demo_master_resume');
-      reloadDataForMode('PUBLIC_DEMO');
-    } else {
-      clearWorkspace();
-    }
+  const resetPublicDemo = () => {
+    if (workspaceMode !== 'PUBLIC_DEMO' || storageService.getWorkspaceMode() !== 'PUBLIC_DEMO') return;
+    storageService.resetPublicDemo();
+    epoch.current++;
+    reloadDataForMode('PUBLIC_DEMO');
+    setWorkspaceEpoch(value => value + 1);
+    setCurrentView('dashboard');
+    setIsQuickGrabOpen(false);
+    setIsAtsGuardsOpen(false);
+    setError(null);
+    setSyncStatus('');
   };
 
   return (
@@ -1124,7 +1123,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         importWorkspaceJson,
         exportWorkspaceJson,
         clearWorkspace,
-        resetAllData
+        resetPublicDemo
       }}
     >
       {children}

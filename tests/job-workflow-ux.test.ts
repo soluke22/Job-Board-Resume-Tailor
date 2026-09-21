@@ -6,7 +6,7 @@ import { DEMO_JOBS } from '../src/data/syntheticDemoData';
 
 test('only authored fit-bearing demo jobs are explicitly assessed and visible as current', () => {
   const assessed = DEMO_JOBS.filter(job => job.fit);
-  assert.deepEqual(assessed.map(job => job.id), ['job-demo-ashby-1', 'job-demo-gh-2']);
+  assert.deepEqual(assessed.map(job => job.id), ['job-demo-ready-4', 'job-demo-ashby-1', 'job-demo-gh-2']);
   for (const job of assessed) {
     assert.equal(job.assessmentStatus, 'ASSESSED');
     assert.equal(currentFit(job), job.fit);
