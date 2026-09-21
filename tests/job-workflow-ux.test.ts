@@ -2,6 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { acknowledgeWorkspaceMutation, canStartJobWorkflow, clipboardOutcome, createSavedJobRetry, createSynchronousSubmitGuard, durableUiLabel, jobRetryUi, planJobCreation, planMasterResumePersistence, planSearchProfilePersistence, runCreateAndAnalyzeJob, runJobWorkflow, shouldAdoptSerializedDraft, validateAndPersistSearchPreferences } from '../src/context/AppContext';
 import { assessmentDisplay, currentFit, jobPrimaryAction } from '../src/utils/assessmentView';
+import { DEMO_JOBS } from '../src/data/syntheticDemoData';
+
+test('only authored fit-bearing demo jobs are explicitly assessed and visible as current', () => {
+  const assessed = DEMO_JOBS.filter(job => job.fit);
+  assert.deepEqual(assessed.map(job => job.id), ['job-demo-ashby-1', 'job-demo-gh-2']);
+  for (const job of assessed) {
+    assert.equal(job.assessmentStatus, 'ASSESSED');
+    assert.equal(currentFit(job), job.fit);
+  }
+  const unassessed = DEMO_JOBS.find(job => job.id === 'job-demo-lever-3');
+  assert.ok(unassessed);
+  assert.equal(unassessed.fit, undefined);
+  assert.notEqual(unassessed.assessmentStatus, 'ASSESSED');
+  assert.equal(currentFit(unassessed), undefined);
+});
 
 test('superseded acknowledgement is not reported as saved and preserves newer storage', async () => {
   let published = false;

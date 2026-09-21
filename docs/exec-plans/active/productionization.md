@@ -1,5 +1,27 @@
 # Productionization execution plan
 
+## Assessment-status compatibility correction (2026-09-21)
+
+Scope: retain the explicit `ASSESSED` requirement in `currentFit`; mark only the
+two authored fit-bearing synthetic demo jobs as assessed; normalize persisted
+legacy jobs with missing status only after the existing owner-scoped assessment
+freshness check succeeds. Missing or unverifiable metadata becomes STALE, and
+explicit UNASSESSED/STALE remains fail-closed. Ordinary saves with a supplied fit
+and omitted status become STALE so new caller input cannot impersonate legacy
+certification. No evidence-eligibility, provenance, queue, or live-resource change.
+
+Acceptance: the focused demo/assessment/workspace/job tests, full Node 24 suite,
+release composition, privacy/runtime checks and scoped diff review pass. The
+historical browser QA remains FAIL; a new SHA-bound preview retest is still needed.
+
+Result: PASS for this bounded local correction. Focused tests 28/28, full and
+release suites 142/142, typecheck, build, harness, normal/strict privacy scans
+(zero findings), runtime and diff checks pass on Node 24.19.0. The existing
+forged-assessment regression caught and prevented re-promotion of explicit STALE;
+a separate boundary re-review found no remaining blocker/high issue. Next exact
+step: independent diff review of the local commit, then separately authorized
+publication and new SHA-bound browser acceptance. Do not revise the old QA FAIL.
+
 ## Preview QA workflow remediation (2026-09-21)
 
 Scope: remediate only the three browser-demonstrated defects from the SHA-bound

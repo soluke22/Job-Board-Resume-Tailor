@@ -91,7 +91,10 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       if (versions.length) job.versionHistory = versions;
       if (events.length) job.statusHistory = events;
       if (job.fit && job.assessmentStatus !== 'UNASSESSED') {
-        try { if (!isCurrent(job.assessmentMetadata, assessmentMetadata(job as any, output.evidence, output.searchProfile))) job.assessmentStatus = 'STALE'; }
+        try {
+          if (!isCurrent(job.assessmentMetadata, assessmentMetadata(job as any, output.evidence, output.searchProfile))) job.assessmentStatus = 'STALE';
+          else if (job.assessmentStatus === undefined) job.assessmentStatus = 'ASSESSED';
+        }
         catch { job.assessmentStatus = 'STALE'; }
       }
       return normalizeApplicationJob(job);
@@ -163,6 +166,9 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
         const previous = await snapshot(tx, ownerId);
         for (const source of input.jobs) {
           const job = normalize({ ...source });
+          // Only pre-existing legacy rows may gain ASSESSED during snapshot. A new
+          // ordinary save cannot certify a caller-supplied fit by omitting status.
+          if (job.fit && job.assessmentStatus === undefined) job.assessmentStatus = 'STALE';
           // Lifecycle history is owner-reported observation, not candidate claim
           // certification. Recursive evidence review tags must not corrupt it.
           for(const key of ['statusHistory','applicationSnapshot','historyQuarantine'])
