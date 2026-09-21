@@ -519,6 +519,7 @@ export const DEMO_JOBS: JobRecord[] = [
       'We are looking for a Frontend Product Engineer to craft responsive user interfaces, expand our shared React/TypeScript component library, and collaborate closely with product design. Requirements: 2+ years of production React and TypeScript experience, strong accessibility knowledge (WCAG), Storybook or component documentation experience, and experience connecting UI to GraphQL APIs.',
     dateAdded: '2026-09-03',
     status: 'Fit Checked',
+    assessmentStatus: 'ASSESSED',
     fit: {
       qualificationFit: 9.2,
       evidenceCoverage: 9.0,
@@ -599,6 +600,7 @@ export const DEMO_JOBS: JobRecord[] = [
       'DataRoute Cloud is hiring a Software Engineer for our Product UI team. You will build user-facing workflows, telemetry monitors, and configuration screens. Tech stack: React, TypeScript, Vite, Tailwind CSS, GraphQL backend.',
     dateAdded: '2026-09-06',
     status: 'Resume Generated',
+    assessmentStatus: 'ASSESSED',
     fit: {
       qualificationFit: 8.9,
       evidenceCoverage: 8.8,

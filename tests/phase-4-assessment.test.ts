@@ -6,6 +6,8 @@ import type { EvidenceItem, JobRecord, SearchProfile } from '../src/types';
 import { persistenceDb, syntheticJob, syntheticEvidence, approveAllEvidence } from './helpers/persistence';
 import { createWorkspaceRepository } from '../server/workspaceRepository';
 import { createAssessmentHandler } from '../server/assessmentRoutes';
+import { and, eq } from 'drizzle-orm';
+import { jobs as jobsTable } from '../server/db/schema';
 
 const jd='Acme\nReact development required\nGraphQL preferred\nContract\nMust relocate\nActive security clearance required\nAI interviewer';
 const job={id:'j',description:jd,rawDescription:jd,canonicalContentStatus:'AVAILABLE',verificationStatus:'LISTED',freshnessBand:'NEW',roleModifiers:[],assessmentStatus:'UNASSESSED'} as JobRecord;
@@ -93,6 +95,47 @@ test('fingerprints invalidate JD, evidence, profile; legacy uncertified; rejecte
   assert.ok(!isCurrent(base,assessmentMetadata({...job,freshnessBand:'OLD'},[evidence()],profile)));
   assert.ok(!isCurrent(undefined,base));
   assert.ok(isCurrent(base,assessmentMetadata(job,[evidence(),{...evidence('bad'),verificationStatus:'rejected'}],profile)));
+});
+test('owner snapshot normalizes only freshness-verified legacy assessments', async () => {
+  const {pg, db} = await persistenceDb();
+  const repo = createWorkspaceRepository(() => db as any);
+  const legacy = (id: string) => ({...syntheticJob(id), jdSource: 'user-provided' as const, rawDescription: 'Synthetic description'});
+  const current = assessmentMetadata(legacy('legacy-current') as JobRecord, [], profile);
+  const input = [
+    {...legacy('legacy-current'), assessmentMetadata: current},
+    {...legacy('legacy-stale'), assessmentMetadata: {...current, algorithmVersion: 'phase4-v1'}},
+    legacy('legacy-unverifiable'),
+    {...legacy('explicit-unassessed'), assessmentMetadata: current},
+    {...legacy('explicit-stale'), assessmentMetadata: current},
+  ];
+  try {
+    const newSave = await repo.save('owner-a', {jobs: input, searchProfile: profile}, 0);
+    assert.equal(newSave.jobs.every((item: JobRecord) => item.assessmentStatus === 'STALE'), true,
+      'ordinary saves cannot certify a newly supplied fit with omitted status');
+    const persisted = await db.select().from(jobsTable).where(eq(jobsTable.ownerId, 'owner-a'));
+    for (const row of persisted) {
+      const legacyData = {...row.data};
+      delete legacyData.assessmentStatus;
+      await db.update(jobsTable).set({data: legacyData})
+        .where(and(eq(jobsTable.ownerId, 'owner-a'), eq(jobsTable.id, row.id)));
+    }
+    const legacyRows = await db.select().from(jobsTable).where(eq(jobsTable.ownerId, 'owner-a'));
+    assert.equal(legacyRows.every(row => row.data.assessmentStatus === undefined), true, 'legacy persisted status is absent');
+    const byId = new Map<string, JobRecord>((await repo.read('owner-a')).jobs.map((item: JobRecord): [string, JobRecord] => [item.id, item]));
+    assert.equal(byId.get('legacy-current')?.assessmentStatus, 'ASSESSED');
+    assert.equal(byId.get('legacy-stale')?.assessmentStatus, 'STALE');
+    assert.equal(byId.get('legacy-unverifiable')?.assessmentStatus, 'STALE');
+
+    const explicit = legacyRows.find(row => row.id === 'explicit-unassessed')!;
+    await db.update(jobsTable).set({data: {...explicit.data, assessmentStatus: 'UNASSESSED'}})
+      .where(and(eq(jobsTable.ownerId, 'owner-a'), eq(jobsTable.id, explicit.id)));
+    const stale = legacyRows.find(row => row.id === 'explicit-stale')!;
+    await db.update(jobsTable).set({data: {...stale.data, assessmentStatus: 'STALE'}})
+      .where(and(eq(jobsTable.ownerId, 'owner-a'), eq(jobsTable.id, stale.id)));
+    const explicitSnapshot = (await repo.read('owner-a')).jobs;
+    assert.equal(explicitSnapshot.find((item: JobRecord) => item.id === explicit.id)?.assessmentStatus, 'UNASSESSED');
+    assert.equal(explicitSnapshot.find((item: JobRecord) => item.id === stale.id)?.assessmentStatus, 'STALE', 'explicit invalidation cannot be re-promoted');
+  } finally { await pg.close(); }
 });
 test('real owner repository certification, caller forgery, stale history and HTTP assessment contract',async()=>{
   const {pg,db}=await persistenceDb();const repo=createWorkspaceRepository(()=>db as any);
