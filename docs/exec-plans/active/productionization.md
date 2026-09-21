@@ -1,5 +1,11 @@
 # Productionization execution plan
 
+## Public Demo QA/testability fixture scope (2026-09-21)
+
+Baseline: clean local `dev` and `origin/dev` at `1b8e7f54be16d78c8e46d6bb49f9c950d4af2497`; `origin/main` remains `befa1282232e0fca880d78485c58ce34d2ff1308`. Add an explicitly confirmed Public Demo reset that removes only `caos_demo_*` browser records and immediately rehydrates canonical synthetic React state. Add one deterministic synthetic ASSESSED job with a current, supported READY tailored resume for Quick Grab browser acceptance. Preserve auth/private records, existing evidence approval/security contracts and production readiness checks. Acceptance: focused privacy/reset and real readiness-gate tests, full tests, typecheck/build/harness/privacy/runtime/release composition and scoped diff review; one local commit only, no push/deploy/main or live-resource action.
+
+Result: Reset is a two-step Demo Setup action, prefix-limited to `caos_demo_*`, and rehydrates all context collections, active job and remounted drafts without touching private memory or session. The fixed synthetic READY job passes current assessment, claim validation, resume inspection and the unchanged final-export fence; disabling evidence makes it stale. Node 24 focused tests 17/17 and full tests 145/145; typecheck, build, harness, privacy (zero findings), runtime and release composition pass. Sol actual-diff review and read-only security review found no BLOCKER/HIGH issues; build chunk warning and external Vercel routing/output gates remain informational/untested. Next exact step: independent diff review of the local checkpoint; no push or deployment in this task.
+
 ## Assessment-status compatibility correction (2026-09-21)
 
 Scope: retain the explicit `ASSESSED` requirement in `currentFit`; mark only the

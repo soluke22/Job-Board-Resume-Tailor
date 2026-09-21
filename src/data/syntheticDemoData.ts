@@ -449,7 +449,80 @@ export const DEMO_MASTER_RESUME: TailoredResume = {
   }
 };
 
+const DEMO_READY_JD = 'Synthetic QA role: Build React and TypeScript telemetry interfaces.';
+const DEMO_READY_REQUIREMENT = 'Build React and TypeScript telemetry interfaces';
+const DEMO_READY_REQUIREMENT_ID = 'r-54d9162e51ff135dbfc369e3';
+const DEMO_READY_EVIDENCE = DEMO_EVIDENCE_ITEMS[1].rawEvidence;
+
+// Deliberately synthetic, fixed-source assessment and certified resume for the
+// public Quick Grab success path. The server readiness test rechecks every hash,
+// evidence link and basis against the unmodified production validators.
+export const DEMO_READY_JOB: JobRecord = {
+  id: 'job-demo-ready-4', atsProvider: 'custom',
+  company: 'Synthetic QA Studio', title: 'Frontend Engineer (READY Demo)',
+  canonicalUrl: 'https://example.invalid/careeros-ready-demo',
+  applyUrl: 'https://example.invalid/careeros-ready-demo',
+  description: DEMO_READY_JD, rawDescription: DEMO_READY_JD, jdSource: 'user-provided',
+  location: 'Remote', remoteStatus: 'remote', employmentType: 'full-time',
+  firstSeenAt: '2026-09-21T00:00:00Z', verificationStatus: 'UNKNOWN',
+  isCurrentlyListed: false, freshnessBand: 'UNKNOWN', sourceChannel: 'Synthetic Public Demo Fixture',
+  primaryRoleFamily: 'frontend-product', roleModifiers: [], seniority: 'Mid',
+  hardRequirements: [DEMO_READY_REQUIREMENT], preferredRequirements: [],
+  technologies: ['React', 'TypeScript'], responsibilities: [DEMO_READY_REQUIREMENT],
+  hiringSignals: [], hardBlockers: [], softGaps: [],
+  qualificationFit: 8, evidenceCoverage: 8, applicationPriority: 'STRONG',
+  priorityReason: 'Synthetic approved Nova telemetry evidence supports the stated frontend requirement.',
+  applicationStatus: 'TAILORED', status: 'Resume Generated', assessmentStatus: 'ASSESSED',
+  dateAdded: '2026-09-21',
+  requirements: [{ id: DEMO_READY_REQUIREMENT_ID, kind: 'hard', excerpt: DEMO_READY_REQUIREMENT,
+    start: DEMO_READY_JD.indexOf(DEMO_READY_REQUIREMENT), end: DEMO_READY_JD.indexOf(DEMO_READY_REQUIREMENT) + DEMO_READY_REQUIREMENT.length }],
+  evidenceMatches: [{ id: DEMO_READY_REQUIREMENT_ID, requirement: DEMO_READY_REQUIREMENT, isHardRequirement: true,
+    candidateEvidence: DEMO_READY_EVIDENCE, strength: 'Strong', relationship: 'direct', gap: '', supportingEvidenceIds: ['demo-ev-2'] }],
+  parsed: { company: 'Synthetic QA Studio', roleTitle: 'Frontend Engineer (READY Demo)', seniority: 'Mid', employmentType: 'full-time',
+    locationExpectations: 'Remote', coreResponsibilities: [DEMO_READY_REQUIREMENT], hardRequirements: [DEMO_READY_REQUIREMENT],
+    preferredRequirements: [], primaryTechnologies: ['React', 'TypeScript'], productDomainExpectations: '', recruiterScreeningSignals: [],
+    classifiedFamily: 'frontend-product', familyRationale: 'Synthetic frontend telemetry role' },
+  fit: { qualificationFit: 8, evidenceCoverage: 8, applicationPriority: 'STRONG', initialFitScore: 8, tailoredFitScore: 8,
+    recommendation: 'APPLY', verdict: 'Apply', verdictReason: 'Synthetic approved evidence directly supports the stated requirement.',
+    strongestMatch: DEMO_READY_EVIDENCE, biggestActualGap: 'No documented gap in the single synthetic requirement.',
+    blockers: [], unsupportedRequirements: [], canTailor: true },
+  assessmentMetadata: { algorithmVersion: 'phase4.1-v3', jdHash: '989e275d240c5323cb7b3064dd94fe0f19dccf07ee446323e1f8557a6c7ab8c2',
+    evidenceFingerprint: 'bdd0d0be44355305e8b9f794a3ed4c3c154d4c696f5bcd7bc926402b817eedcc',
+    profileFingerprint: '1b93b4218b39c8a66e25f18ce32225e9613ddbc1d7e585ed700d1f616a7bac04', assessedAt: '2026-09-21T00:00:00Z', source: 'user-provided' },
+  tailoredResume: {
+    id: 'resume-demo-ready-4', jobId: 'job-demo-ready-4', roleFamily: 'frontend-product',
+    header: structuredClone(DEMO_MASTER_RESUME.header), education: structuredClone(DEMO_MASTER_RESUME.education),
+    professionalSummary: DEMO_READY_EVIDENCE,
+    skills: [{ category: 'Technical', skills: ['React'] }],
+    experience: [{ id: 'demo-exp-2', employer: 'Nova Analytics Labs', title: 'Software Engineer', period: '2022 - 2023',
+      location: 'San Francisco, CA', bullets: [{ id: 'demo-ready-b-1', section: 'experience', parentId: 'demo-exp-2', text: DEMO_READY_EVIDENCE,
+        targetRequirement: DEMO_READY_REQUIREMENT, evidenceSource: 'demo-ev-2', whyThisBullet: 'Exact approved synthetic evidence.',
+        underlyingEvidence: '', supportingEvidenceId: 'demo-ev-2', provenanceStatus: 'verified', enabled: true }] }],
+    projects: [], pageEstimate: { isOnePage: false, estimatedLines: 0, overflowRisk: 'moderate', trimSuggestions: ['Confirm page fit in print preview.'] },
+    basis: { assessmentFingerprint: 'e9c17b1d54aadd8cac44d198d64c4cd358fb7a09f227d3999baf32a0fa0b8b44',
+      jdHash: '989e275d240c5323cb7b3064dd94fe0f19dccf07ee446323e1f8557a6c7ab8c2',
+      evidenceFingerprint: 'ade3b404d31b979f3fa42ccb6615c32dfd70131d2ed72db25220482766118080',
+      profileFingerprint: '1b93b4218b39c8a66e25f18ce32225e9613ddbc1d7e585ed700d1f616a7bac04',
+      masterFingerprint: '6738236cd5f69650fb4dff70e1be0c0ac4e4179dcdba1a7766d50e55d974ce5b', tailoringAlgorithmVersion: 'phase5-extractive-v1' },
+    claimLedger: [
+      { claimId: 'summary', artifactId: 'resume-demo-ready-4', claimType: 'summary', scopeId: '', text: DEMO_READY_EVIDENCE,
+        textHash: '03ad0036e01f1d06622baede1966f567dbe5c54328fbdb8b40ad27a87f840eb3', sourceKind: 'evidence', supportingEvidenceIds: ['demo-ev-2'], supportingProjectIds: [],
+        targetRequirementIds: [DEMO_READY_REQUIREMENT_ID], generationMode: 'generated', validationStatus: 'verified',
+        validatedTextHash: '03ad0036e01f1d06622baede1966f567dbe5c54328fbdb8b40ad27a87f840eb3', validatedAt: '2026-09-21T00:00:00Z', validationAlgorithmVersion: 'phase5-extractive-v1', issues: [] },
+      { claimId: 'demo-ready-b-1', artifactId: 'resume-demo-ready-4', claimType: 'experience', scopeId: 'demo-exp-2', text: DEMO_READY_EVIDENCE,
+        textHash: '03ad0036e01f1d06622baede1966f567dbe5c54328fbdb8b40ad27a87f840eb3', sourceKind: 'evidence', supportingEvidenceIds: ['demo-ev-2'], supportingProjectIds: [],
+        targetRequirementIds: [DEMO_READY_REQUIREMENT_ID], generationMode: 'generated', validationStatus: 'verified',
+        validatedTextHash: '03ad0036e01f1d06622baede1966f567dbe5c54328fbdb8b40ad27a87f840eb3', validatedAt: '2026-09-21T00:00:00Z', validationAlgorithmVersion: 'phase5-extractive-v1', issues: [] },
+      { claimId: 'skill-20c5089fb59b351df406cbad', artifactId: 'resume-demo-ready-4', claimType: 'skill', scopeId: '', text: 'React',
+        textHash: '8547fea176beffc6b9ba494c67799714bd6d8955fa65c4db4bfc1f09d18fe697', sourceKind: 'evidence', supportingEvidenceIds: ['demo-ev-2'], supportingProjectIds: [],
+        targetRequirementIds: [DEMO_READY_REQUIREMENT_ID], generationMode: 'generated', validationStatus: 'verified',
+        validatedTextHash: '8547fea176beffc6b9ba494c67799714bd6d8955fa65c4db4bfc1f09d18fe697', validatedAt: '2026-09-21T00:00:00Z', validationAlgorithmVersion: 'phase5-extractive-v1', issues: [] }
+    ], readiness: 'READY', readinessIssues: []
+  }
+};
+
 export const DEMO_JOBS: JobRecord[] = [
+  DEMO_READY_JOB,
   {
     id: 'job-demo-ashby-1',
     atsProvider: 'ashby',
