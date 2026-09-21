@@ -1,5 +1,30 @@
 # Productionization execution plan
 
+## Preview QA workflow remediation (2026-09-21)
+
+Scope: remediate only the three browser-demonstrated defects from the SHA-bound
+`08926658` dev-preview QA: distinguish local Search Preferences validation from
+durable-save failure, retain the Add Job modal through saved-job analysis failure
+with stable-ID retry semantics, and prevent unassessed or stale Job views from
+rendering assessment-derived conclusions. Preserve the existing revisioned
+persistence queue, owner-only fail-closed behavior, evidence trust/review model,
+assessment/artifact invalidation, and Quick Grab fences. The QA documentation
+commit immediately below this work is not a product baseline change.
+
+Acceptance: focused behavioral tests prove validation, creation/retry/navigation,
+and assessment display contracts; Node 24 release checks and whitespace checks
+pass; protected storage/API/server/evidence-review contracts are unchanged. A new
+SHA-bound browser preview retest remains required before the original QA FAIL may
+be reconsidered. No remote, deployment, or live-resource action is in scope.
+
+Builder result: PASS after one consolidated correction cycle. Sol accepted the
+actual diff with no remaining blocker/high defect in the three scoped workflows.
+Independent Node 24.19.0 clean install, focused UX suites (25/25), full and
+release suites (140/140), typecheck, build, harness, privacy, runtime, and
+whitespace checks pass. The remediation preserves the original preview QA FAIL;
+next exact step is independent diff review, then separate publication and new
+SHA-bound browser acceptance only when authorized.
+
 ## Daily-workflow UX correctness scope (2026-09-20)
 
 Authorized baseline: clean `dev` and `origin/dev` at `41a3e96`; `origin/main`

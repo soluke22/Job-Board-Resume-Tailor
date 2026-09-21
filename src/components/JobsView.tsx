@@ -1,4 +1,4 @@
-import { currentFit } from '../utils/assessmentView';
+import { currentFit, jobPrimaryAction } from '../utils/assessmentView';
 import React, { useState } from 'react';
 import {
   PlusCircle,
@@ -129,8 +129,8 @@ export const JobsView: React.FC = () => {
           </div>
         ) : (
           filteredJobs.map((job) => {
-            const verdict = currentFit(job)?.verdict || 'Borderline';
-            const canTailor = currentFit(job)?.canTailor ?? true;
+            const verdict = currentFit(job)?.verdict;
+            const primaryAction = jobPrimaryAction(job);
 
             return (
               <div
@@ -147,7 +147,7 @@ export const JobsView: React.FC = () => {
                         {job.parsed.classifiedFamily}
                       </span>
                     )}
-                    {currentFit(job) && (
+                    {verdict && (
                       <span
                         className={`px-2.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider flex items-center space-x-1 ${
                           verdict === 'Apply'
@@ -208,7 +208,7 @@ export const JobsView: React.FC = () => {
                     Fit & Evidence
                   </button>
 
-                  {canTailor ? (
+                  {primaryAction === 'Tailor Studio' ? (
                     <button
                       onClick={() => openResumeEditor(job.id)}
                       className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors flex items-center space-x-1.5 shadow-xs cursor-pointer"
@@ -219,9 +219,9 @@ export const JobsView: React.FC = () => {
                   ) : (
                     <button
                       onClick={() => openJobDetail(job.id)}
-                      className="px-3 py-1.5 text-xs font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-lg cursor-pointer"
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg cursor-pointer ${primaryAction === 'Skip Guardrail' ? 'text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900' : 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900'}`}
                     >
-                      Skip Guardrail
+                      {primaryAction}
                     </button>
                   )}
 

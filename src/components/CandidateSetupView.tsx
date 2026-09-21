@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createSynchronousSubmitGuard, durableUiLabel, shouldAdoptCandidateDraft, useApp } from '../context/AppContext';
+import { createSynchronousSubmitGuard, durableUiLabel, shouldAdoptCandidateDraft, useApp, validateAndPersistSearchPreferences, validateSearchPreferencesDraft } from '../context/AppContext';
 import { previewImport, readLegacyWorkspace, selectedImport, type ImportChoice } from '../services/legacyImport';
 import { PrivateFilesView } from './PrivateFilesView';
 
@@ -16,6 +16,7 @@ export const CandidateSetupView: React.FC = () => {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPreferences, setSavingPreferences] = useState(false);
   const [preferencesSaveState, setPreferencesSaveState] = useState<'clean' | 'dirty' | 'saving' | 'saved' | 'failed'>('clean');
+  const [preferencesValidationError, setPreferencesValidationError] = useState('');
   const profileSubmitting = useRef(createSynchronousSubmitGuard());
   const preferencesSubmitting = useRef(createSynchronousSubmitGuard());
   const privateMode = workspaceMode === 'PRIVATE_WORKSPACE' && authSession.isOwner;
@@ -65,14 +66,17 @@ export const CandidateSetupView: React.FC = () => {
     <section className={box}>
       <h2 className="font-semibold">Search preferences</h2>
       <p className="text-sm text-slate-500">Set role families, locations, technologies and compensation constraints. Blank values stay unspecified.</p>
-      <textarea aria-label="Search preferences JSON" className={input + ' font-mono h-48'} value={preferences} onChange={event => { setPreferences(event.target.value); setPreferencesSaveState('dirty'); }} />
+      <textarea aria-label="Search preferences JSON" className={input + ' font-mono h-48'} value={preferences} onChange={event => { setPreferences(event.target.value); setPreferencesSaveState('dirty'); setPreferencesValidationError(''); }} />
       <button disabled={savingPreferences} className="text-emerald-600 font-medium disabled:opacity-40" onClick={async () => {
+        const validation = validateSearchPreferencesDraft(preferences);
+        if (validation.kind === 'invalid') { setPreferencesSaveState('dirty'); setPreferencesValidationError(validation.message); return; }
         if (!preferencesSubmitting.current.acquire()) return;
-        setSavingPreferences(true); setPreferencesSaveState('saving'); setMessage('');
-        try { const value = JSON.parse(preferences); if (!Array.isArray(value.preferredRoleFamilies) || !Array.isArray(value.technologyStrengths)) throw new Error('Expected a complete search profile object.'); await saveSearchProfile(value); setPreferencesSaveState('saved'); setMessage(privateMode ? 'Search preferences saved privately.' : 'Demo search preferences updated.'); }
+        setSavingPreferences(true); setPreferencesSaveState('saving'); setPreferencesValidationError(''); setMessage('');
+        try { await validateAndPersistSearchPreferences(preferences, saveSearchProfile); setPreferencesSaveState('saved'); setMessage(privateMode ? 'Search preferences saved privately.' : 'Demo search preferences updated.'); }
         catch (err: any) { setPreferencesSaveState('failed'); setMessage(err.message || 'Search preferences were not saved. Reload required.'); }
         finally { preferencesSubmitting.current.release(); setSavingPreferences(false); }
       }}>{savingPreferences ? 'Saving…' : 'Save search preferences'}</button><span role="status" aria-live="polite" className="ml-3 text-xs">{durableUiLabel(preferencesSaveState === 'clean' && preferencesIsDirty ? 'dirty' : preferencesSaveState, privateMode)}</span>
+      {preferencesValidationError && <p role="alert" className="text-sm text-rose-600">{preferencesValidationError}</p>}
     </section>
     <section className={box}>
       <h2 className="font-semibold">Master resume and evidence</h2>
