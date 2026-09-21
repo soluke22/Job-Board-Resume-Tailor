@@ -87,11 +87,51 @@ export const durableUiLabel = (state: DurableUiState, privateMode: boolean) => s
 export const shouldAdoptSerializedDraft = (draft: unknown, adopted: unknown) => JSON.stringify(draft) === JSON.stringify(adopted);
 export async function clipboardOutcome(write: (text: string) => Promise<void>, text: string): Promise<'copied' | 'failed'> { try { await write(text); return 'copied'; } catch { return 'failed'; } }
 
+export type SearchPreferencesValidation = { kind: 'valid'; value: SearchProfile } | { kind: 'invalid'; message: string };
+export function validateSearchPreferencesDraft(draft: string): SearchPreferencesValidation {
+  try {
+    const value = JSON.parse(draft);
+    if (!Array.isArray(value.preferredRoleFamilies) || !Array.isArray(value.technologyStrengths)) {
+      throw new Error('Expected a complete search profile object.');
+    }
+    return { kind: 'valid', value };
+  } catch {
+    return { kind: 'invalid', message: 'Invalid search preferences. Fix the JSON and try again.' };
+  }
+}
+export async function validateAndPersistSearchPreferences(
+  draft: string, persist: (profile: SearchProfile) => Promise<void>
+): Promise<SearchPreferencesValidation> {
+  const validation = validateSearchPreferencesDraft(draft);
+  if (validation.kind === 'valid') await persist(validation.value);
+  return validation;
+}
+
 export type JobWorkflowOutcome = { kind: 'analyzed'; jobId: string } | { kind: 'analysis-failed'; jobId: string; message: string };
 export async function runJobWorkflow(create: () => Promise<JobRecord>, analyze: (jobId: string) => Promise<void>, existingJobId?: string): Promise<JobWorkflowOutcome> {
   const jobId = existingJobId || (await create()).id;
   try { await analyze(jobId); return { kind: 'analyzed', jobId }; }
   catch (error: any) { return { kind: 'analysis-failed', jobId, message: error?.message || 'Job analysis failed' }; }
+}
+export async function runCreateAndAnalyzeJob(
+  create: () => Promise<JobRecord>, analyze: (jobId: string) => Promise<void>, navigate: (jobId: string) => void, existingJobId?: string
+): Promise<JobWorkflowOutcome> {
+  const outcome = await runJobWorkflow(create, analyze, existingJobId);
+  if (outcome.kind === 'analyzed') navigate(outcome.jobId);
+  return outcome;
+}
+export type SavedJobRetry<T> = { jobId: string; draft: Readonly<T> };
+export function createSavedJobRetry<T extends object>(jobId: string, draft: T): SavedJobRetry<T> {
+  return { jobId, draft: Object.freeze({ ...draft }) };
+}
+export function jobRetryUi(pendingJobId?: string) {
+  const retryingSavedJob = !!pendingJobId;
+  return {
+    fieldsDisabled: retryingSavedJob,
+    presetsDisabled: retryingSavedJob,
+    fetchDisabled: retryingSavedJob,
+    primaryLabel: retryingSavedJob ? 'Retry analysis' : 'Analyze Fit'
+  };
 }
 export const canStartJobWorkflow = (isFetching: boolean, isWorking: boolean) => !isFetching && !isWorking;
 export const planJobCreation = (currentJobs: JobRecord[], job: JobRecord) => [job, ...currentJobs];
@@ -650,13 +690,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       if (outcome.kind === 'superseded') throw new Error('Job creation was superseded by newer workspace changes. Reload required.');
     } else setJobs(updated);
-    setActiveJobId(newJob.id);
-    setCurrentView('job-detail');
     return newJob;
   };
 
   const createAndAnalyzeJob = async (rawDescription: string, sourceUrl?: string, company?: string, title?: string, userProvided = true, existingJobId?: string) => {
-    return runJobWorkflow(() => addJob(rawDescription, sourceUrl, company, title, userProvided), analyzeJob, existingJobId);
+    return runCreateAndAnalyzeJob(() => addJob(rawDescription, sourceUrl, company, title, userProvided), analyzeJob, openJobDetail, existingJobId);
   };
 
   const deleteJob = (id: string) => {
