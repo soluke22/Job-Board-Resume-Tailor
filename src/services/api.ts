@@ -58,12 +58,21 @@ async function privateFetch(input: string, init?: RequestInit): Promise<Response
 export async function workspaceRequest(path: string, init?: RequestInit): Promise<any> {
   const epoch = generation;
   const response = await fetchPrivateResponse(path, init);
-  const data = await readPrivateBody(response, epoch, true);
+  const body = await readPrivateBody(response, epoch, false);
   if (epoch !== generation) throw new Error('Session changed');
+  let data: any;
+  try { data = JSON.parse(body); } catch {
+    if (epoch === generation && storageService.getAuthSession().isAuthenticated) window.dispatchEvent(new Event('workspace-access-lost'));
+    data = undefined;
+  }
   if (!response.ok) {
     accessLost(response);
-    throw new Error(data.error || 'Private workspace service unavailable');
+    const message = typeof data?.error === 'string' && data.error.trim()
+      ? data.error
+      : `Private workspace service unavailable (HTTP ${response.status})`;
+    throw new Error(message);
   }
+  if (data === undefined) throw new Error(`Private workspace returned an invalid response (HTTP ${response.status})`);
   return data;
 }
 const jsonRequest = (data: any) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });

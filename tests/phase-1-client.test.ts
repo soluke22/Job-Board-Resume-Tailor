@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { storageService } from '../src/services/storage';
 import { apiService, workspaceRequest, invalidatePrivateRequests, setBeforePrivateRequest, signOutPrivateWorkspace } from '../src/services/api';
+import { shouldDismissAuthModal } from '../src/components/AuthModal';
 
 const browser = new EventTarget();
 const values = new Map<string, string>();
@@ -60,6 +61,65 @@ test('public demo session probing does not dispatch private access-loss events d
     assert.equal(lost, 0);
     assert.ok(storageService.getEvidence('PUBLIC_DEMO').length > 0);
   } finally { globalThis.fetch = original; browser.removeEventListener('workspace-access-lost', count); loseAccess(); }
+});
+
+test('workspace requests handle JSON and empty or non-JSON responses without exposing parser or intermediary text', async () => {
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => Response.json({ authenticated: false, isOwner: false });
+    assert.deepEqual(await apiService.getSession(), { authenticated: false, isOwner: false });
+
+    globalThis.fetch = async () => Response.json({ error: 'Synthetic safe server error' }, { status: 409 });
+    await assert.rejects(workspaceRequest('/api/workspace/data'), /Synthetic safe server error/);
+
+    for (const body of ['', '<html>synthetic intermediary details</html>']) {
+      authenticate();
+      globalThis.fetch = async () => new Response(body, { status: 500, headers: { 'Content-Type': 'text/html' } });
+      await assert.rejects(workspaceRequest('/api/workspace/data'), (error: Error) => {
+        assert.match(error.message, /Private workspace service unavailable \(HTTP 500\)/);
+        assert.doesNotMatch(error.message, /Unexpected end of JSON input|synthetic intermediary details|<html>/);
+        return true;
+      });
+      assert.equal(storageService.getAuthSession().isAuthenticated, false);
+    }
+
+    authenticate();
+    globalThis.fetch = async () => new Response('{broken', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    await assert.rejects(apiService.getSession(), (error: Error) => {
+      assert.match(error.message, /Private workspace returned an invalid response \(HTTP 200\)/);
+      assert.doesNotMatch(error.message, /SyntaxError|Unexpected end of JSON input/);
+      return true;
+    });
+    assert.equal(storageService.getAuthSession().isAuthenticated, false);
+    assert.deepEqual(storageService.getEvidence('PRIVATE_WORKSPACE'), []);
+
+    authenticate();
+    globalThis.fetch = async () => new Response('', { status: 403 });
+    await assert.rejects(workspaceRequest('/api/workspace/data'), /Private workspace service unavailable \(HTTP 403\)/);
+    assert.equal(storageService.getAuthSession().isAuthenticated, false);
+    assert.deepEqual(storageService.getEvidence('PRIVATE_WORKSPACE'), []);
+  } finally { globalThis.fetch = original; loseAccess(); }
+});
+
+test('auth modal Escape and backdrop decisions dismiss only while idle and only on the backdrop', async () => {
+  assert.equal(shouldDismissAuthModal('escape', false), true);
+  assert.equal(shouldDismissAuthModal('backdrop', false, true), true);
+  assert.equal(shouldDismissAuthModal('backdrop', false, false), false);
+  assert.equal(shouldDismissAuthModal('escape', true), false);
+  assert.equal(shouldDismissAuthModal('backdrop', true, true), false);
+
+  const source = await readFile('src/components/AuthModal.tsx', 'utf8');
+  assert.match(source, /document\.addEventListener\('keydown', onKeyDown\)/);
+  assert.match(source, /event\.key === 'Escape' && shouldDismissAuthModal\('escape', isBusy \|\| activeOperation\.current\)/);
+  assert.match(source, /shouldDismissAuthModal\('backdrop', isBusy \|\| activeOperation\.current, event\.target === event\.currentTarget\)/);
+  assert.match(source, /onClick=\{\(\) => setIsAuthModalOpen\(false\)\}/);
+  assert.match(source, /role="dialog"[\s\S]*aria-modal="true"[\s\S]*aria-labelledby="auth-modal-title"/);
+  const escapeHandler = source.slice(source.indexOf('const onKeyDown'), source.indexOf("document.addEventListener('keydown'"));
+  const backdropHandler = source.slice(source.indexOf("shouldDismissAuthModal('backdrop'"), source.indexOf('role="dialog"'));
+  for (const handler of [escapeHandler, backdropHandler]) {
+    assert.match(handler, /setIsAuthModalOpen\(false\)/);
+    assert.doesNotMatch(handler, /setWorkspaceMode\(|logout\(/);
+  }
 });
 
 test('stale workspace save reports conflict without auto-merge, demo substitution or cache overwrite; reload adopts server state', async () => {
