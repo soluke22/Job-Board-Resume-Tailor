@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Shield, ShieldAlert, ShieldCheck, Lock, Key, LogOut, CheckCircle2, AlertTriangle, EyeOff } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+
+export function shouldDismissAuthModal(kind: 'escape' | 'backdrop', busy: boolean, isBackdrop = false): boolean {
+  return !busy && (kind === 'escape' || isBackdrop);
+}
 
 export const AuthModal: React.FC = () => {
   const {
@@ -17,12 +21,29 @@ export const AuthModal: React.FC = () => {
   } = useApp();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const activeOperation = useRef(false);
+  const isBusy = isSubmitting || isSigningOut || signOutPending;
+
+  useEffect(() => {
+    if (!isAuthModalOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && shouldDismissAuthModal('escape', isBusy || activeOperation.current)) {
+        event.preventDefault();
+        setIsAuthModalOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isAuthModalOpen, isBusy, setIsAuthModalOpen]);
 
   if (!isAuthModalOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (activeOperation.current) return;
+    activeOperation.current = true;
     setLoginError(null);
     clearError();
     setIsSubmitting(true);
@@ -35,6 +56,7 @@ export const AuthModal: React.FC = () => {
     } catch (err: any) {
       setLoginError(err.message || 'Login failed');
     } finally {
+      activeOperation.current = false;
       setIsSubmitting(false);
     }
   };
@@ -45,11 +67,24 @@ export const AuthModal: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    if (await logout()) setIsAuthModalOpen(false);
+    if (activeOperation.current) return;
+    activeOperation.current = true;
+    setIsSigningOut(true);
+    try {
+      if (await logout()) setIsAuthModalOpen(false);
+    } finally {
+      activeOperation.current = false;
+      setIsSigningOut(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4"
+      onClick={(event) => {
+        if (shouldDismissAuthModal('backdrop', isBusy || activeOperation.current, event.target === event.currentTarget)) setIsAuthModalOpen(false);
+      }}
+    >
       <div
         className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden text-slate-100"
         role="dialog"
