@@ -76,6 +76,24 @@ export async function workspaceRequest(path: string, init?: RequestInit): Promis
   return data;
 }
 const jsonRequest = (data: any) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+
+export function privateSignInFailureNotice(search: string): string | null {
+  return new URLSearchParams(search).get('workspace') === 'private'
+    ? 'Private sign-in was not accepted. Continue with the configured owner Google account.'
+    : null;
+}
+
+export function clearPrivateSignInIntent(location?: Pick<Location, 'href'>, history?: Pick<History, 'state' | 'replaceState'>): boolean {
+  if (!location || !history) return false;
+  try {
+    const url = new URL(location.href);
+    if (url.searchParams.get('workspace') !== 'private') return false;
+    url.searchParams.delete('workspace');
+    history.replaceState(history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    return true;
+  } catch { return false; }
+}
+
 export const apiService = {
   async approveEvidence(evidenceId: string, revision: number, contentHash: string): Promise<any> {
     const res = await privateFetch('/api/workspace/evidence-approval', jsonRequest({ evidenceId, revision, contentHash }));
@@ -210,4 +228,5 @@ export async function signOutPrivateWorkspace(clearClient: () => void): Promise<
   // durable server revocation or its retry.
   try { localStorage.setItem('caos_logout_event', String(Date.now())); } catch {}
   await apiService.logout();
+  clearPrivateSignInIntent(window.location, window.history);
 }

@@ -24,7 +24,7 @@ import {
   RecruiterOutreach
 } from '../types';
 import { storageService } from '../services/storage';
-import { apiService, setBeforePrivateRequest, invalidatePrivateRequests, signOutPrivateWorkspace } from '../services/api';
+import { apiService, setBeforePrivateRequest, invalidatePrivateRequests, signOutPrivateWorkspace, privateSignInFailureNotice, clearPrivateSignInIntent } from '../services/api';
 
 export type AppView =
   | 'dashboard'
@@ -412,7 +412,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const session = await apiService.getSession();
         if (cancelled || started !== epoch.current) return;
         if (!session.authenticated || !session.isOwner) {
-          if (new URLSearchParams(window.location.search).get('workspace') === 'private') setError('Private sign-in was not accepted. Continue with the configured owner Google account.');
+          const notice = privateSignInFailureNotice(window.location.search);
+          if (notice) setError(notice);
           return;
         }
         const result = await apiService.getWorkspaceData();
@@ -423,9 +424,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setWorkspaceModeState('PRIVATE_WORKSPACE');
         setCurrentView(result.data?.profile?.name ? 'dashboard' : 'candidate-setup');
         setSyncStatus('Saved privately');
+        clearPrivateSignInIntent(window.location, window.history);
         scheduleExpiry(session.expiresAt);
       } catch (err: any) {
-        if (!cancelled && started === epoch.current && new URLSearchParams(window.location.search).get('workspace') === 'private') setError(err.message);
+        if (!cancelled && started === epoch.current && privateSignInFailureNotice(window.location.search)) setError(err.message);
       } finally { if (!cancelled) setSessionLoading(false); }
     };
     void restore();
