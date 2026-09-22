@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { canHideAdvancedPreferences, commonSearchPreferences, composeSearchPreferencesDraft, isPrivateOnboarding, mergeCommonSearchPreferences, ordinaryRoleFamilies, privateOnboardingSteps, ROLE_FAMILY_OPTIONS, toggleOrdinaryRoleFamily } from '../src/components/CandidateSetupView';
+import { applyAdvancedSearchPreferencesDraft, canHideAdvancedPreferences, commonSearchPreferences, isPrivateOnboarding, mergeCommonSearchPreferences, ordinaryRoleFamilies, privateOnboardingSteps, ROLE_FAMILY_OPTIONS, toggleOrdinaryRoleFamily } from '../src/components/CandidateSetupView';
 import { importDestination, importReviewWarning, previewImport, selectedImport } from '../src/services/legacyImport';
 import { DEFAULT_SEARCH_PROFILE } from '../src/data/privateSeedTemplate';
 
@@ -35,18 +35,46 @@ test('ordinary role-family checkboxes map only the exact PrimaryRoleFamily value
   assert.throws(() => toggleOrdinaryRoleFamily([], 'unknown-family'), /Unsupported ordinary role family/);
 });
 
-test('advanced and ordinary preferences compose deterministically, with visible controls authoritative', () => {
-  const original: any = { ...structuredClone(DEFAULT_SEARCH_PROFILE), salaryPreference: { minTarget: 100000 }, preferredModifiers: ['platform'], technologyStrengths: ['Before'] };
-  const common = { ...commonSearchPreferences(original), technologyStrengths: 'Visible React' };
-  const advanced = { ...original, salaryPreference: { minTarget: 180000 }, preferredModifiers: ['design-systems'], technologyStrengths: ['Hidden override'] };
-  const composed = composeSearchPreferencesDraft(JSON.stringify(advanced), common, original);
-  assert.equal(composed.kind, 'valid');
-  if (composed.kind === 'valid') {
-    assert.deepEqual(composed.value.salaryPreference, { minTarget: 180000 }, 'advanced-only field survives');
-    assert.deepEqual(composed.value.preferredModifiers, ['design-systems'], 'advanced-only modifier survives');
-    assert.deepEqual(composed.value.technologyStrengths, ['Visible React'], 'ordinary field wins over conflicting advanced JSON');
-  }
-  assert.deepEqual(composeSearchPreferencesDraft('{ broken', common, original), { kind: 'invalid', message: 'Invalid search preferences. Fix the JSON and try again.' });
+test('unknown role families survive unrelated edits and toggling a known checkbox', () => {
+  const original: any = { ...structuredClone(DEFAULT_SEARCH_PROFILE), preferredRoleFamilies: ['frontend', 'legacy-family'] };
+  const common = commonSearchPreferences(original);
+  assert.deepEqual(common.roleFamilies, [], 'unknown values are not invented as checkbox options');
+  const locationOnly = mergeCommonSearchPreferences(original, { ...common, locations: 'Boston' });
+  assert.deepEqual(locationOnly.preferredRoleFamilies, ['frontend', 'legacy-family']);
+  assert.deepEqual(locationOnly.hybridLocations, ['Boston']);
+  const toggled = mergeCommonSearchPreferences(original, { ...common, roleFamilies: toggleOrdinaryRoleFamily(common.roleFamilies, 'frontend-product') });
+  assert.deepEqual(toggled.preferredRoleFamilies, ['frontend', 'legacy-family', 'frontend-product']);
+  assert.deepEqual(mergeCommonSearchPreferences(original, common), original, 'untouched values round-trip exactly');
+});
+
+test('applied Advanced JSON owns the full profile and later structured edits preserve unrelated fields', () => {
+  const original: any = { ...structuredClone(DEFAULT_SEARCH_PROFILE), preferredRoleFamilies: ['legacy-family'], salaryPreference: { minTarget: 100000 }, technologyStrengths: ['Before'] };
+  const advanced = { ...original, salaryPreference: { minTarget: 180000 }, technologyStrengths: ['Advanced React'], targetSeniority: ['Principal'], preferredRoleFamilies: ['legacy-family', 'frontend-product'] };
+  const applied = applyAdvancedSearchPreferencesDraft(JSON.stringify(advanced));
+  assert.equal(applied.kind, 'valid');
+  if (applied.kind !== 'valid') return;
+  assert.deepEqual(applied.common.roleFamilies, ['frontend-product']);
+  assert.equal(applied.common.technologyStrengths, 'Advanced React');
+  assert.equal(applied.common.seniority, 'Principal');
+  assert.deepEqual(mergeCommonSearchPreferences(applied.value, applied.common), advanced, 'save payload exactly matches the applied full JSON');
+  const laterCommon = { ...applied.common, locations: 'Boston', roleFamilies: toggleOrdinaryRoleFamily(applied.common.roleFamilies, 'forward-deployed-software') };
+  const savePayload = mergeCommonSearchPreferences(applied.value, laterCommon);
+  assert.deepEqual(savePayload.preferredRoleFamilies, ['legacy-family', 'frontend-product', 'forward-deployed-software']);
+  assert.deepEqual(savePayload.technologyStrengths, ['Advanced React']);
+  assert.deepEqual(savePayload.targetSeniority, ['Principal']);
+  assert.deepEqual(savePayload.salaryPreference, { minTarget: 180000 });
+  assert.deepEqual(savePayload.hybridLocations, ['Boston']);
+  assert.deepEqual(JSON.parse(JSON.stringify(savePayload)), savePayload, 'serialized save payload is the composed profile without a second overwrite');
+  assert.deepEqual(applyAdvancedSearchPreferencesDraft('{ broken'), { kind: 'invalid', message: 'Invalid search preferences. Fix the JSON and try again.' });
+  assert.equal(applyAdvancedSearchPreferencesDraft('{"preferredRoleFamilies":[],"technologyStrengths":[]}').kind, 'invalid', 'incomplete valid JSON is rejected locally');
+});
+
+test('Setup applies full JSON before saving the composed profile', async () => {
+  const source = await readFile('src/components/CandidateSetupView.tsx', 'utf8');
+  assert.match(source, /const applied = applyAdvancedSearchPreferencesDraft\(preferences\)/);
+  assert.match(source, /setAppliedPreferences\(applied\.value\); setCommonPreferences\(applied\.common\)/);
+  assert.match(source, /const serialized = JSON\.stringify\(composedPreferences, null, 2\)/);
+  assert.match(source, /validateAndPersistSearchPreferences\(serialized, saveSearchProfile\)/);
 });
 
 test('import preview is selective and non-mutating with explicit destination and trust warnings', () => {
