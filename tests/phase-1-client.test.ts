@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { storageService } from '../src/services/storage';
-import { apiService, workspaceRequest, invalidatePrivateRequests, setBeforePrivateRequest, signOutPrivateWorkspace } from '../src/services/api';
+import { apiService, workspaceRequest, invalidatePrivateRequests, setBeforePrivateRequest, signOutPrivateWorkspace, privateSignInFailureNotice, clearPrivateSignInIntent } from '../src/services/api';
 import { shouldDismissAuthModal } from '../src/components/AuthModal';
 
 const browser = new EventTarget();
@@ -191,6 +191,62 @@ test('browser storage errors cannot stop server logout or retry; server errors r
     await signOutPrivateWorkspace(loseAccess);
     assert.equal(requests, 2);
   } finally { globalThis.fetch = original; localStorage.setItem = write; loseAccess(); }
+});
+
+test('private sign-in intent is only a failure notice, and URL cleanup preserves unrelated navigation', () => {
+  const notice = 'Private sign-in was not accepted. Continue with the configured owner Google account.';
+  loseAccess();
+  assert.equal(privateSignInFailureNotice('?workspace=private'), notice);
+  assert.equal(storageService.getAuthSession().isAuthenticated, false);
+  assert.equal(storageService.getWorkspaceMode(), 'PUBLIC_DEMO');
+  assert.deepEqual(storageService.getEvidence('PRIVATE_WORKSPACE'), []);
+
+  const location = { href: 'https://preview.example.invalid/?workspace=private&view=setup#search' };
+  const history = { state: { synthetic: true }, replaceState(_state: unknown, _unused: string, target?: string | URL | null) {
+    location.href = new URL(String(target), location.href).href;
+  } };
+  assert.equal(clearPrivateSignInIntent(location, history), true);
+  assert.equal(location.href, 'https://preview.example.invalid/?view=setup#search');
+  assert.equal(privateSignInFailureNotice(new URL(location.href).search), null);
+  assert.equal(clearPrivateSignInIntent(location, history), false);
+  assert.equal(storageService.getAuthSession().isAuthenticated, false);
+  assert.equal(storageService.getWorkspaceMode(), 'PUBLIC_DEMO');
+  assert.ok(storageService.getEvidence('PUBLIC_DEMO').length > 0);
+});
+
+test('successful server sign-out clears stale private intent after revocation, not after a failed attempt', async () => {
+  const originalFetch = globalThis.fetch;
+  const previousLocation = (browser as any).location;
+  const previousHistory = (browser as any).history;
+  const location = { href: 'https://preview.example.invalid/?workspace=private' };
+  let replacements = 0;
+  const history = { state: null, replaceState(_state: unknown, _unused: string, target?: string | URL | null) {
+    replacements++;
+    location.href = new URL(String(target), location.href).href;
+  } };
+  Object.assign(browser, { location, history });
+  try {
+    authenticate();
+    globalThis.fetch = async () => Response.json({ error: 'Synthetic revocation unavailable' }, { status: 503 });
+    await assert.rejects(signOutPrivateWorkspace(loseAccess), /revocation unavailable/);
+    assert.equal(location.href, 'https://preview.example.invalid/?workspace=private');
+    assert.equal(replacements, 0);
+
+    authenticate();
+    globalThis.fetch = async () => Response.json({ success: true });
+    await signOutPrivateWorkspace(loseAccess);
+    assert.equal(location.href, 'https://preview.example.invalid/');
+    assert.equal(replacements, 1);
+    assert.equal(privateSignInFailureNotice(new URL(location.href).search), null);
+    assert.equal(storageService.getWorkspaceMode(), 'PUBLIC_DEMO');
+    assert.equal(storageService.getAuthSession().isAuthenticated, false);
+    assert.deepEqual(storageService.getEvidence('PRIVATE_WORKSPACE'), []);
+    assert.ok(storageService.getEvidence('PUBLIC_DEMO').length > 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    Object.assign(browser, { location: previousLocation, history: previousHistory });
+    loseAccess();
+  }
 });
 
 test('client/server auth surfaces have no legacy bearer, URL token or persisted auth path', async () => {
