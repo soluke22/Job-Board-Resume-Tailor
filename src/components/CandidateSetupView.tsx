@@ -3,6 +3,7 @@ import { createSynchronousSubmitGuard, durableUiLabel, shouldAdoptCandidateDraft
 import { previewImport, readLegacyWorkspace, selectedImport, type ImportChoice } from '../services/legacyImport';
 import { PrivateFilesView } from './PrivateFilesView';
 import type { PrimaryRoleFamily, SearchProfile } from '../types';
+import { searchProfileSchema } from '../../server/db/workspaceValidation';
 
 export type CommonSearchPreferences = {
   roleFamilies: PrimaryRoleFamily[]; seniority: string; allowedEmploymentTypes: string; excludedEmploymentTypes: string;
@@ -48,15 +49,29 @@ export function commonSearchPreferences(profile: SearchProfile): CommonSearchPre
 // The spread deliberately preserves advanced preferences (compensation, hiring
 // process and modifiers) when the owner uses ordinary form controls.
 export function mergeCommonSearchPreferences(profile: SearchProfile, common: CommonSearchPreferences): SearchProfile {
+  const original = commonSearchPreferences(profile);
+  const selectedFamilies = new Set(ordinaryRoleFamilies(common.roleFamilies));
+  const retainedFamilies = profile.preferredRoleFamilies.filter(family =>
+    !ROLE_FAMILY_OPTIONS.some(option => option.value === family) || selectedFamilies.has(family));
+  for (const family of selectedFamilies) if (!retainedFamilies.includes(family)) retainedFamilies.push(family);
+  const changed = <K extends keyof CommonSearchPreferences>(field: K) =>
+    JSON.stringify(common[field]) !== JSON.stringify(original[field]);
   return {
     ...profile,
-    preferredRoleFamilies: ordinaryRoleFamilies(common.roleFamilies),
-    targetSeniority: listValue(common.seniority), allowedEmploymentTypes: listValue(common.allowedEmploymentTypes),
-    excludedEmploymentTypes: listValue(common.excludedEmploymentTypes), remotePreference: common.remotePreference,
-    hybridLocations: listValue(common.locations), maximumOnsiteFrequency: common.maximumOnsiteFrequency,
-    relocationAllowed: common.relocationAllowed, clearancePolicy: common.clearancePolicy,
-    excludedRolePatterns: listValue(common.roleExclusions), companyExclusions: listValue(common.companyExclusions),
-    technologyStrengths: listValue(common.technologyStrengths), technologyAdjacencies: listValue(common.technologyAdjacencies), technologyGaps: listValue(common.technologyGaps)
+    preferredRoleFamilies: changed('roleFamilies') ? retainedFamilies : profile.preferredRoleFamilies,
+    targetSeniority: changed('seniority') ? listValue(common.seniority) : profile.targetSeniority,
+    allowedEmploymentTypes: changed('allowedEmploymentTypes') ? listValue(common.allowedEmploymentTypes) : profile.allowedEmploymentTypes,
+    excludedEmploymentTypes: changed('excludedEmploymentTypes') ? listValue(common.excludedEmploymentTypes) : profile.excludedEmploymentTypes,
+    remotePreference: changed('remotePreference') ? common.remotePreference : profile.remotePreference,
+    hybridLocations: changed('locations') ? listValue(common.locations) : profile.hybridLocations,
+    maximumOnsiteFrequency: changed('maximumOnsiteFrequency') ? common.maximumOnsiteFrequency : profile.maximumOnsiteFrequency,
+    relocationAllowed: changed('relocationAllowed') ? common.relocationAllowed : profile.relocationAllowed,
+    clearancePolicy: changed('clearancePolicy') ? common.clearancePolicy : profile.clearancePolicy,
+    excludedRolePatterns: changed('roleExclusions') ? listValue(common.roleExclusions) : profile.excludedRolePatterns,
+    companyExclusions: changed('companyExclusions') ? listValue(common.companyExclusions) : profile.companyExclusions,
+    technologyStrengths: changed('technologyStrengths') ? listValue(common.technologyStrengths) : profile.technologyStrengths,
+    technologyAdjacencies: changed('technologyAdjacencies') ? listValue(common.technologyAdjacencies) : profile.technologyAdjacencies,
+    technologyGaps: changed('technologyGaps') ? listValue(common.technologyGaps) : profile.technologyGaps
   };
 }
 
@@ -68,12 +83,13 @@ export function canHideAdvancedPreferences(draft: string, profile: SearchProfile
   return draft === JSON.stringify(profile, null, 2);
 }
 
-// Common controls deliberately win for their owned fields; advanced JSON supplies
-// only the fields not represented by those visible controls.
-export function composeSearchPreferencesDraft(advancedDraft: string, common: CommonSearchPreferences, fallback: SearchProfile) {
+// Applying full JSON transfers ownership to that draft, including its common fields.
+export function applyAdvancedSearchPreferencesDraft(advancedDraft: string) {
   const parsed = validateSearchPreferencesDraft(advancedDraft);
   if (parsed.kind === 'invalid') return parsed;
-  return { kind: 'valid' as const, value: mergeCommonSearchPreferences({ ...fallback, ...parsed.value }, common) };
+  if (!searchProfileSchema.safeParse(parsed.value).success)
+    return { kind: 'invalid' as const, message: 'Invalid search preferences. Fix the JSON and try again.' };
+  return { kind: 'valid' as const, value: parsed.value, common: commonSearchPreferences(parsed.value) };
 }
 
 export function privateOnboardingSteps(state: { profileStarted: boolean; searchPreferencesStarted: boolean; masterResumeStarted: boolean; evidenceCount: number; projectCount: number; skillCount: number; jobCount: number }) {
@@ -96,8 +112,8 @@ export const CandidateSetupView: React.FC = () => {
   const adoptedProfile = useRef(profile);
   const [preferences, setPreferences] = useState(JSON.stringify(searchProfile, null, 2));
   const adoptedPreferences = useRef(JSON.stringify(searchProfile, null, 2));
+  const [appliedPreferences, setAppliedPreferences] = useState(searchProfile);
   const [commonPreferences, setCommonPreferences] = useState(() => commonSearchPreferences(searchProfile));
-  const adoptedCommonPreferences = useRef(commonSearchPreferences(searchProfile));
   const [advancedPreferencesOpen, setAdvancedPreferencesOpen] = useState(false);
   const [choices, setChoices] = useState<ImportChoice[]>([]);
   const [selected, setSelected] = useState(new Set<string>());
@@ -113,21 +129,22 @@ export const CandidateSetupView: React.FC = () => {
   const preferencesSubmitting = useRef(createSynchronousSubmitGuard());
   const privateMode = isPrivateOnboarding(workspaceMode, authSession.isOwner);
   const profileIsDirty = !shouldAdoptCandidateDraft(draft, profile);
-  const preferencesIsDirty = preferences !== JSON.stringify(searchProfile, null, 2)
-    || JSON.stringify(mergeCommonSearchPreferences(searchProfile, commonPreferences)) !== JSON.stringify(searchProfile);
+  const composedPreferences = mergeCommonSearchPreferences(appliedPreferences, commonPreferences);
+  const preferencesIsDirty = JSON.stringify(composedPreferences) !== JSON.stringify(searchProfile)
+    || advancedPreferencesOpen && !canHideAdvancedPreferences(preferences, composedPreferences);
   useEffect(() => {
     if (shouldAdoptCandidateDraft(draft, adoptedProfile.current)) setDraft(profile);
     adoptedProfile.current = profile;
   }, [draft, profile]);
   useEffect(() => {
     const canonical = JSON.stringify(searchProfile, null, 2);
-    if (preferences === adoptedPreferences.current) { setPreferences(canonical); setPreferencesSaveState('clean'); }
-    adoptedPreferences.current = canonical;
-    if (JSON.stringify(commonPreferences) === JSON.stringify(adoptedCommonPreferences.current)) {
+    if (preferences === adoptedPreferences.current
+      && JSON.stringify(mergeCommonSearchPreferences(appliedPreferences, commonPreferences), null, 2) === adoptedPreferences.current) {
+      setPreferences(canonical); setAppliedPreferences(searchProfile);
       setCommonPreferences(commonSearchPreferences(searchProfile)); setPreferencesSaveState('clean');
     }
-    adoptedCommonPreferences.current = commonSearchPreferences(searchProfile);
-  }, [preferences, commonPreferences, searchProfile]);
+    adoptedPreferences.current = canonical;
+  }, [searchProfile]);
   const preview = (items: ImportChoice[]) => { setChoices(items); setSelected(new Set()); setImportSucceeded(false); setMessage(items.length ? 'Preview only: select individual records to import. Nothing has been uploaded or changed.' : 'No legacy records found.'); };
   const exportData = async () => {
     try {
@@ -170,6 +187,7 @@ export const CandidateSetupView: React.FC = () => {
     <section className={box}>
       <h2 className="font-semibold">Search preferences</h2>
       <p className="text-sm text-slate-500">Use ordinary controls for common preferences. Separate multiple values with semicolons; blank values stay unspecified.</p>
+      <fieldset disabled={savingPreferences || advancedPreferencesOpen}>
       <div className="grid sm:grid-cols-2 gap-3">{([
         ['seniority', 'Target seniority'], ['locations', 'Hybrid or onsite locations'], ['maximumOnsiteFrequency', 'Maximum onsite frequency'],
         ['allowedEmploymentTypes', 'Allowed employment types'], ['excludedEmploymentTypes', 'Excluded employment types'], ['roleExclusions', 'Role exclusions'], ['companyExclusions', 'Company exclusions'],
@@ -180,21 +198,37 @@ export const CandidateSetupView: React.FC = () => {
         <label className="text-sm">Clearance roles<select className={input} value={commonPreferences.clearancePolicy} onChange={event => { setCommonPreferences(previous => ({ ...previous, clearancePolicy: event.target.value as SearchProfile['clearancePolicy'] })); setPreferencesSaveState('dirty'); }}><option value="exclude_clearance">Exclude roles requiring clearance</option><option value="open_to_clearance">Open to clearance roles</option></select></label>
         <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={commonPreferences.relocationAllowed} onChange={event => { setCommonPreferences(previous => ({ ...previous, relocationAllowed: event.target.checked })); setPreferencesSaveState('dirty'); }} /> Open to relocation</label>
       </div>
+      </fieldset>
       <button type="button" className="text-slate-600 dark:text-slate-300 text-sm" onClick={() => {
-        if (!advancedPreferencesOpen) { setPreferences(JSON.stringify(mergeCommonSearchPreferences(searchProfile, commonPreferences), null, 2)); setAdvancedPreferencesOpen(true); return; }
-        if (!canHideAdvancedPreferences(preferences, searchProfile)) { setPreferencesSaveState('dirty'); setPreferencesValidationError('Advanced JSON has unsaved changes. Save it or restore it before hiding.'); return; }
+        if (!advancedPreferencesOpen) { setPreferences(JSON.stringify(composedPreferences, null, 2)); setAdvancedPreferencesOpen(true); return; }
+        if (!canHideAdvancedPreferences(preferences, composedPreferences)) { setPreferencesSaveState('dirty'); setPreferencesValidationError('Apply or discard Advanced JSON edits before hiding.'); return; }
         setAdvancedPreferencesOpen(false);
       }}> {advancedPreferencesOpen ? 'Hide advanced JSON preferences' : 'Show advanced JSON preferences'} </button>
-      {advancedPreferencesOpen && <div className="space-y-2"><p className="text-xs text-slate-500">Advanced JSON is optional. It preserves fields not shown above, including compensation, hiring-process preferences, and role modifiers.</p><textarea aria-label="Advanced search preferences JSON" className={input + ' font-mono h-48'} value={preferences} onChange={event => { setPreferences(event.target.value); setPreferencesSaveState('dirty'); setPreferencesValidationError(''); }} /></div>}
+      {advancedPreferencesOpen && <div className="space-y-2">
+        <p className="text-xs text-slate-500">Advanced JSON edits the full Search Profile. Apply it to update the ordinary controls before saving; applying does not save. Ordinary controls are paused while this editor is open.</p>
+        <textarea aria-label="Advanced search preferences JSON" className={input + ' font-mono h-48'} value={preferences} disabled={savingPreferences} onChange={event => { setPreferences(event.target.value); setPreferencesSaveState('dirty'); setPreferencesValidationError(''); }} />
+        <div className="flex gap-4"><button type="button" disabled={savingPreferences} className="text-emerald-600 font-medium disabled:opacity-40" onClick={() => {
+          const applied = applyAdvancedSearchPreferencesDraft(preferences);
+          if (applied.kind === 'invalid') { setPreferencesSaveState('dirty'); setPreferencesValidationError(applied.message); return; }
+          setAppliedPreferences(applied.value); setCommonPreferences(applied.common);
+          setPreferences(JSON.stringify(applied.value, null, 2)); setAdvancedPreferencesOpen(false);
+          setPreferencesSaveState(JSON.stringify(applied.value) === JSON.stringify(searchProfile) ? 'clean' : 'dirty'); setPreferencesValidationError('');
+        }}>Apply Advanced JSON</button><button type="button" disabled={savingPreferences} className="text-slate-600 dark:text-slate-300 disabled:opacity-40" onClick={() => {
+          setPreferences(JSON.stringify(composedPreferences, null, 2)); setAdvancedPreferencesOpen(false); setPreferencesValidationError('');
+          setPreferencesSaveState(JSON.stringify(composedPreferences) === JSON.stringify(searchProfile) ? 'clean' : 'dirty');
+        }}>Discard Advanced JSON edits</button></div>
+      </div>}
       <button disabled={savingPreferences} className="text-emerald-600 font-medium disabled:opacity-40" onClick={async () => {
-        const validation = advancedPreferencesOpen
-          ? composeSearchPreferencesDraft(preferences, commonPreferences, searchProfile)
-          : { kind: 'valid' as const, value: mergeCommonSearchPreferences(searchProfile, commonPreferences) };
-        if (validation.kind === 'invalid') { setPreferencesSaveState('dirty'); setPreferencesValidationError(validation.message); return; }
-        const serialized = JSON.stringify(validation.value, null, 2);
+        if (advancedPreferencesOpen && !canHideAdvancedPreferences(preferences, composedPreferences)) {
+          setPreferencesSaveState('dirty'); setPreferencesValidationError('Apply or discard Advanced JSON edits before saving.'); return;
+        }
+        if (!searchProfileSchema.safeParse(composedPreferences).success) {
+          setPreferencesSaveState('dirty'); setPreferencesValidationError('Invalid search preferences. Fix the values and try again.'); return;
+        }
+        const serialized = JSON.stringify(composedPreferences, null, 2);
         if (!preferencesSubmitting.current.acquire()) return;
         setSavingPreferences(true); setPreferencesSaveState('saving'); setPreferencesValidationError(''); setMessage('');
-        try { await validateAndPersistSearchPreferences(serialized, saveSearchProfile); setPreferences(serialized); setPreferencesSaveState('saved'); setMessage(privateMode ? 'Search preferences saved privately.' : 'Demo search preferences updated.'); }
+        try { await validateAndPersistSearchPreferences(serialized, saveSearchProfile); setAppliedPreferences(composedPreferences); setCommonPreferences(commonSearchPreferences(composedPreferences)); setPreferences(serialized); setPreferencesSaveState('saved'); setMessage(privateMode ? 'Search preferences saved privately.' : 'Demo search preferences updated.'); }
         catch (err: any) { setPreferencesSaveState('failed'); setMessage(err.message || 'Search preferences were not saved. Reload required.'); }
         finally { preferencesSubmitting.current.release(); setSavingPreferences(false); }
       }}>{savingPreferences ? 'Saving…' : 'Save search preferences'}</button><span role="status" aria-live="polite" className="ml-3 text-xs">{durableUiLabel(preferencesSaveState === 'clean' && preferencesIsDirty ? 'dirty' : preferencesSaveState, privateMode)}</span>
