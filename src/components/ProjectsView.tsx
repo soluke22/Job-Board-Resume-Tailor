@@ -3,7 +3,7 @@ import { FolderGit2, CheckCircle2, Shield, Users, Code2, ExternalLink } from 'lu
 import { useApp } from '../context/AppContext';
 
 export const ProjectsView: React.FC = () => {
-  const { projects } = useApp();
+  const { projects, setCurrentView } = useApp();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -14,13 +14,18 @@ export const ProjectsView: React.FC = () => {
             Defensible Technical Projects
           </h1>
           <span className="px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 text-xs font-semibold">
-            {projects.length} Verified Projects
+            {projects.length} Project records
           </span>
         </div>
         <p className="text-xs text-slate-500 mt-0.5">
           Record project context and supporting evidence for the skills you want to demonstrate.
         </p>
       </div>
+
+      {projects.length === 0 && <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-sm space-y-2">
+        <p>No project records yet. Use Setup to selectively import structured records when applicable; records are not verified by presence.</p>
+        <button type="button" className="text-emerald-600 font-medium" onClick={() => setCurrentView('candidate-setup')}>Return to Setup and import</button>
+      </div>}
 
       {/* Projects Cards List */}
       <div className="space-y-6">
