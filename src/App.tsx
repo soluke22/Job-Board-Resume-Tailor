@@ -60,7 +60,7 @@ const AppContent: React.FC = () => {
 
       {/* Main View Router */}
       {workspaceMode === 'PRIVATE_WORKSPACE' && <div role="status" className="px-6 py-2 text-xs text-slate-500">{syncStatus}</div>}
-      <main key={workspaceMode + workspaceEpoch} className="flex-1 pb-16">
+      <main key={`main-workspace-${workspaceMode}-${workspaceEpoch}`} className="flex-1 pb-16">
         {currentView === 'dashboard' && <DashboardView />}
         {currentView === 'discover' && <DiscoverView />}
         {currentView === 'pipeline' && <PipelineView />}
@@ -78,7 +78,7 @@ const AppContent: React.FC = () => {
       </main>
 
       {/* Modals */}
-      <QuickDataGrabModal key={workspaceMode + workspaceEpoch}
+      <QuickDataGrabModal key={`quick-data-grab-workspace-${workspaceMode}-${workspaceEpoch}`}
         isOpen={isQuickGrabOpen}
         onClose={() => setIsQuickGrabOpen(false)}
       />

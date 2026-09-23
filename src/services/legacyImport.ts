@@ -1,6 +1,18 @@
 import { PRIVATE_FIELDS } from './storage';
 
-export interface ImportChoice { key: string; field: string; index?: number; label: string; source: string; warning: string; value: any }
+export interface ImportChoice { key: string; field: string; index?: number; label: string; importSource: string; recordSource: string | null; destination: string; warning: string; value: any }
+
+export function importDestination(field: string): string {
+  return ({ profile: 'Candidate Profile', searchProfile: 'Search Preferences', masterResume: 'Master Resume', evidence: 'Evidence Bank', projects: 'Projects', skills: 'Skills', jobs: 'Pipeline' } as Record<string, string>)[field] || field;
+}
+
+export function importReviewWarning(field: string): string {
+  if (field === 'evidence') return 'Imported evidence remains untrusted and requires Evidence Bank review before it can support claims.';
+  if (['projects', 'skills', 'masterResume'].includes(field)) return 'Imported claim-bearing content remains untrusted, is not verified by its presence here, and needs supporting reviewed evidence before it can support claims.';
+  if (['profile', 'searchProfile'].includes(field)) return 'Review imported profile or preference details for accuracy; their presence does not verify claims or evidence.';
+  return 'Untrusted import: review the destination records before relying on them.';
+}
+
 export function previewImport(input: any, source: string): ImportChoice[] {
   const data = input?.data || input;
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Expected a workspace JSON object.');
@@ -9,8 +21,8 @@ export function previewImport(input: any, source: string): ImportChoice[] {
     return values.map((value: any, index: number) => ({
       key: field + ':' + index, field, index: Array.isArray(data[field]) ? index : undefined,
       label: String(value?.name || value?.title || value?.rawEvidence || value?.id || field).slice(0, 120),
-      source: String(value?.sourceLocation || value?.source || source),
-      warning: 'Untrusted import: may contain old seeds or generated claims. Requires review.', value
+      importSource: source, recordSource: value?.sourceLocation || value?.source ? String(value.sourceLocation || value.source) : null, destination: importDestination(field),
+      warning: importReviewWarning(field), value
     }));
   });
 }

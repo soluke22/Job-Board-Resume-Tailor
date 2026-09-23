@@ -1,5 +1,338 @@
 # Productionization execution plan
 
+## Post-sign-out private intent cleanup (2026-09-22)
+
+Baseline: clean local `dev` and `origin/dev` at `de925c2c1a02249252b7c90ea78a743b100bba04`; `origin/main` remains `befa1282232e0fca880d78485c58ce34d2ff1308`. Scope: remove stale `?workspace=private` intent after confirmed owner restoration and successful server sign-out, while retaining the failed-login notice for a genuinely unauthenticated private return. No auth guard, owner check, session revocation, private data, evidence, onboarding, server, or configuration change.
+
+Result: PASS. Node 24.19.0 focused client/auth tests 12/12, full and release suites 158/158, typecheck, build, privacy scan (zero findings), runtime check, and whitespace check pass. A read-only boundary review found no security regression. A first host-Node-25 full run produced only the two expected Node-24 pin failures; the required Node-24 rerun passed fully. Next exact step: independent diff review, then separately authorized dev publication and focused preview sign-out/reload retest. No push, deployment, main, or live-resource action in this local checkpoint.
+
+## Private workspace Search Preferences review correction (2026-09-22)
+
+Independent review of local onboarding commit `92946e0` found two round-trip defects in Search Preferences. This checkpoint supersedes the initial result below where it describes ordinary controls as authoritative. The correction retains existing unknown role-family strings while known checkboxes change, and makes valid Advanced JSON authoritative only after an explicit Apply action that also refreshes the ordinary controls. Later ordinary edits change their own fields while preserving the applied full profile; Save sends that exact composed profile through the existing durable acknowledgement and job invalidation path. Incomplete or malformed Advanced JSON fails local validation. No server schema, auth, import trust, evidence review, or production configuration changed. Node 24.19.0 focused onboarding tests 9/9, full and release suites 156/156, typecheck, build, harness, normal/strict privacy scans (zero findings), runtime and diff checks pass. The aggregate diff against `82860f6` contains only the six original onboarding files, with these corrections in Setup, its focused tests, and this checkpoint. Next exact step: independent review of the two-commit local candidate, then separately authorized dev publication and browser acceptance. No push/deployment/main/live-resource action.
+
+## Private workspace onboarding UX scope (2026-09-22)
+
+Baseline: clean local `dev` and `origin/dev` at `82860f6440c58c357f11c7ad63dd591bb78b81a3`; `origin/main` remains `befa1282232e0fca880d78485c58ce34d2ff1308`. Scope is Candidate Setup only: an ordered empty-private-workspace guide linked to existing views, ordinary controls for common search preferences while preserving advanced fields, human-readable profile labels, and clearer selective import preview/review/next actions. Preserve private owner guards, durable preference acknowledgement, demo isolation, evidence/provenance review, and server import behavior. Acceptance: focused pure-helper coverage for preference preservation, import non-mutation/trust language, ordered affordances and demo/private gating; full Node suite plus typecheck/build/privacy/runtime/release/diff checks and a supported local smoke. No auth/server/schema/config/live-resource change.
+
+Result: PASS after two consolidated correction requests, the second limited to an enum-safety finding caught during final review. The Setup UI now uses semicolon-safe ordinary controls for common search preferences while preserving advanced-only fields and making visible common controls authoritative; malformed advanced JSON remains a local validation error and unsaved advanced drafts cannot be hidden. The ordinary Role families checkbox control is constrained to the exact five `PrimaryRoleFamily` values, with focused mapping, multi-select and unknown-value rejection coverage. Empty authenticated private workspaces get a seven-step linked guide (including Search Preferences) whose record-count indicators never imply verification and whose Master Resume language reflects selective structured import plus storage-only source documents. Import previews remain selective/non-mutating, distinguish the import container from record-declared source, provide field-accurate review boundaries, and offer post-import Evidence Bank/Master Resume/Setup actions. Projects and Skills use neutral record counts and a Setup/import empty state. Root actual-diff review and an independent read-only provenance review found no remaining blocker/high or security defect. Under bundled Node 24.19.0, focused suites pass 24/24 and full/release suites pass 154/154; typecheck, build, harness, normal/strict privacy scans (zero findings), runtime and diff checks pass. Local smoke covered the rendered Setup controls without private/live data; browser exploration of the deployed pre-change empty workspace confirmed the mapped flow and performed preview only, with no import or private-record mutation. The repository lacks a React DOM harness, so Projects/Skills empty-state wiring uses narrow source inspection plus local smoke. Next exact step: independent diff review of the local checkpoint, then separately authorized dev-preview publication and browser acceptance. No push/deployment/main/live-resource action occurred.
+
+## Public Demo QA/testability fixture scope (2026-09-21)
+
+Baseline: clean local `dev` and `origin/dev` at `1b8e7f54be16d78c8e46d6bb49f9c950d4af2497`; `origin/main` remains `befa1282232e0fca880d78485c58ce34d2ff1308`. Add an explicitly confirmed Public Demo reset that removes only `caos_demo_*` browser records and immediately rehydrates canonical synthetic React state. Add one deterministic synthetic ASSESSED job with a current, supported READY tailored resume for Quick Grab browser acceptance. Preserve auth/private records, existing evidence approval/security contracts and production readiness checks. Acceptance: focused privacy/reset and real readiness-gate tests, full tests, typecheck/build/harness/privacy/runtime/release composition and scoped diff review; one local commit only, no push/deploy/main or live-resource action.
+
+Result: Reset is a two-step Demo Setup action, prefix-limited to `caos_demo_*`, and rehydrates all context collections, active job and remounted drafts without touching private memory or session. The fixed synthetic READY job passes current assessment, claim validation, resume inspection and the unchanged final-export fence; disabling evidence makes it stale. Node 24 focused tests 17/17 and full tests 145/145; typecheck, build, harness, privacy (zero findings), runtime and release composition pass. Sol actual-diff review and read-only security review found no BLOCKER/HIGH issues; build chunk warning and external Vercel routing/output gates remain informational/untested. Next exact step: independent diff review of the local checkpoint; no push or deployment in this task.
+
+## Assessment-status compatibility correction (2026-09-21)
+
+Scope: retain the explicit `ASSESSED` requirement in `currentFit`; mark only the
+two authored fit-bearing synthetic demo jobs as assessed; normalize persisted
+legacy jobs with missing status only after the existing owner-scoped assessment
+freshness check succeeds. Missing or unverifiable metadata becomes STALE, and
+explicit UNASSESSED/STALE remains fail-closed. Ordinary saves with a supplied fit
+and omitted status become STALE so new caller input cannot impersonate legacy
+certification. No evidence-eligibility, provenance, queue, or live-resource change.
+
+Acceptance: the focused demo/assessment/workspace/job tests, full Node 24 suite,
+release composition, privacy/runtime checks and scoped diff review pass. The
+historical browser QA remains FAIL; a new SHA-bound preview retest is still needed.
+
+Result: PASS for this bounded local correction. Focused tests 28/28, full and
+release suites 142/142, typecheck, build, harness, normal/strict privacy scans
+(zero findings), runtime and diff checks pass on Node 24.19.0. The existing
+forged-assessment regression caught and prevented re-promotion of explicit STALE;
+a separate boundary re-review found no remaining blocker/high issue. Next exact
+step: independent diff review of the local commit, then separately authorized
+publication and new SHA-bound browser acceptance. Do not revise the old QA FAIL.
+
+## Preview QA workflow remediation (2026-09-21)
+
+Scope: remediate only the three browser-demonstrated defects from the SHA-bound
+`08926658` dev-preview QA: distinguish local Search Preferences validation from
+durable-save failure, retain the Add Job modal through saved-job analysis failure
+with stable-ID retry semantics, and prevent unassessed or stale Job views from
+rendering assessment-derived conclusions. Preserve the existing revisioned
+persistence queue, owner-only fail-closed behavior, evidence trust/review model,
+assessment/artifact invalidation, and Quick Grab fences. The QA documentation
+commit immediately below this work is not a product baseline change.
+
+Acceptance: focused behavioral tests prove validation, creation/retry/navigation,
+and assessment display contracts; Node 24 release checks and whitespace checks
+pass; protected storage/API/server/evidence-review contracts are unchanged. A new
+SHA-bound browser preview retest remains required before the original QA FAIL may
+be reconsidered. No remote, deployment, or live-resource action is in scope.
+
+Builder result: PASS after one consolidated correction cycle. Sol accepted the
+actual diff with no remaining blocker/high defect in the three scoped workflows.
+Independent Node 24.19.0 clean install, focused UX suites (25/25), full and
+release suites (140/140), typecheck, build, harness, privacy, runtime, and
+whitespace checks pass. The remediation preserves the original preview QA FAIL;
+next exact step is independent diff review, then separate publication and new
+SHA-bound browser acceptance only when authorized.
+
+## Daily-workflow UX correctness scope (2026-09-20)
+
+Authorized baseline: clean `dev` and `origin/dev` at `41a3e96`; `origin/main`
+remains `befa128`. Scope is the final bounded client workflow correction for Add
+Job + Analyze, Quick Grab readiness/enabled-content/clipboard truthfulness, durable
+Search Preferences and Master Resume saves, acknowledged-mutation supersession,
+and basic modal/async correctness in files already touched. One builder owns
+in-scope discovery, implementation, deterministic tests, debugging and synthetic
+local UX smoke. Sol owns architecture, protected-boundary decisions, final diff
+review, integration gates and the single local checkpoint commit.
+
+Acceptance: reuse only the existing `storageService` snapshot and revisioned
+`persistCurrent` queue; use existing `canExportFinal` and existing invalidation/
+provenance contracts; creation must durably acknowledge one stable job before
+analysis and preserve that same job for partial-success retry; explicit saves must
+publish only acknowledged, nonsuperseded state; Quick Grab must fence non-ready
+tailored content and exclude every disabled bullet; clipboard success must follow
+the fulfilled API promise. Protected storage/API/evidence-review/server files and
+`tests/evidence-review.test.ts` stay unchanged unless Sol first approves a
+demonstrated necessity. Required Node 24 install, focused behavioral tests, full
+release gates, diff review and supported synthetic smoke must pass. No main, push,
+PR, deployment, dependency upgrade or live-resource action.
+
+Result: PASS. The builder completed one consolidated correction cycle and Sol
+accepted the final actual diff with no remaining blocker/high correctness defect.
+Node 24.19.0 clean-install validation passed: focused workspace/job/Quick Grab/
+evidence suites 22/22, full and release suites 137/137, typecheck, build, harness,
+privacy, runtime and whitespace checks. Protected security-baseline files remain
+unchanged. No browser surface was available, so interactive synthetic smoke remains
+explicitly unavailable; deterministic workflow tests cover the supported local
+substitute. Next exact step: independent diff review, then Vercel dev-preview
+acceptance only after the local checkpoint is intentionally published to `dev`.
+
+## Workspace persistence UX checkpoint (2026-09-20)
+
+Result: PASS. From the preserved builder-harness baseline `00616df`, one bounded
+builder implemented explicit durable-save UX for Candidate Setup and Evidence
+Bank. Candidate profile drafts now follow adopted data only while clean and show
+truthful clean/dirty/saving/failure states. Manual evidence and approval use
+synchronous duplicate-submit guards, retain dialogs through acknowledgement, and
+publish only adopted durable results. Manual evidence remains review-required;
+approval retains the existing persisted ID/revision/SHA-256 server protocol. Main
+workspace and Quick Data Grab remount keys are distinctly namespaced.
+
+Changed implementation scope is limited to `src/App.tsx`,
+`src/components/CandidateSetupView.tsx`,
+`src/components/EvidenceBankView.tsx`, `src/context/AppContext.tsx`, and the new
+`tests/workspace-ux.test.ts`. The protected storage/API/evidence-review/server
+baseline and `tests/evidence-review.test.ts` are byte-identical to `00616df`.
+No second queue, endpoint, component fetch, client-created Verified state,
+automatic ambiguous-failure recovery or auth/private-readiness weakening was
+introduced.
+
+Node 24.19.0 validation: focused workspace UX 3/3; complete suite 123/123 with
+zero failures or skips; typecheck, build, harness, privacy scan, runtime check,
+release:check and diff checks pass; strict privacy reports zero findings. Synthetic
+local Evidence Bank smoke saved one manual record, increased the count exactly
+once, rendered Needs review and closed only after acknowledgement. No duplicate-key
+console capture was available in the smoke environment; the distinct key contract
+is covered by focused source validation. Existing Rollup annotation and >500 kB
+bundle warnings remain non-blocking. No live resources, deployment or remote branch
+were touched. Next exact step: independent review, then publish the local dev
+checkpoint to a dev preview when separately authorized; do not modify main.
+
+Independent review correction: PASS. The explicit private profile action now stages
+the current storage-backed profile and exactly invalidated jobs, acknowledges that
+complete snapshot through the existing queue, then publishes React state. Manual
+evidence follows the same pattern for current storage-backed evidence plus assessed-
+job/artifact invalidation. Unsuperseded failures restore staged storage without
+publishing phantom state; durable failure remains reload-required. Candidate submit
+uses a synchronous guard. Behavioral tests cover acknowledgement ordering, failure,
+supersession, current-storage evidence, dependent assessment/artifact staleness,
+clean/dirty draft adoption and same-frame submission. Protected security files and
+the evidence-review suite remain unchanged. Node 24.19.0 focused tests pass 12/12
+(workspace UX 7/7, evidence review 5/5); full and release suites pass 127/127 with
+zero failures/skips; typecheck, build, harness, normal/strict privacy zero, runtime
+and diff checks pass. Correction commit is local only; no deployment or live-resource
+action. Next exact step: independent review of the correction commit before any
+separately authorized push or preview publication.
+
+## Bounded implementation builder harness (2026-09-20)
+
+Scope: reconcile the unpushed AI Studio documentation checkpoint onto canonical
+`origin/main`, add one bounded write-capable builder role, document Sol/builder
+ownership, and create the workspace-persistence UX worker contract. No UX
+implementation, production source, remote branch, deployment or live-resource
+change is authorized. Acceptance: supported custom-agent TOML and harness checks,
+existing specialist/domain-skill preservation, no production-source diff, one
+local checkpoint commit, and an explicit current-host discovery/restart result.
+
+Result: PASS. Reconciled `dev` at `f443681` with `origin/main` as ancestor and
+preserved the original `f18085c` tip at `backup/pre-builder-f18085c`. Builder
+TOML parsing, harness integrity and diff checks pass; existing domain skills and
+read-only specialist TOMLs are unchanged; no production source changed. The
+current host's already-loaded role registry does not expose `builder`; fully
+restart/reopen Codex before using it. Next exact step: after restart, delegate the
+workspace persistence UX brief to one builder; Sol reviews the actual diff and
+runs acceptance before integration.
+
+## AI Studio canonical-main import acceptance (2026-09-15)
+
+Owner completed GitHub connection. AI Studio's import dialog explicitly states
+imports do not stay synced. Selected the listed soluke22/Job-Board-Resume-Tailor
+main entry; AI Studio reported Successfully imported 156 files from GitHub and
+created app d1ba3882-10e2-4b0d-a4af-f89540b1ce32. Existing stale shared app was
+not modified or deleted. EXISTING_APP_NOT_SYNCABLE / replacement required.
+
+Exact Git SHA is not exposed. SOURCE_EQUIVALENCE_VERIFIED against canonical main
+befa1282232e0fca880d78485c58ce34d2ff1308 by source markers: Add Evidence,
+Needs review, Review &amp; approve and Verified; approveEvidenceItem;
+evidenceReviewContent/evidenceReviewHash/contentHash; private approval API;
+persisted-ID/revision validation; owner-scoped server repository approval;
+preserveEvidenceReview/unreviewedEvidence and review-required imports. ATS source
+has Ashby/Greenhouse/Lever supported adapters and slice(0,3) verification scope.
+Assessment phase4.1-v3 present. AI Studio converted package-manager host state
+(package-lock omitted and bun.lock shown); no application source rewrite requested
+or accepted and no push control used.
+
+Public demo PASS in embedded and direct preview: synthetic Jordan Taylor fixture,
+current Add Evidence and Verified render. Added one explicitly synthetic public
+preview-only record to exercise new state; Needs review rendered. Review & approve
+source/control is present and correctly private-owner-gated, so it is not exposed
+in public demo. Private mode PASS fail-closed: Workspace Security & Access retained
+Public Demo Mode Active, no private data, and requires verified owner Google login.
+No provider credentials/secrets entered. App build successful. Host debug reports
+HMR websocket disconnects and a nonfatal duplicate React key warning
+(PUBLIC_DEMO0); the app remains rendered and this key comes from unchanged App.tsx,
+not PR3. No PR3 runtime failure demonstrated.
+
+AI Studio verification PASS WITH HOST LIMITATION: exact SHA unavailable, import is
+a non-syncing replacement, AI Studio substitutes package-manager host state, and
+private approval UI cannot be exercised without production owner auth. Production
+settings weakened NO. No GitHub/Vercel/Neon mutation, AI source generation, real
+career data or Gemini invocation. Remaining blocker NONE. Ready production Gemini
+acceptance YES; Gemini calls remain0. Replacement URL:
+https://aistudio.google.com/apps/d1ba3882-10e2-4b0d-a4af-f89540b1ce32
+
+
+## AI Studio canonical-main update attempt (2026-09-15)
+
+Scope: prefer in-place update of saved app 6e455b3c-588b-4598-a6d9-9d02b1ac8869;
+otherwise preserve it and freshly import soluke22/Job-Board-Resume-Tailor main at
+befa1282232e0fca880d78485c58ce34d2ff1308. No manual file copying, AI rewrite,
+GitHub/Vercel/Neon mutation or Gemini invocation.
+
+Finding: EXISTING_APP_NOT_SYNCABLE. The shared saved app is read-only, says Remix
+to make this app your own, and exposes only ZIP download under source export. It
+has no GitHub refresh/sync/re-import or replace-source control. Old app untouched.
+New app workflow exposes Import from GitHub and requires Sign in to GitHub. The
+button was invoked through accessibility and semantic controls, both hidden and
+visible, but no OAuth window/tab opened and the import dialog remained unchanged.
+Fresh import cannot continue until the owner completes the GitHub connection in
+the visible browser. Connection text warns the resulting editor can also push to
+the selected repository; no authorization or repository selection has occurred.
+No replacement app exists yet. Gemini calls remain0. Next exact step: owner clicks
+Sign in to GitHub and completes the required GitHub authorization, then import only
+canonical main and verify PR3 source/render contracts.
+
+
+## Saved AI Studio access retry (2026-09-15)
+
+Retry scope: open shared app 6e455b3c-588b-4598-a6d9-9d02b1ac8869 after
+owner access change; inspect source/render against canonical main
+befa1282232e0fca880d78485c58ce34d2ff1308. No replacement/remix, GitHub,
+production, provider, configuration or real-data mutations. No Gemini calls.
+
+Result: ACCESSIBLE through the shared-app warning. AI Studio labels it as an app
+from another developer and permits read-only source/preview inspection. Exact Git
+SHA is not exposed. Source is stale and not equivalent to canonical main: rendered
+Evidence Bank says Add Verified Evidence and has no Needs review, Review & approve
+or distinct review-status UI. Source search has no /api/workspace/evidence-approval,
+evidenceReviewContent or evidenceReviewHash, and the visible EvidenceBankView uses
+only add/toggle/delete actions. PR3 evidence-review checkpoint therefore fails.
+
+Public synthetic demo PASS: Jordan Taylor fixture loads without provider access or
+startup failure; no real/private career data observed. Private boundary PASS: mode
+switch opens Workspace Security & Access, retains Public Demo Mode Active and
+requires the owner's verified Google account; no private workspace is exposed.
+Embedded preview works, so no iframe host limitation applies. ATS provider scope
+PASS: imported adapter contract/search confirms supported Ashby, Greenhouse and
+Lever adapters (other detected ATS labels remain unsupported/fail-closed per the
+canonical contract). Assessment algorithm PASS: phase4.1-v3 is present in imported
+server/tests source. Production settings weakened: NO.
+
+AI Studio verification FAIL due to stale saved-app source, not external access and
+not a production defect. Remaining blocker: update the existing saved app from
+canonical GitHub main without changing GitHub/production, then repeat source/UI
+render checks. Ready to resume production Gemini acceptance: NO. Gemini calls0.
+
+
+## Saved AI Studio verification attempt (2026-09-14)
+
+Scope: inspect saved app 6e455b3c-588b-4598-a6d9-9d02b1ac8869 against canonical
+main befa1282232e0fca880d78485c58ce34d2ff1308; refresh only through normal
+GitHub import/update if stale. Acceptance requires source equivalence, PR3 review
+UI, public synthetic demo, fail-closed private boundary, ATS scope and algorithm.
+No different app unless irrecoverably broken; no Gemini calls or production edits.
+
+Result: supplied https://ai.studio/apps/6e455b3c-588b-4598-a6d9-9d02b1ac8869
+redirects to aistudio.google.com with the same app ID and displays Page not found.
+Go to Build works. Signed-in My apps shows No apps yet and Allow Drive access.
+The actual Allow Drive access button was clicked; no authorization dialog, new tab
+or app appeared. No permission grant was completed. This does not establish that
+the saved app is irrecoverably broken, so no replacement app was created.
+
+AI Studio source freshness/render/demo/private boundary remain UNVERIFIED;
+verification FAIL (access blocker), not a demonstrated CareerOS defect or iframe
+HOST_LIMITATION. Production evidence-review remains PASS from prior acceptance.
+No production security setting weakened; no source/configuration/database edits,
+no real data created and no Gemini invocation. Next exact step: recover access to
+this saved app (working accessible app link or owner-resolved AI Studio Drive
+access), then inspect source and run Phase11 host regression. Ready Gemini: NO.
+
+
+## PR3 merge and production review acceptance (2026-09-14)
+
+PR3 final audit PASS: open main<-dev, one expected commit, exact head
+0796b34cfb06440bee5492b6c87786ed98cf5df3, base6da65a3f78f798aece45994b4420625dfb0c0bf9,
+MERGEABLE/CLEAN, Vercel preview success, no review requests or unresolved threads.
+Complete diff A-L reviewed: eligibility unchanged, ordinary saves cannot promote
+trust, persisted owner ID/revision/content hash approval, transactional audit,
+material-edit demotion, toggles preserve review, imports require approval and
+canonical invalidation remains fail closed. No demonstrated source defect.
+Fresh Node24.21.0 release:check PASS: typecheck/build/harness, 120/120 tests, zero
+skipped, strict privacy scan zero findings, runtime/client credential markers.
+Source/lock contracts and working/PR diff whitespace checks pass.
+
+Before merge, tracked worktree clean; pending acceptance notes/ignore change
+preserved in a named stash. Ignored .env.local and .vercel state relocated to a
+private temporary backup without reading contents. No such state remained in
+repo at merge. No additional source changes or validator weakening.
+Merged with exact-head guard at2026-09-14T20:38:47Z; dev retained.
+Main befa1282232e0fca880d78485c58ce34d2ff1308 has parents
+6da65a3f78f798aece45994b4420625dfb0c0bf9 and0796b34cfb06440bee5492b6c87786ed98cf5df3.
+Tree b8843195130a5c2d8ddea47b3f353d7791f0eed4 exactly equals audited head tree.
+Origin/local main verified; no unexpected post-merge commit. Stayed on dev.
+
+Automatic Vercel production dpl_79Ag6bvJ8qu2KMo1nw44VecA8t7s READY, Git SHA
+befa1282232e0fca880d78485c58ce34d2ff1308, Node24.x, canonical alias
+https://job-board-resume-tailor.vercel.app. No duplicate/manual deployment.
+Vercel connector scope denied metadata; authorized existing CLI/API read fallback
+verified it. Health200, owner auth/session200 and workspace/data200; session active.
+
+Normal production UI PASS: Add Evidence -> synthetic Review Co./Frontend Engineer
+statement -> Needs review; DB confirms session-unreviewed/requiresUserReview=true,
+eligible0. Review dialog exposes complete claim metadata; explicit approval200.
+DB verified=true, requiresUserReview=false, lastVerifiedAt present, approval audit1.
+Verified card rendered before and after reload. No material edit UI; live edit
+demotion NOT_APPLICABLE, covered by server tests. UI deleted test record; DB
+evidence0/jobs0, revision6, verified owner1/Google account1/unexpired session1,
+approval audit1 retained by design. AI reservations0; Gemini never invoked.
+Bounded20m/100-row deployment log scan returned13 rows: no5xx, invocation failures
+or scanned credential/raw-provider-payload markers. Observability remains bounded.
+
+Production evidence-review acceptance PASS. AI Studio checkpoint UNVERIFIED /
+AI_STUDIO_APP_ACCESS_REQUIRED: signed-in My apps asks Allow Drive access, no app
+available. No access granted or auth weakened. Existing Drive metadata searches
+did not identify CareerOS app; no unrelated file contents read. Asked for direct
+existing app URL. Cannot classify in-host source/render verification as passed.
+Next exact step: open the established AI Studio app against NEW canonical main,
+verify Evidence Bank/manual review/status/public demo and host auth limitations.
+Ready to resume Gemini acceptance: NO until this checkpoint is completed.
+Owner tab retained; stop before Gemini. These are post-merge local audit notes.
+
 ## Evidence review usability fix scope (2026-09-14)
 
 Predecessor/canonical main: 6da65a3f78f798aece45994b4420625dfb0c0bf9.

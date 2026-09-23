@@ -58,15 +58,42 @@ async function privateFetch(input: string, init?: RequestInit): Promise<Response
 export async function workspaceRequest(path: string, init?: RequestInit): Promise<any> {
   const epoch = generation;
   const response = await fetchPrivateResponse(path, init);
-  const data = await readPrivateBody(response, epoch, true);
+  const body = await readPrivateBody(response, epoch, false);
   if (epoch !== generation) throw new Error('Session changed');
+  let data: any;
+  try { data = JSON.parse(body); } catch {
+    if (epoch === generation && storageService.getAuthSession().isAuthenticated) window.dispatchEvent(new Event('workspace-access-lost'));
+    data = undefined;
+  }
   if (!response.ok) {
     accessLost(response);
-    throw new Error(data.error || 'Private workspace service unavailable');
+    const message = typeof data?.error === 'string' && data.error.trim()
+      ? data.error
+      : `Private workspace service unavailable (HTTP ${response.status})`;
+    throw new Error(message);
   }
+  if (data === undefined) throw new Error(`Private workspace returned an invalid response (HTTP ${response.status})`);
   return data;
 }
 const jsonRequest = (data: any) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+
+export function privateSignInFailureNotice(search: string): string | null {
+  return new URLSearchParams(search).get('workspace') === 'private'
+    ? 'Private sign-in was not accepted. Continue with the configured owner Google account.'
+    : null;
+}
+
+export function clearPrivateSignInIntent(location?: Pick<Location, 'href'>, history?: Pick<History, 'state' | 'replaceState'>): boolean {
+  if (!location || !history) return false;
+  try {
+    const url = new URL(location.href);
+    if (url.searchParams.get('workspace') !== 'private') return false;
+    url.searchParams.delete('workspace');
+    history.replaceState(history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    return true;
+  } catch { return false; }
+}
+
 export const apiService = {
   async approveEvidence(evidenceId: string, revision: number, contentHash: string): Promise<any> {
     const res = await privateFetch('/api/workspace/evidence-approval', jsonRequest({ evidenceId, revision, contentHash }));
@@ -201,4 +228,5 @@ export async function signOutPrivateWorkspace(clearClient: () => void): Promise<
   // durable server revocation or its retry.
   try { localStorage.setItem('caos_logout_event', String(Date.now())); } catch {}
   await apiService.logout();
+  clearPrivateSignInIntent(window.location, window.history);
 }

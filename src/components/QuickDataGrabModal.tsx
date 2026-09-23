@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   Copy,
@@ -14,7 +14,14 @@ import {
   Layers,
   Sparkles
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { clipboardOutcome, useApp } from '../context/AppContext';
+import { canExportFinal } from '../utils/resumeReadiness';
+import type { JobRecord, ResumeBullet, TailoredResume } from '../types';
+
+export const enabledBullets = <T extends ResumeBullet>(bullets: T[]) => bullets.filter((bullet) => bullet.enabled !== false);
+export const formatExperienceBullets = (resume: TailoredResume) => resume.experience.flatMap((experience) => enabledBullets(experience.bullets)).map((bullet) => `* ${bullet.text}`).join('\n');
+export const formatProjectBullets = (project: TailoredResume['projects'][number]) => `${project.name}\n${enabledBullets(project.bullets).map((bullet) => `* ${bullet.text}`).join('\n')}`;
+export const selectQuickGrabResume = (activeJob: JobRecord | null, masterResume: TailoredResume) => !activeJob ? { kind: 'master' as const, resume: masterResume } : activeJob.tailoredResume && canExportFinal(activeJob.tailoredResume, activeJob.assessmentStatus) ? { kind: 'tailored' as const, resume: activeJob.tailoredResume } : { kind: 'blocked' as const };
 
 interface QuickDataGrabModalProps {
   isOpen: boolean;
@@ -22,19 +29,25 @@ interface QuickDataGrabModalProps {
 }
 
 export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, onClose }) => {
-  const { profile, masterResume, activeJob, skills, projects, evidence } = useApp();
+  const { profile, masterResume, activeJob, skills, projects, evidence, openResumeEditor } = useApp();
   const [activeTab, setActiveTab] = useState<'ats-text' | 'skills' | 'experience' | 'contact' | 'summary' | 'projects'>('ats-text');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [clipboardError, setClipboardError] = useState<string | null>(null);
+  useEffect(() => { const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); }; window.addEventListener('keydown', escape); return () => window.removeEventListener('keydown', escape); }, [onClose]);
 
   if (!isOpen) return null;
 
-  const currentResume = activeJob?.tailoredResume || masterResume;
+  const selection = selectQuickGrabResume(activeJob, masterResume);
+  const tailoredBlocked = selection.kind === 'blocked';
+  const currentResume = selection.kind === 'blocked' ? masterResume : selection.resume;
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
+  const copyToClipboard = async (text: string, key: string) => {
+    const result = await clipboardOutcome(value => navigator.clipboard.writeText(value), text);
+    if (result === 'copied') { setClipboardError(null); setCopiedKey(key); setTimeout(() => setCopiedKey(null), 2000); }
+    else { setCopiedKey(null); setClipboardError('Clipboard access was denied. Copy the visible text manually.'); }
   };
+
+  if (tailoredBlocked) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><div role="dialog" aria-modal="true" aria-labelledby="quick-grab-title" className="bg-white dark:bg-slate-900 rounded-xl p-6 max-w-lg space-y-4"><h2 id="quick-grab-title" className="font-semibold">Application copy is unavailable</h2><p className="text-sm">This tailored resume is not ready for final export. Review and validate it before copying application materials; the master baseline is not substituted for an active job.</p><div className="flex gap-3"><button className="text-emerald-600" onClick={() => { openResumeEditor(activeJob!.id); onClose(); }}>Open resume review</button><button onClick={onClose}>Close</button></div></div></div>;
 
   // Generate clean ATS plain text
   const generateAtsPlainText = () => {
@@ -55,8 +68,7 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
     text += `PROFESSIONAL EXPERIENCE\n`;
     currentResume.experience.forEach((e) => {
       text += `${e.employer} - ${e.title} (${e.period})\n`;
-      e.bullets
-        .filter((b) => b.enabled !== false)
+      enabledBullets(e.bullets)
         .forEach((b) => {
           text += `* ${b.text}\n`;
         });
@@ -66,8 +78,7 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
     text += `TECHNICAL PROJECTS\n`;
     currentResume.projects.forEach((p) => {
       text += `${p.name} [${p.technologies?.join(', ')}] (${p.period})\n`;
-      p.bullets
-        .filter((b) => b.enabled !== false)
+      enabledBullets(p.bullets)
         .forEach((b) => {
           text += `* ${b.text}\n`;
         });
@@ -87,12 +98,12 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden my-6 flex flex-col max-h-[90vh]">
+      <div role="dialog" aria-modal="true" aria-labelledby="quick-grab-title" className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden my-6 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/60">
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+              <h2 id="quick-grab-title" className="text-base font-semibold text-slate-900 dark:text-white">
                 Quick Data Grabber & Application Clipboard
               </h2>
               <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold uppercase tracking-wider">
@@ -142,6 +153,7 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+          {clipboardError && <p role="alert" aria-live="assertive" className="rounded border border-rose-300 p-3 text-rose-700">{clipboardError}</p>}
           {/* TAB 1: Full ATS Plain Text */}
           {activeTab === 'ats-text' && (
             <div className="space-y-3">
@@ -236,10 +248,7 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
                 </div>
                 <button
                   onClick={() => {
-                    const allBullets = currentResume.experience
-                      .flatMap((e) => e.bullets)
-                      .map((b) => `* ${b.text}`)
-                      .join('\n');
+                    const allBullets = formatExperienceBullets(currentResume);
                     copyToClipboard(allBullets, 'all-experience-bullets');
                   }}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium flex items-center space-x-1.5 cursor-pointer"
@@ -251,7 +260,7 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
 
               <div className="space-y-2.5">
                 {currentResume.experience
-                  .flatMap((e) => e.bullets)
+                  .flatMap((e) => enabledBullets(e.bullets))
                   .map((b, idx) => (
                     <div
                       key={b.id || idx}
@@ -300,7 +309,7 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
                       </span>
                       <button
                         onClick={() => {
-                          const pText = `${proj.name}\n${proj.bullets.map((b) => `* ${b.text}`).join('\n')}`;
+                          const pText = formatProjectBullets(proj);
                           copyToClipboard(pText, `proj-${pIdx}`);
                         }}
                         className="px-2.5 py-1 bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-200 text-[11px] font-medium flex items-center space-x-1 cursor-pointer"
@@ -310,7 +319,7 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
                       </button>
                     </div>
                     <div className="space-y-1.5">
-                      {proj.bullets.map((b, bIdx) => (
+                      {enabledBullets(proj.bullets).map((b, bIdx) => (
                         <div key={bIdx} className="flex items-start justify-between gap-2 text-slate-700 dark:text-slate-300">
                           <p className="text-[11px] leading-relaxed">• {b.text}</p>
                           <button
@@ -394,7 +403,7 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
-                    Master Baseline Professional Summary
+                    {selection.kind === 'tailored' ? 'Ready tailored professional summary' : 'Master Baseline professional summary'}
                   </span>
                   <button
                     onClick={() =>
@@ -415,7 +424,7 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
                 <div className="space-y-2 pt-2">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
-                      Tailored Cover Letter Body ({activeJob.company})
+                      Draft tailored cover letter body ({activeJob.company})
                     </span>
                     <button
                       onClick={() =>
@@ -442,7 +451,7 @@ export const QuickDataGrabModal: React.FC<QuickDataGrabModalProps> = ({ isOpen, 
         {/* Modal Footer */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
           <span className="text-[11px] text-slate-500">
-            Current Document: {activeJob ? `${activeJob.company} Tailored Resume` : 'Master Baseline Resume'}
+            Current Document: {selection.kind === 'tailored' ? `${activeJob!.company} Ready Tailored Resume` : 'Master Baseline Resume'}
           </span>
           <button
             onClick={onClose}
