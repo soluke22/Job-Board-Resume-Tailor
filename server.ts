@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { AssessmentError } from './server/assessment.js';
 import { createAssessmentHandler } from './server/assessmentRoutes.js';
 import { createResumeHandler } from './server/resumeRoutes.js';
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response, NextFunction, RequestHandler } from 'express';
 import dotenv from 'dotenv';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { installAuth, requireWorkspaceOwner, privateNoStore } from './server/auth.js';
@@ -34,13 +34,34 @@ app.use('/api/workspace', createWorkspaceRouter());
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 // All remaining application APIs handle private data or invoke private services.
 app.use('/api', requireWorkspaceOwner);
-app.use('/api', async (req, res, next) => {
-  if (!isBudgetedExternalPath(req.path)) { next(); return; }
-  try { await reserveProviderCall(res.locals.ownerId, 'external'); next(); }
-  catch (error) { res.status(error instanceof ProviderBudgetExceeded ? 429 : 503).json({ error: 'External operation budget unavailable or exceeded; retry later' }); }
-});
+export function createProviderBudgetMiddleware(reserve = reserveProviderCall): RequestHandler {
+  return async (req, res, next) => {
+    if (!isBudgetedExternalPath(req.path)) { next(); return; }
+    try { await reserve(res.locals.ownerId, 'external'); next(); }
+    catch (error) {
+      if (error instanceof ProviderBudgetExceeded) {
+        res.status(429).json({ error: 'External operation budget exceeded; retry after the current window', code: 'PROVIDER_BUDGET_EXCEEDED' });
+        return;
+      }
+      // Diagnostic category only: provider exceptions may contain connection or
+      // query details and must never be exposed or logged verbatim.
+      console.warn('provider_budget_unavailable category=external');
+      res.status(503).json({ error: 'External operation budget is temporarily unavailable; retry later', code: 'PROVIDER_UNAVAILABLE' });
+    }
+  };
+}
+app.use('/api', createProviderBudgetMiddleware());
 
 // Lazy initialization of GoogleGenAI
+export class ProviderBudgetUnavailable extends Error {}
+export async function reserveAiProviderCall(ownerId: string, reserve = reserveProviderCall): Promise<void> {
+  try {
+    await reserve(ownerId, 'ai');
+  } catch (error) {
+    if (error instanceof ProviderBudgetExceeded) throw error;
+    throw new ProviderBudgetUnavailable();
+  }
+}
 function getGeminiClient(req: Request, alreadyMinimized = false): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -56,7 +77,7 @@ function getGeminiClient(req: Request, alreadyMinimized = false): GoogleGenAI | 
   });
   const generate = client.models.generateContent.bind(client.models);
   client.models.generateContent = async (params: any) => {
-    await reserveProviderCall(req.res!.locals.ownerId, 'ai');
+    await reserveAiProviderCall(req.res!.locals.ownerId);
     const bounded = { ...params, config: { ...params.config, httpOptions: { ...params.config?.httpOptions, timeout: 30000 } } };
     return generate(alreadyMinimized ? bounded : redactAiPayload(bounded, req.body?.candidateProfile));
   };
@@ -242,48 +263,60 @@ app.post('/api/verify-ats', async (req: Request, res: Response): Promise<void> =
 // ==========================================
 // 12. Search-Grounded Job Discovery Engine
 // ==========================================
-app.post('/api/discover-jobs', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const {
-      searchProfile,
-      customQueries,
-      evidenceItems,
-      existingJobs,
-      queryBudget = 4
-    } = req.body;
+export function createDiscoveryHandler(client = getGeminiClient): RequestHandler {
+  return async (req: Request, res: Response): Promise<void> => {
+    try {
+      const {
+        searchProfile,
+        customQueries,
+        evidenceItems,
+        existingJobs,
+        queryBudget = 4
+      } = req.body;
 
-    const ai = getGeminiClient(req);
-    if (!ai) {
-      res.status(503).json({
-        error:
-          'Gemini API key is not configured. Studio fails closed to prevent unverified hallucinations. Please configure GEMINI_API_KEY in Settings.'
-      });
-      return;
-    }
-
-    try { validateDiscoveryInput(searchProfile, queryBudget, customQueries); }
-    catch (error) { res.status(400).json({error: (error as Error).message}); return; }
-    // Budget counts requests, not Google's unobservable internal query execution.
-    const outcome = await executeDiscoveryRequest(prompt => ai.models.generateContent({
-      model: MODEL_NAME, contents: [{text: prompt}], config: {tools: [{googleSearch: {}}]}
-    }), searchProfile, queryBudget, customQueries);
-    const candidates = outcome.jobs;
-    const merged = mergeDiscoveredJobs(Array.isArray(existingJobs) ? existingJobs : [], candidates);
-    res.json({
-      discoveredJobs: merged.newJobs.filter(j => j.verificationStatus !== 'NOT_LISTED'),
-      refreshedJobs: merged.refreshedJobs,
-      discoveryRequestsUsed: outcome.discoveryRequestsUsed, queryBudgetUsed: outcome.queryBudgetUsed, queryBudgetUnit: outcome.queryBudgetUnit,
-      freshnessStats: {
-        newCount: merged.newJobs.filter(j => j.freshnessBand === 'NEW').length,
-        recentCount: merged.newJobs.filter(j => j.freshnessBand === 'RECENT').length,
-        unknownCount: merged.newJobs.filter(j => j.freshnessBand === 'UNKNOWN').length
+      const ai = client(req);
+      if (!ai) {
+        res.status(503).json({
+          error: 'AI generation is not configured. Discovery remains unavailable until it is configured.',
+          code: 'AI_NOT_CONFIGURED'
+        });
+        return;
       }
-    });
-  } catch (error: any) {
-    console.error('Private operation failed');
-    res.status(500).json({ error: 'Job discovery failed' });
-  }
-});
+
+      try { validateDiscoveryInput(searchProfile, queryBudget, customQueries); }
+      catch (error) { res.status(400).json({error: (error as Error).message}); return; }
+      // Budget counts requests, not Google's unobservable internal query execution.
+      const outcome = await executeDiscoveryRequest(prompt => ai.models.generateContent({
+        model: MODEL_NAME, contents: [{text: prompt}], config: {tools: [{googleSearch: {}}]}
+      }), searchProfile, queryBudget, customQueries);
+      const candidates = outcome.jobs;
+      const merged = mergeDiscoveredJobs(Array.isArray(existingJobs) ? existingJobs : [], candidates);
+      res.json({
+        discoveredJobs: merged.newJobs.filter(j => j.verificationStatus !== 'NOT_LISTED'),
+        refreshedJobs: merged.refreshedJobs,
+        discoveryRequestsUsed: outcome.discoveryRequestsUsed, queryBudgetUsed: outcome.queryBudgetUsed, queryBudgetUnit: outcome.queryBudgetUnit,
+        freshnessStats: {
+          newCount: merged.newJobs.filter(j => j.freshnessBand === 'NEW').length,
+          recentCount: merged.newJobs.filter(j => j.freshnessBand === 'RECENT').length,
+          unknownCount: merged.newJobs.filter(j => j.freshnessBand === 'UNKNOWN').length
+        }
+      });
+    } catch (error) {
+      if (error instanceof ProviderBudgetExceeded) {
+        res.status(429).json({ error: 'AI operation budget exceeded; retry after the current window', code: 'PROVIDER_BUDGET_EXCEEDED' });
+        return;
+      }
+      if (error instanceof ProviderBudgetUnavailable) {
+        console.warn('provider_budget_unavailable category=ai');
+        res.status(503).json({ error: 'AI operation budget is temporarily unavailable; retry later', code: 'PROVIDER_UNAVAILABLE' });
+        return;
+      }
+      console.error('Private operation failed');
+      res.status(500).json({ error: 'Job discovery failed', code: 'DISCOVERY_FAILED' });
+    }
+  };
+}
+app.post('/api/discover-jobs', createDiscoveryHandler());
 
 // Phase 6 certified downstream artifacts use the Phase 4/5 strict adapter.
 for (const [path, operation] of [['generate-proof-pack','proof'],['generate-outreach','outreach'],['generate-answers','answers'],['generate-referral','referral']] as const) {
