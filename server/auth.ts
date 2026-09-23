@@ -91,13 +91,13 @@ export function createOwnerGuard(reader: SessionReader = readSession): RequestHa
     privateNoStore(req, res, () => {});
     try {
       const { origin } = authConfiguration();
-      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers.origin !== origin) { res.status(403).json({ error: 'Invalid request origin' }); return; }
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers.origin !== origin) { res.status(403).json({ error: 'Invalid request origin', code: 'AUTH_FORBIDDEN' }); return; }
       const session = await reader(req);
-      if (!hasValidSession(session)) { res.status(401).json({ error: 'Authentication required' }); return; }
-      if (!isOwnerIdentity(session.user)) { res.status(403).json({ error: 'Private workspace access denied' }); return; }
+      if (!hasValidSession(session)) { res.status(401).json({ error: 'Authentication required', code: 'AUTH_REQUIRED' }); return; }
+      if (!isOwnerIdentity(session.user)) { res.status(403).json({ error: 'Private workspace access denied', code: 'AUTH_FORBIDDEN' }); return; }
       res.locals.ownerId = session.user.id;
       next();
-    } catch { res.status(503).json({ error: 'Private authentication is unavailable' }); }
+    } catch { res.status(503).json({ error: 'Private authentication is unavailable', code: 'AUTH_UNAVAILABLE' }); }
   };
 }
 export const requireWorkspaceOwner = createOwnerGuard();
@@ -110,13 +110,13 @@ export function installAuth(app: Express, authProvider = getAuth) {
       const session = await sessionReader(req);
       if (!hasValidSession(session) || !isOwnerIdentity(session?.user)) { res.json({ authenticated: false, isOwner: false }); return; }
       res.json({ authenticated: true, isOwner: true, expiresAt: session.session.expiresAt, user: { id: session.user.id, email: session.user.email, name: session.user.name } });
-    } catch { res.status(503).json({ error: 'Private authentication is unavailable' }); }
+    } catch { res.status(503).json({ error: 'Private authentication is unavailable', code: 'AUTH_UNAVAILABLE' }); }
   });
   app.all('/api/auth/*', async (req, res) => {
     try {
       const { origin } = authConfiguration();
-      if (!['GET', 'HEAD'].includes(req.method) && req.headers.origin !== origin) { res.status(403).json({ error: 'Invalid request origin' }); return; }
+      if (!['GET', 'HEAD'].includes(req.method) && req.headers.origin !== origin) { res.status(403).json({ error: 'Invalid request origin', code: 'AUTH_FORBIDDEN' }); return; }
       await toNodeHandler(authProvider())(req, res);
-    } catch { if (!res.headersSent) res.status(503).json({ error: 'Private authentication is unavailable' }); }
+    } catch { if (!res.headersSent) res.status(503).json({ error: 'Private authentication is unavailable', code: 'AUTH_UNAVAILABLE' }); }
   });
 }

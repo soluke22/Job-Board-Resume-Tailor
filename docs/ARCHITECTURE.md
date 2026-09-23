@@ -13,7 +13,9 @@ Workspace routes inherit an owner router; private files use direct owner guards;
 remaining /api operations inherit the server owner boundary. Health is public.
 Cookie sessions are HttpOnly/Lax, Secure over HTTPS, one day with hourly renewal,
 without cookie caching. Missing configuration or session/storage outages deny
-private access. See [PRIVACY_BOUNDARY.md](PRIVACY_BOUNDARY.md) for precise rules.
+private access; direct non-auth application-request failures do not substitute
+for an auth verdict or clear a still-verifiable session. See
+[PRIVACY_BOUNDARY.md](PRIVACY_BOUNDARY.md) for precise rules.
 
 server/db contains Neon/Drizzle schemas and migrations for auth and owner-scoped
 workspace entities. workspaceRepository handles revisioned reads/writes/imports;
@@ -43,8 +45,9 @@ Workspace changes synchronize through revisioned APIs. src/services/storage.ts
 keeps private data/auth UI metadata in memory; public demo uses separate synthetic
 fixtures and public localStorage keys. legacyImport previews explicit local
 imports for owner confirmation. Empty private state uses blank setup defaults.
-Refresh rehydrates from server. Session loss, expiry, logout or unavailable private
-services clear private UI/cache; stale responses are rejected by generation.
+Refresh rehydrates from server. Session loss, expiry, logout, or unavailable
+session/auth verification clear private UI/cache; direct non-auth service failures
+preserve a verified session. Stale responses are rejected by generation.
 Public demo rendering remains independent of auth/database configuration.
 
 ## AI and ATS boundaries

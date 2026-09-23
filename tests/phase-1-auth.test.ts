@@ -112,9 +112,14 @@ test('invalid session expiry and auth service failure deny handler access', asyn
   const app = express();
   app.get('/invalid', createOwnerGuard(async () => ({ user: { id: 'owner', email: config.OWNER_EMAIL, emailVerified: true }, session: { expiresAt: new Date(NaN) } })), (_req, res) => { calls++; res.json({}); });
   app.get('/outage', createOwnerGuard(async () => { throw new Error('synthetic outage'); }), (_req, res) => { calls++; res.json({}); });
+  app.post('/forbidden', createOwnerGuard(async () => ({ user: { id: 'other', email: 'other@example.invalid', emailVerified: true }, session: { expiresAt: new Date(Date.now() + 60_000) } })), (_req, res) => { calls++; res.json({}); });
   await serve(app, async url => {
-    assert.equal((await fetch(url + '/invalid')).status, 401);
-    assert.equal((await fetch(url + '/outage')).status, 503);
+    const invalid = await fetch(url + '/invalid'); assert.equal(invalid.status, 401);
+    assert.deepEqual(await invalid.json(), { error: 'Authentication required', code: 'AUTH_REQUIRED' });
+    const outage = await fetch(url + '/outage'); assert.equal(outage.status, 503);
+    assert.deepEqual(await outage.json(), { error: 'Private authentication is unavailable', code: 'AUTH_UNAVAILABLE' });
+    const forbidden = await fetch(url + '/forbidden', { method: 'POST', headers: { Origin: config.BETTER_AUTH_URL } }); assert.equal(forbidden.status, 403);
+    assert.deepEqual(await forbidden.json(), { error: 'Private workspace access denied', code: 'AUTH_FORBIDDEN' });
     assert.equal(calls, 0);
   });
 });
@@ -182,12 +187,12 @@ test('actual installed route inventory protects all application, workspace and p
       const response = await fetch(url + route.path.replace(':id', 'synthetic'), { method: route.method.toUpperCase(), headers: { Origin: config.BETTER_AUTH_URL } });
       assert.equal(response.status, 401, route.path);
       assert.match(response.headers.get('cache-control')!, /private.*no-store/);
-      assert.deepEqual(await response.json(), { error: 'Authentication required' });
+      assert.deepEqual(await response.json(), { error: 'Authentication required', code: 'AUTH_REQUIRED' });
     }
     assert.equal((await fetch(url + '/api/health')).status, 200);
     delete process.env.DATABASE_URL;
     const outage = await fetch(url + '/api/workspace/data'); assert.equal(outage.status, 503);
-    assert.deepEqual(await outage.json(), { error: 'Private authentication is unavailable' });
+    assert.deepEqual(await outage.json(), { error: 'Private authentication is unavailable', code: 'AUTH_UNAVAILABLE' });
     Object.assign(process.env, config);
   });
   const source = await readFile('server.ts', 'utf8');

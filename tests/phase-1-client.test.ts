@@ -27,25 +27,29 @@ test('private cache is memory-only; clearing access preserves the separate synth
   assert.ok(storageService.getEvidence('PUBLIC_DEMO').length > 0);
 });
 
-test('401/403/503 and network outage clear private access and never return demo records', async () => {
+test('private API error codes preserve a valid session for provider failures and fail closed only for explicit auth loss', async () => {
   const original = globalThis.fetch;
   try {
-    for (const status of [401, 403, 503]) {
+    for (const { status, code, losesAccess } of [
+      { status: 503, code: 'PROVIDER_UNAVAILABLE', losesAccess: false },
+      { status: 503, code: 'AUTH_UNAVAILABLE', losesAccess: true },
+      { status: 401, code: 'AUTH_REQUIRED', losesAccess: true },
+      { status: 403, code: 'AUTH_FORBIDDEN', losesAccess: true },
+      { status: 429, code: 'PROVIDER_BUDGET_EXCEEDED', losesAccess: false },
+    ]) {
       authenticate();
       globalThis.fetch = async (_path, init) => {
         assert.equal(init?.credentials, 'same-origin'); assert.equal(init?.cache, 'no-store');
-        return Response.json({ error: 'Synthetic unavailable' }, { status });
+        return Response.json({ error: `Synthetic ${code.toLowerCase()} error`, code }, { status });
       };
-      await assert.rejects(workspaceRequest('/api/workspace/data'), /Synthetic unavailable/);
-      assert.equal(storageService.getAuthSession().isAuthenticated, false);
-      assert.deepEqual(storageService.getEvidence('PRIVATE_WORKSPACE'), []);
+      await assert.rejects(apiService.discoverJobs({ preferredRoleFamilies: [], technologyStrengths: [], remotePreference: 'any' }), new RegExp(`Synthetic ${code.toLowerCase()} error`));
+      assert.equal(storageService.getAuthSession().isAuthenticated, !losesAccess, code);
+      assert.equal(storageService.getEvidence('PRIVATE_WORKSPACE').length, losesAccess ? 0 : 1, code);
     }
     authenticate(); globalThis.fetch = async () => { throw new TypeError('Synthetic network outage'); };
     await assert.rejects(workspaceRequest('/api/workspace/data'), /network outage/);
-    assert.equal(storageService.getAuthSession().isAuthenticated, false);
-    authenticate(); globalThis.fetch = async () => new Response('Synthetic proxy unavailable', { status: 503 });
-    await assert.rejects(workspaceRequest('/api/workspace/data'));
-    assert.equal(storageService.getAuthSession().isAuthenticated, false);
+    assert.equal(storageService.getAuthSession().isAuthenticated, true);
+    assert.equal(storageService.getEvidence('PRIVATE_WORKSPACE').length, 1);
   } finally { globalThis.fetch = original; loseAccess(); }
 });
 
@@ -80,7 +84,8 @@ test('workspace requests handle JSON and empty or non-JSON responses without exp
         assert.doesNotMatch(error.message, /Unexpected end of JSON input|synthetic intermediary details|<html>/);
         return true;
       });
-      assert.equal(storageService.getAuthSession().isAuthenticated, false);
+      assert.equal(storageService.getAuthSession().isAuthenticated, true);
+      assert.equal(storageService.getEvidence('PRIVATE_WORKSPACE').length, 1);
     }
 
     authenticate();
@@ -90,14 +95,14 @@ test('workspace requests handle JSON and empty or non-JSON responses without exp
       assert.doesNotMatch(error.message, /SyntaxError|Unexpected end of JSON input/);
       return true;
     });
-    assert.equal(storageService.getAuthSession().isAuthenticated, false);
-    assert.deepEqual(storageService.getEvidence('PRIVATE_WORKSPACE'), []);
+      assert.equal(storageService.getAuthSession().isAuthenticated, true);
+      assert.equal(storageService.getEvidence('PRIVATE_WORKSPACE').length, 1);
 
     authenticate();
     globalThis.fetch = async () => new Response('', { status: 403 });
     await assert.rejects(workspaceRequest('/api/workspace/data'), /Private workspace service unavailable \(HTTP 403\)/);
-    assert.equal(storageService.getAuthSession().isAuthenticated, false);
-    assert.deepEqual(storageService.getEvidence('PRIVATE_WORKSPACE'), []);
+    assert.equal(storageService.getAuthSession().isAuthenticated, true);
+    assert.equal(storageService.getEvidence('PRIVATE_WORKSPACE').length, 1);
   } finally { globalThis.fetch = original; loseAccess(); }
 });
 
@@ -183,6 +188,7 @@ test('browser storage errors cannot stop server logout or retry; server errors r
     globalThis.fetch = async (path, init) => {
       assert.equal(path, '/api/auth/sign-out'); assert.equal(init?.method, 'POST');
       assert.equal(storageService.getAuthSession().isAuthenticated, false);
+      assert.deepEqual(storageService.getEvidence('PRIVATE_WORKSPACE'), []);
       requests++;
       return Response.json(requests === 1 ? { error: 'Synthetic revocation unavailable' } : { success: true }, { status: requests === 1 ? 503 : 200 });
     };
