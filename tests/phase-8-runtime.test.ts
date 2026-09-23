@@ -149,7 +149,7 @@ test('real adapter no-config startup preserves health, nested private/auth error
       assert.match(res.headers.get('content-type')!, /json/); assert.match(res.headers.get('cache-control')!, /private.*no-store/);
       assert.equal(res.headers.get('x-content-type-options'), 'nosniff'); assert.equal(res.headers.get('x-frame-options'), 'DENY');
       assert.equal(res.headers.get('referrer-policy'), 'no-referrer'); assert(!res.headers.has('x-powered-by'));
-      assert.deepEqual(await res.json(), { error: 'Private authentication is unavailable' });
+      assert.deepEqual(await res.json(), { error: 'Private authentication is unavailable', code: 'AUTH_UNAVAILABLE' });
     }
     const malformed = await fetch(url + '/api/analyze-job', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{bad' });
     assert.equal(malformed.status, 400); assert.deepEqual(await malformed.json(), { error: 'Invalid request' });
