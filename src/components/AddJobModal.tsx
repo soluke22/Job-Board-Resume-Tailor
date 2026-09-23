@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Sparkles, Loader2, FileText, Link2, Building, Briefcase, Download } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { canStartJobWorkflow, createSavedJobRetry, jobRetryUi, type SavedJobRetry, useApp } from '../context/AppContext';
 import { apiService } from '../services/api';
 
 interface AddJobModalProps {
@@ -8,8 +8,10 @@ interface AddJobModalProps {
   onClose: () => void;
 }
 
+type JobDraft = { company: string; title: string; sourceUrl: string; rawDescription: string; userProvided: boolean };
+
 export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => {
-  const { addJob, analyzeJob } = useApp();
+  const { createAndAnalyzeJob } = useApp();
 
   const [company, setCompany] = useState('');
   const [title, setTitle] = useState('');
@@ -19,6 +21,22 @@ export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingUrl, setIsFetchingUrl] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pendingJob, setPendingJob] = useState<SavedJobRetry<JobDraft> | null>(null);
+  const submitGuard = useRef(false);
+  const retryUi = jobRetryUi(pendingJob?.jobId);
+  const draftLocked = retryUi.fieldsDisabled;
+  const displayedDraft: JobDraft = pendingJob?.draft || { company, title, sourceUrl, rawDescription, userProvided };
+
+  const resetDraft = () => {
+    setCompany(''); setTitle(''); setSourceUrl(''); setRawDescription(''); setUserProvided(true);
+    setPendingJob(null); setErrorMessage(null);
+  };
+  const handleClose = () => { if (!isLoading && !isFetchingUrl) { resetDraft(); onClose(); } };
+
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') handleClose(); };
+    window.addEventListener('keydown', escape); return () => window.removeEventListener('keydown', escape);
+  }, [isLoading, isFetchingUrl]);
 
   if (!isOpen) return null;
 
@@ -27,6 +45,7 @@ export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => 
       setErrorMessage('Please enter a valid URL starting with http:// or https://');
       return;
     }
+    if (draftLocked || isFetchingUrl || isLoading) return;
     setIsFetchingUrl(true);
     setErrorMessage(null);
     try {
@@ -47,25 +66,28 @@ export const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose }) => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rawDescription.trim()) {
+    if (!canStartJobWorkflow(isFetchingUrl, isLoading)) return;
+    if (!displayedDraft.rawDescription.trim()) {
       setErrorMessage('Please provide a job description to analyze.');
       return;
     }
 
+    if (submitGuard.current) return;
+    submitGuard.current = true;
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const createdJob = await addJob(rawDescription, sourceUrl, company, title, userProvided);
-      await analyzeJob(createdJob.id);
-      onClose();
-      // Reset form
-      setCompany('');
-      setTitle('');
-      setSourceUrl('');
-      setRawDescription('');
+      const outcome = await createAndAnalyzeJob(displayedDraft.rawDescription, displayedDraft.sourceUrl, displayedDraft.company, displayedDraft.title, displayedDraft.userProvided, pendingJob?.jobId);
+      if (outcome.kind === 'analysis-failed') {
+        setPendingJob(createSavedJobRetry(outcome.jobId, displayedDraft));
+        setErrorMessage(`Job saved, but analysis failed. Retry analysis. ${outcome.message}`);
+        return;
+      }
+      resetDraft(); onClose();
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to analyze job.');
+      setErrorMessage(err.message || 'Job creation was not saved.');
     } finally {
+      submitGuard.current = false;
       setIsLoading(false);
     }
   };
@@ -131,10 +153,10 @@ Notice: This position is pure low-level storage engine architecture and contains
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden my-8">
+      <div role="dialog" aria-modal="true" aria-labelledby="add-job-title" className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden my-8">
         <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+            <h2 id="add-job-title" className="text-lg font-semibold text-slate-900 dark:text-white">
               Add Job for Fit Analysis
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -142,8 +164,8 @@ Notice: This position is pure low-level storage engine architecture and contains
             </p>
           </div>
           <button
-            onClick={onClose}
-            disabled={isLoading}
+              onClick={handleClose}
+            disabled={isLoading || isFetchingUrl}
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -157,6 +179,7 @@ Notice: This position is pure low-level storage engine architecture and contains
             <button
               type="button"
               onClick={() => loadSample('frontend')}
+              disabled={retryUi.presetsDisabled}
               className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-slate-700 dark:text-slate-200 hover:border-emerald-500 transition-colors cursor-pointer"
             >
               Airbnb (Frontend Fit)
@@ -164,6 +187,7 @@ Notice: This position is pure low-level storage engine architecture and contains
             <button
               type="button"
               onClick={() => loadSample('design-systems')}
+              disabled={retryUi.presetsDisabled}
               className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-slate-700 dark:text-slate-200 hover:border-emerald-500 transition-colors cursor-pointer"
             >
               Vercel (UI Systems Fit)
@@ -171,6 +195,7 @@ Notice: This position is pure low-level storage engine architecture and contains
             <button
               type="button"
               onClick={() => loadSample('skip-backend')}
+              disabled={retryUi.presetsDisabled}
               className="px-2.5 py-1 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded text-rose-700 dark:text-rose-300 hover:bg-rose-100 transition-colors cursor-pointer"
             >
               Datadog (Skip / Stretch Test)
@@ -180,10 +205,11 @@ Notice: This position is pure low-level storage engine architecture and contains
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {errorMessage && (
-            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300">
+            <div role="alert" aria-live="assertive" className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300">
               {errorMessage}
             </div>
           )}
+          {pendingJob && <p className="text-xs text-amber-700 dark:text-amber-300">This job has already been saved. Retry analysis uses the saved version.</p>}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -193,8 +219,9 @@ Notice: This position is pure low-level storage engine architecture and contains
               </label>
               <input
                 type="text"
-                value={company}
+                value={displayedDraft.company}
                 onChange={(e) => setCompany(e.target.value)}
+                disabled={draftLocked}
                 placeholder="e.g. Airbnb, Stripe, Figma"
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
@@ -207,8 +234,9 @@ Notice: This position is pure low-level storage engine architecture and contains
               </label>
               <input
                 type="text"
-                value={title}
+                value={displayedDraft.title}
                 onChange={(e) => setTitle(e.target.value)}
+                disabled={draftLocked}
                 placeholder="e.g. Frontend Software Engineer"
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
@@ -221,11 +249,11 @@ Notice: This position is pure low-level storage engine architecture and contains
                 <Link2 className="w-3.5 h-3.5 text-slate-400" />
                 <span>Job Posting URL (Optional)</span>
               </label>
-              {sourceUrl.trim() && (
+              {displayedDraft.sourceUrl.trim() && !draftLocked && (
                 <button
                   type="button"
                   onClick={handleFetchUrl}
-                  disabled={isFetchingUrl || isLoading}
+                  disabled={retryUi.fetchDisabled || isFetchingUrl || isLoading}
                   className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center space-x-1 font-medium cursor-pointer disabled:opacity-50"
                 >
                   {isFetchingUrl ? (
@@ -245,8 +273,9 @@ Notice: This position is pure low-level storage engine architecture and contains
             <div className="flex items-center space-x-2">
               <input
                 type="url"
-                value={sourceUrl}
+                value={displayedDraft.sourceUrl}
                 onChange={(e) => setSourceUrl(e.target.value)}
+                disabled={draftLocked}
                 placeholder="https://company.com/careers/..."
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
@@ -261,8 +290,9 @@ Notice: This position is pure low-level storage engine architecture and contains
             <textarea
               required
               rows={9}
-              value={rawDescription}
+              value={displayedDraft.rawDescription}
               onChange={(e) => { setRawDescription(e.target.value); setUserProvided(true); }}
+              disabled={draftLocked}
               placeholder="Paste the complete job description here..."
               className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
             />
@@ -275,15 +305,15 @@ Notice: This position is pure low-level storage engine architecture and contains
             <div className="flex items-center space-x-2">
               <button
                 type="button"
-                onClick={onClose}
-                disabled={isLoading}
+                onClick={handleClose}
+                disabled={isLoading || isFetchingUrl}
                 className="px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || isFetchingUrl}
                 className="px-5 py-2 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg transition-colors flex items-center space-x-2 cursor-pointer shadow-xs"
               >
                 {isLoading ? (
@@ -294,7 +324,7 @@ Notice: This position is pure low-level storage engine architecture and contains
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>Analyze Fit</span>
+                    <span>{retryUi.primaryLabel}</span>
                   </>
                 )}
               </button>

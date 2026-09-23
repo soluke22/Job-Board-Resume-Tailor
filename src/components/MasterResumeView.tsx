@@ -1,28 +1,44 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FileText, Save, Check, RotateCcw, ShieldCheck, Printer, ClipboardCopy, Copy } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { clipboardOutcome, createSynchronousSubmitGuard, durableUiLabel, shouldAdoptSerializedDraft, useApp } from '../context/AppContext';
 import { ResumePaper } from './ResumePaper';
 import { TailoredResume } from '../types';
 
 export const MasterResumeView: React.FC = () => {
-  const { masterResume, saveMasterResume, setIsQuickGrabOpen } = useApp();
+  const { masterResume, saveMasterResume, setIsQuickGrabOpen, workspaceMode } = useApp();
   const [editableResume, setEditableResume] = useState<TailoredResume>(
     JSON.parse(JSON.stringify(masterResume))
   );
   const [savedNotice, setSavedNotice] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+  const [saveState, setSaveState] = useState<'clean' | 'dirty' | 'saving' | 'saved' | 'failed'>('clean');
+  const [clipboardError, setClipboardError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const savedMaster = useRef(JSON.stringify(masterResume));
+  const saveGuard = useRef(createSynchronousSubmitGuard());
+  const draftIsDirty = !shouldAdoptSerializedDraft(editableResume, masterResume);
 
-  const handleSave = () => {
-    saveMasterResume(editableResume);
-    setSavedNotice(true);
-    setTimeout(() => setSavedNotice(false), 2500);
+  useEffect(() => {
+    if (shouldAdoptSerializedDraft(editableResume, JSON.parse(savedMaster.current))) { setEditableResume(JSON.parse(JSON.stringify(masterResume))); setSaveState('clean'); }
+    savedMaster.current = JSON.stringify(masterResume);
+  }, [editableResume, masterResume]);
+
+  const handleSave = async () => {
+    if (!saveGuard.current.acquire()) return;
+    setIsSaving(true); setSaveState('saving');
+    try {
+      await saveMasterResume(editableResume);
+      setSaveState('saved'); setSavedNotice(true);
+      setTimeout(() => setSavedNotice(false), 2500);
+    } catch { setSaveState('failed'); }
+    finally { saveGuard.current.release(); setIsSaving(false); }
   };
 
   const handleReset = () => {
     setEditableResume(JSON.parse(JSON.stringify(masterResume)));
   };
 
-  const copyMasterPlainText = () => {
+  const copyMasterPlainText = async () => {
     let text = `${editableResume.header.name.toUpperCase()}\n`;
     text += `${editableResume.header.location} | ${editableResume.header.email} | ${editableResume.header.phone}\n`;
     text += `${editableResume.header.links.map((l) => `${l.label}: ${l.url}`).join(' | ')}\n\n`;
@@ -64,9 +80,9 @@ export const MasterResumeView: React.FC = () => {
       text += `${edu.institution}, ${edu.degree} (${edu.period})\n`;
     });
 
-    navigator.clipboard.writeText(text);
-    setCopiedText(true);
-    setTimeout(() => setCopiedText(false), 2000);
+    const result = await clipboardOutcome(value => navigator.clipboard.writeText(value), text);
+    if (result === 'copied') { setClipboardError(null); setCopiedText(true); setTimeout(() => setCopiedText(false), 2000); }
+    else { setCopiedText(false); setClipboardError('Clipboard access was denied. Copy the visible text manually.'); }
   };
 
   return (
@@ -79,7 +95,7 @@ export const MasterResumeView: React.FC = () => {
               Master Resume Baseline
             </h1>
             <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 text-xs font-semibold uppercase tracking-wider">
-              Immutable Baseline
+              Master Baseline
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -123,13 +139,16 @@ export const MasterResumeView: React.FC = () => {
           </button>
           <button
             onClick={handleSave}
+            disabled={isSaving}
             className="px-4 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-xs transition-colors flex items-center space-x-1 cursor-pointer"
           >
             {savedNotice ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
-            <span>{savedNotice ? 'Baseline Saved' : 'Save Baseline'}</span>
+            <span>{isSaving ? 'Saving…' : savedNotice ? 'Baseline Saved' : 'Save Baseline'}</span>
           </button>
         </div>
       </div>
+      <p role="status" aria-live="polite" className="text-xs text-slate-500">{durableUiLabel(draftIsDirty && saveState === 'clean' ? 'dirty' : saveState, workspaceMode === 'PRIVATE_WORKSPACE')}</p>
+      {clipboardError && <p role="alert" aria-live="assertive" className="text-xs text-rose-600">{clipboardError}</p>}
 
       {/* Two-Column Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -168,9 +187,7 @@ export const MasterResumeView: React.FC = () => {
             <textarea
               rows={5}
               value={editableResume.professionalSummary || ''}
-              onChange={(e) =>
-                setEditableResume({ ...editableResume, professionalSummary: e.target.value })
-              }
+              onChange={(e) => { setEditableResume({ ...editableResume, professionalSummary: e.target.value }); setSaveState('dirty'); }}
               className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white leading-relaxed focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>

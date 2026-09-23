@@ -17,6 +17,7 @@ import {
   Info
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { assessmentDisplay } from '../utils/assessmentView';
 
 export const JobAnalysisView: React.FC = () => {
   const {
@@ -50,8 +51,9 @@ export const JobAnalysisView: React.FC = () => {
   }
 
   const { parsed, evidenceMatches, sessionQuestions, tailoringPlan } = activeJob;
-  const fit = activeJob.assessmentStatus === 'STALE' ? undefined : activeJob.fit;
-  const verdict = fit?.verdict || 'Borderline';
+  const assessment = assessmentDisplay(activeJob);
+  const fit = assessment.fit;
+  const verdict = assessment.verdict;
   const canTailor = activeJob.assessmentStatus === 'ASSESSED' && !!fit?.recommendation && fit.recommendation !== 'SKIP';
 
   const handleGapAnswerChange = (qId: string, value: string) => {
@@ -154,7 +156,7 @@ export const JobAnalysisView: React.FC = () => {
                 Qualification Fit
               </span>
               <span className="text-xl font-bold text-slate-800 dark:text-slate-200">
-                {fit?.qualificationFit ?? '—'} <span className="text-xs font-normal text-slate-500">/ 10</span>
+                {fit?.qualificationFit ?? '—'} {fit && <span className="text-xs font-normal text-slate-500">/ 10</span>}
               </span>
             </div>
             <div className="w-px h-8 bg-slate-200 dark:bg-slate-700" />
@@ -163,7 +165,7 @@ export const JobAnalysisView: React.FC = () => {
                 Evidence Coverage
               </span>
               <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-                {fit?.evidenceCoverage ?? '—'} <span className="text-xs font-normal text-emerald-700/60">/ 10</span>
+                {fit?.evidenceCoverage ?? '—'} {fit && <span className="text-xs font-normal text-emerald-700/60">/ 10</span>}
               </span>
             </div>
             <div className="w-px h-8 bg-slate-200 dark:bg-slate-700" />
@@ -173,7 +175,9 @@ export const JobAnalysisView: React.FC = () => {
               </span>
               <span
                 className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider ${
-                  verdict === 'Apply'
+                  assessment.state !== 'current'
+                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700'
+                    : verdict === 'Apply'
                     ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
                     : verdict === 'Borderline'
                     ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
@@ -187,7 +191,7 @@ export const JobAnalysisView: React.FC = () => {
         </div>
 
         {/* STRICT GUARDRAIL BANNER IF SKIP */}
-        {!fit ? <p className="text-sm text-slate-500">Assessment required before an application decision or tailoring plan.</p> : !canTailor ? (
+        {!fit ? <p className="text-sm text-slate-500">{assessment.summary}</p> : !canTailor ? (
           <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-900 dark:text-rose-200 space-y-2">
             <div className="flex items-center space-x-2">
               <XCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
@@ -259,7 +263,7 @@ export const JobAnalysisView: React.FC = () => {
               Strongest Selling Point
             </h3>
             <p className="text-xs text-slate-700 dark:text-slate-300 mt-1.5">
-              {fit?.strongestMatch || 'No supporting match has been recorded.'}
+              {assessment.strongestMatch}
             </p>
           </div>
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -267,7 +271,7 @@ export const JobAnalysisView: React.FC = () => {
               Biggest Actual Gap
             </h3>
             <p className="text-xs text-slate-700 dark:text-slate-300 mt-1.5">
-              {fit?.biggestActualGap || 'None identified as hard blocker.'}
+              {assessment.biggestActualGap}
             </p>
           </div>
         </div>
@@ -281,13 +285,15 @@ export const JobAnalysisView: React.FC = () => {
           <p className="text-[11px] text-slate-500">
             JD requirements that cannot be truthfully claimed on the resume:
           </p>
-          {(fit?.unsupportedRequirements || []).length === 0 ? (
+          {!fit ? (
+            <p className="text-xs text-slate-500">Unknown until assessment completes.</p>
+          ) : (assessment.unsupportedRequirements || []).length === 0 ? (
             <p className="text-xs text-emerald-600 dark:text-emerald-400">
               Zero unsupported claims detected. All target requirements map to candidate evidence.
             </p>
           ) : (
             <ul className="space-y-1.5">
-              {fit?.unsupportedRequirements.map((un, i) => (
+              {assessment.unsupportedRequirements?.map((un, i) => (
                 <li key={i} className="text-xs text-rose-600 dark:text-rose-400 flex items-start space-x-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0" />
                   <span>{un}</span>
@@ -299,7 +305,7 @@ export const JobAnalysisView: React.FC = () => {
       </div>
 
       {/* Evidence Gap Interview (Stage 3) */}
-      {sessionQuestions && sessionQuestions.length > 0 && (
+      {fit && sessionQuestions && sessionQuestions.length > 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
@@ -393,7 +399,7 @@ export const JobAnalysisView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {(evidenceMatches || []).map((m, idx) => (
+              {!fit ? <tr><td colSpan={5} className="py-3 px-4 text-slate-500">Unknown until assessment completes.</td></tr> : (evidenceMatches || []).map((m, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                   <td className="py-3 px-4 font-medium text-slate-900 dark:text-white max-w-xs">
                     {m.requirement}
@@ -438,7 +444,7 @@ export const JobAnalysisView: React.FC = () => {
       </div>
 
       {/* Tailoring Plan View (Stage 4) */}
-      {tailoringPlan && (
+      {fit && tailoringPlan && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center space-x-2">

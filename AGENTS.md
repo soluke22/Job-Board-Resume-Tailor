@@ -32,13 +32,18 @@ Open the named .agents/skills/<name>/SKILL.md directly.
 | Final diff, privacy/security and release checks | release-validation |
 
 ## Specialist invocation
-Parent owns writes; default productionization model is GPT-5.6 Sol Medium.
-Do not spawn automatically. When a narrow helper saves context, use:
+Default productionization parent is GPT-5.6 Sol Medium. Sol owns architecture,
+contracts, scope, security decisions, acceptance and integration. Substantial
+implementation may be delegated to one builder with one coherent bounded brief;
+the builder is the sole writer and owns assigned edits, tests, debugging and
+routine UI QA. Review its actual diff rather than trusting its summary, and
+default to one consolidated correction cycle. Do not poll a healthy builder.
+Do not invoke helpers ritualistically. When a narrow read-only helper saves context, use:
 - code-mapper: Terra Medium; read-only subsystem mapping.
 - docs-researcher: Luna Medium; read-only official API documentation.
 - test-triager: Terra Medium; read-only focused failure diagnosis.
 - security-reviewer: Sol High; read-only demonstrated boundary defects.
-Parent plus at most two helpers; no recursive swarm or overlapping writers.
+One writer by default; no recursive delegation or overlapping writers.
 See AGENT_HARNESS for configuration support and escalation rules.
 
 ## Validation and checkpoints

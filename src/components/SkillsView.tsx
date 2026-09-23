@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { SkillCategory } from '../types';
 
 export const SkillsView: React.FC = () => {
-  const { skills } = useApp();
+  const { skills, setCurrentView } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -33,13 +33,18 @@ export const SkillsView: React.FC = () => {
             Curated Skills Inventory
           </h1>
           <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 text-xs font-semibold">
-            {skills.length} Defensible Skills
+            {skills.length} Skill records
           </span>
         </div>
         <p className="text-xs text-slate-500 mt-0.5">
           Review the evidence supporting each skill before including it in an application.
         </p>
       </div>
+
+      {skills.length === 0 && <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-sm space-y-2">
+        <p>No skill records yet. Use Setup to selectively import structured records when applicable; records are not verified by presence.</p>
+        <button type="button" className="text-emerald-600 font-medium" onClick={() => setCurrentView('candidate-setup')}>Return to Setup and import</button>
+      </div>}
 
       {/* Filter & Search */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs space-y-3">

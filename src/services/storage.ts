@@ -79,6 +79,15 @@ export const storageService = {
     return { profile: this.getProfile('PRIVATE_WORKSPACE'), searchProfile: this.getSearchProfile('PRIVATE_WORKSPACE'), evidence: this.getEvidence('PRIVATE_WORKSPACE'), projects: this.getProjects('PRIVATE_WORKSPACE'), skills: this.getSkills('PRIVATE_WORKSPACE'), jobs: this.getJobs('PRIVATE_WORKSPACE'), masterResume: this.getMasterResume('PRIVATE_WORKSPACE') };
   },
   clearPrivateCache(): void { privateMemory.clear(); },
+  resetPublicDemo(): void {
+    if (currentMode !== 'PUBLIC_DEMO') throw new Error('Switch to Public Demo before resetting it.');
+    const demoKeys: string[] = [];
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (key?.startsWith('caos_demo_')) demoKeys.push(key);
+    }
+    for (const key of demoKeys) localStorage.removeItem(key);
+  },
 
   // Candidate Profile
   getProfile(mode?: WorkspaceMode): CandidateProfile {
@@ -88,9 +97,9 @@ export const storageService = {
 
     try {
       const data = cache.getItem(key);
-      return data ? JSON.parse(data) : fallback;
+      return data ? JSON.parse(data) : structuredClone(fallback);
     } catch {
-      return fallback;
+      return structuredClone(fallback);
     }
   },
 
@@ -109,9 +118,9 @@ export const storageService = {
 
     try {
       const data = cache.getItem(key);
-      return data ? JSON.parse(data) : fallback;
+      return data ? JSON.parse(data) : structuredClone(fallback);
     } catch {
-      return fallback;
+      return structuredClone(fallback);
     }
   },
 
@@ -129,9 +138,9 @@ export const storageService = {
 
     try {
       const data = cache.getItem(key);
-      return data ? JSON.parse(data) : fallback;
+      return data ? JSON.parse(data) : structuredClone(fallback);
     } catch {
-      return fallback;
+      return structuredClone(fallback);
     }
   },
 
@@ -149,9 +158,9 @@ export const storageService = {
 
     try {
       const data = cache.getItem(key);
-      return data ? JSON.parse(data) : fallback;
+      return data ? JSON.parse(data) : structuredClone(fallback);
     } catch {
-      return fallback;
+      return structuredClone(fallback);
     }
   },
 
@@ -169,9 +178,9 @@ export const storageService = {
 
     try {
       const data = cache.getItem(key);
-      return data ? JSON.parse(data) : fallback;
+      return data ? JSON.parse(data) : structuredClone(fallback);
     } catch {
-      return fallback;
+      return structuredClone(fallback);
     }
   },
 
@@ -189,9 +198,9 @@ export const storageService = {
 
     try {
       const data = cache.getItem(key);
-      return data ? JSON.parse(data) : fallback;
+      return data ? JSON.parse(data) : structuredClone(fallback);
     } catch {
-      return fallback;
+      return structuredClone(fallback);
     }
   },
 
@@ -209,9 +218,9 @@ export const storageService = {
 
     try {
       const data = cache.getItem(key);
-      return data ? JSON.parse(data) : fallback;
+      return data ? JSON.parse(data) : structuredClone(fallback);
     } catch {
-      return fallback;
+      return structuredClone(fallback);
     }
   },
 
