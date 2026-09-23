@@ -18,23 +18,20 @@ let beforePrivateRequest: () => Promise<void> = async () => {};
 export function setBeforePrivateRequest(callback: () => Promise<void>) { beforePrivateRequest = callback; }
 let generation = 0;
 export function invalidatePrivateRequests() { generation++; }
-function accessLost(response: Response) {
-  if (storageService.getAuthSession().isAuthenticated && (response.status === 401 || response.status === 403 || response.status === 503)) window.dispatchEvent(new Event('workspace-access-lost'));
+type SafeApiError = { error?: unknown; code?: unknown };
+function accessLost(response: Response, data?: SafeApiError) {
+  const code = typeof data?.code === 'string' ? data.code : undefined;
+  const authLoss = response.status === 401 ||
+    (response.status === 403 && code === 'AUTH_FORBIDDEN') ||
+    code === 'AUTH_UNAVAILABLE';
+  if (authLoss && storageService.getAuthSession().isAuthenticated) window.dispatchEvent(new Event('workspace-access-lost'));
+  return authLoss;
 }
 async function fetchPrivateResponse(input: string, init?: RequestInit): Promise<Response> {
-  const epoch = generation;
-  try { return await fetch(input, { credentials: 'same-origin', cache: 'no-store', ...init }); }
-  catch (error) {
-    if (epoch === generation && storageService.getAuthSession().isAuthenticated) window.dispatchEvent(new Event('workspace-access-lost'));
-    throw error;
-  }
+  return fetch(input, { credentials: 'same-origin', cache: 'no-store', ...init });
 }
-async function readPrivateBody(response: Response, epoch: number, json: boolean): Promise<any> {
-  try { return await (json ? response.json() : response.text()); }
-  catch (error) {
-    if (epoch === generation && storageService.getAuthSession().isAuthenticated) window.dispatchEvent(new Event('workspace-access-lost'));
-    throw error;
-  }
+async function readPrivateBody(response: Response, json: boolean): Promise<any> {
+  return json ? response.json() : response.text();
 }
 async function privateFetch(input: string, init?: RequestInit): Promise<Response> {
   if (storageService.getWorkspaceMode() !== 'PRIVATE_WORKSPACE' || !storageService.getAuthSession().isAuthenticated) throw new Error('Sign in to the private workspace to use this action. Demo records remain synthetic.');
@@ -42,15 +39,16 @@ async function privateFetch(input: string, init?: RequestInit): Promise<Response
   await beforePrivateRequest();
   if (epoch !== generation) throw new Error('Session changed');
   const response = await fetchPrivateResponse(input, init);
-  const body = await readPrivateBody(response, epoch, false);
+  const body = await readPrivateBody(response, false);
   if (epoch !== generation) throw new Error('Session changed');
-  accessLost(response);
-  if (epoch !== generation) throw new Error('Private access is unavailable. Sign in again.');
+  let data: SafeApiError | undefined;
+  try { data = JSON.parse(body); } catch { /* non-JSON intermediary responses have no auth code */ }
+  const authLoss = accessLost(response, data);
   const result = new Response(body, { status: response.status, headers: response.headers });
   const parse = result.json.bind(result);
   result.json = async () => {
     const data = await parse();
-    if (epoch !== generation) throw new Error('Session changed');
+    if (!authLoss && epoch !== generation) throw new Error('Session changed');
     return data;
   };
   return result;
@@ -58,15 +56,14 @@ async function privateFetch(input: string, init?: RequestInit): Promise<Response
 export async function workspaceRequest(path: string, init?: RequestInit): Promise<any> {
   const epoch = generation;
   const response = await fetchPrivateResponse(path, init);
-  const body = await readPrivateBody(response, epoch, false);
+  const body = await readPrivateBody(response, false);
   if (epoch !== generation) throw new Error('Session changed');
   let data: any;
   try { data = JSON.parse(body); } catch {
-    if (epoch === generation && storageService.getAuthSession().isAuthenticated) window.dispatchEvent(new Event('workspace-access-lost'));
     data = undefined;
   }
   if (!response.ok) {
-    accessLost(response);
+    accessLost(response, data);
     const message = typeof data?.error === 'string' && data.error.trim()
       ? data.error
       : `Private workspace service unavailable (HTTP ${response.status})`;

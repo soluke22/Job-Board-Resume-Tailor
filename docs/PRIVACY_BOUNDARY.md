@@ -44,9 +44,13 @@ Private browser records and session UI metadata are held in memory. Demo records
 use a separate synthetic source and public browser keys. Private defaults are
 blank and an empty authorized workspace opens candidate setup. Restore reads the
 server session then the workspace; a private read error never hydrates demo data.
-401/403/503 and network failures remove private UI/cache access. Logout invalidates
-outstanding requests immediately; failed server revocation is explicit and
-retryable. Server session expiry schedules local clearance; session checks run
+The browser removes private UI/cache access only for an HTTP 401, an explicit
+`AUTH_FORBIDDEN` 403, or `AUTH_UNAVAILABLE`; provider, storage, arbitrary 5xx,
+429 and direct non-auth application-request network failures retain an
+authenticated private session and return only their safe server message. Periodic
+session-health/auth-verification outages still clear private access because the
+session can no longer be verified. Logout invalidates outstanding requests immediately;
+failed server revocation is explicit and retryable. Server session expiry schedules local clearance; session checks run
 every 30 seconds and on focus/visibility restoration. Generation checks reject
 stale workspace/export/AI responses after session or workspace transitions.
 Switching to the public demo is an explicit view change; it does not revoke the
