@@ -291,6 +291,10 @@ export const DiscoverView: React.FC = () => {
                         {job.atsProvider.toUpperCase()}
                       </span>
 
+                      <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-sky-950/40 border border-sky-800/40 text-sky-300">
+                        {job.sourceChannel || 'Web Search Lead'}
+                      </span>
+
                       <span
                         className={`px-2 py-0.5 rounded text-[11px] font-medium border flex items-center space-x-1 ${
                           job.verificationStatus === 'LISTED'

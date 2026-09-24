@@ -3,7 +3,8 @@
 ## Current State — committed dev implementation
 React 19/Vite renders through src/main.tsx and src/App.tsx. AppContext coordinates
 candidate setup, discovery, evidence, tailoring and application workflows.
-Express/Gemini remains the application server; server/local.ts serves Vite in
+Express remains the application server, with Gemini limited to later intelligence
+workflows; server/local.ts serves Vite in
 development and dist/client in production. api/index.ts is the Vercel adapter.
 Build emits dist/client and dist/server.mjs; Next.js remains conditional.
 
@@ -40,7 +41,7 @@ Local Node pools reuse until shutdown; Node serverless pools/auth instances are
 request-local and closed boundaries reject late continuations without reopening.
 
 Private data flow: server session -> authorized workspace read -> in-memory
-browser cache -> AppContext -> API -> guarded Express -> database/Gemini/Blob.
+browser cache -> AppContext -> API -> guarded Express -> database/providers/Blob.
 Workspace changes synchronize through revisioned APIs. src/services/storage.ts
 keeps private data/auth UI metadata in memory; public demo uses separate synthetic
 fixtures and public localStorage keys. legacyImport previews explicit local
@@ -50,13 +51,21 @@ session/auth verification clear private UI/cache; direct non-auth service failur
 preserve a verified session. Stale responses are rejected by generation.
 Public demo rendering remains independent of auth/database configuration.
 
-## AI and ATS boundaries
-Gemini initializes server-side from GEMINI_API_KEY. Discovery uses search
-through Gemini; analysis, evidence matches, plans, resumes, letters, evaluations,
-proof packs and outreach run through owner-protected API routes. AI outputs remain
+## Discovery, AI and ATS boundaries
+Discovery is deterministic and does not instantiate an AI client. A bounded query
+builder sends only allowlisted SearchProfile-derived queries to the configured
+server-side Brave Web Search API, then treats results as untrusted leads requiring
+exact ATS or company-page verification. Google Custom Search is not used or claimed
+as full-web Google search. Missing BRAVE_SEARCH_API_KEY returns an explicit
+configuration error; it never falls back to Gemini. Discovery consumes the external
+provider budget only.
+
+Gemini initializes server-side from GEMINI_API_KEY for analysis, evidence matches,
+plans, resumes, letters, evaluations, proof packs and outreach through owner-protected
+API routes. AI outputs remain
 untrusted; route authorization does not establish semantic candidate provenance.
 JSON parsing and redaction are not sufficient evidence validation.
-Phase 3 discovery uses server/discovery.ts and exact public ATS adapters, preserving
+Discovery uses server/discovery.ts and exact public ATS adapters, preserving
 search provenance separately from canonical content, independent source/local dates,
 uncertain freshness and unassessed jobs. Shared src/utils/jobIdentity.ts merges
 current/history matches without replacing application lifecycle/attachments.

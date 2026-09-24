@@ -137,7 +137,7 @@ test('encoded 2 MiB upload fits app and provider body budgets', () => {
 });
 
 test('real adapter no-config startup preserves health, nested private/auth errors and headers', async () => {
-  const keys = ['DATABASE_URL','OWNER_EMAIL','BETTER_AUTH_SECRET','BETTER_AUTH_URL','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','BLOB_STORE_ID','BLOB_READ_WRITE_TOKEN','VERCEL_OIDC_TOKEN','GEMINI_API_KEY'];
+  const keys = ['DATABASE_URL','OWNER_EMAIL','BETTER_AUTH_SECRET','BETTER_AUTH_URL','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','BLOB_STORE_ID','BLOB_READ_WRITE_TOKEN','VERCEL_OIDC_TOKEN','GEMINI_API_KEY','BRAVE_SEARCH_API_KEY'];
   const saved = keys.map(key => process.env[key]); keys.forEach(key => { delete process.env[key]; });
   const outer = express(); outer.disable('x-powered-by'); outer.use((req, res, next) => { void defaultHandler(req, res).catch(next); });
   const server = outer.listen(0, '127.0.0.1'); await new Promise<void>(r => server.once('listening', r));

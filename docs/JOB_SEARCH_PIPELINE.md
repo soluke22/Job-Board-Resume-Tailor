@@ -7,13 +7,23 @@ unassessed record -> source-backed requirements -> approved owner evidence retri
 -> validated semantic matching -> deterministic qualification/coverage/priority.
 
 ### Discovery source is not canonical source
-server/discovery.ts builds the prompt from allowlisted configured SearchProfile
-preferences. No candidate identity/contact/evidence is sent by discovery. Optional
-customQueries are passed as search-query suggestions; provider execution cannot
-be guaranteed. Grounding web source URLs and actual SDK webSearchQueries are
-retained. Missing grounding metadata is not fabricated. Discovery company/title
-labels remain in discoveryCompany/discoveryTitle; a provider title replaces the
+server/discovery.ts deterministically builds at most ten human-readable queries from
+allowlisted SearchProfile fields. It uses role families, modifiers, technologies,
+remote/location preferences and targeted Ashby/Greenhouse/Lever domains without
+turning exclusion lists into positive terms. The browser sends only queryBudget;
+the server loads the owner-scoped persisted SearchProfile and existing jobs after the
+normal save-before-request fence. Candidate identity, contact, evidence and history
+are not accepted from the request or sent to Brave. Brave result URLs/titles/snippets remain untrusted discovery
+data; missing metadata is not fabricated. A verified provider title replaces the
 display title when available. No company identity is invented from a board slug.
+
+The broad-web provider is Brave Search using its independent index. This is a
+general web-search provider, not Google-direct search. Google Custom Search JSON API
+is closed to new customers and is not an appropriate new full-web dependency.
+Persisting search-result fields requires a Brave plan whose terms grant storage
+rights. Greenhouse, Ashby and Lever APIs remain board/company-scoped verification
+sources, not universal job indexes. Workday has no implemented universal public API;
+recognized Workday postings remain unsupported rather than scraped or promoted.
 
 discoveryUrl, discoveryAliases, discoverySourceUrls and discoverySummary retain
 untrusted discovery data. canonicalUrl/applyUrl come from supported provider
@@ -91,13 +101,16 @@ not certified until reassessed through the Phase 4 contract.
 Classification is not fit. Removed discoveries are not returned as new active leads;
 unlisted/unknown/unsupported records retain visible uncertainty, not active claims.
 
-### Request budget
-One Gemini grounding request runs per successful invocation. queryBudget (1-10)
-is an upper bound on discovery requests, not a requested number of Google queries.
-discoveryRequestsUsed counts the actual request invocation; legacy queryBudgetUsed
-is an alias with queryBudgetUnit discovery_requests. Internal Google query counts
-cannot be measured reliably; returned grounding query strings are provenance only.
-Invalid budgets/custom query shapes reject before any discovery request.
+### Request budget and failures
+queryBudget (1-10) is the maximum number of deterministic Brave Web Search queries.
+discoveryRequestsUsed and queryBudgetUsed report the exact executed query count with
+queryBudgetUnit web_search_queries. Each search query consumes an owner-scoped
+external-budget unit; no AI budget is reserved. Searches execute concurrently, at
+most twelve leads are verified concurrently, and each provider boundary has an
+eight-second deadline. Invalid budgets reject before search. Missing configuration
+and provider timeout/rate-limit/unavailability use
+SEARCH_* errors; malformed results use DISCOVERY_FAILED. These are never workspace
+authentication verdicts and never trigger a Gemini fallback.
 
 ### Fetch boundary
 server/safeFetch.ts serves generic verification and /api/fetch-job-url retrieval.

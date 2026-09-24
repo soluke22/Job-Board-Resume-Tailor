@@ -591,7 +591,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsDiscovering(true);
     setError(null);
     try {
-      const res = await apiService.discoverJobs(searchProfile, undefined, queryBudget, jobs);
+      const res = await apiService.discoverJobs(queryBudget);
       const newDiscovered = res.discoveredJobs || [];
 
       // Read the latest cache after the await: an in-flight search must not undo

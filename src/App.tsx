@@ -95,7 +95,7 @@ const AppContent: React.FC = () => {
           <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
           <span className="font-medium">
             {isDiscovering
-              ? 'Discovering active ATS postings with search grounding...'
+              ? 'Finding web leads and verifying exact ATS postings...'
               : isAnalyzing
               ? 'Analyzing job requirements against candidate evidence...'
               : 'Synthesizing tailored artifacts & defensible proof packs...'}
