@@ -38,10 +38,17 @@ The read-only security review's P2 correction makes `VERCEL_ENV=production` an
 unconditional veto even if `NODE_ENV` conflicts, with missing/conflicting
 environment regression coverage. Node 24.19.0 focused 30/30 and full 162/162,
 typecheck, build, strict privacy/runtime/release and whitespace checks pass.
-Next exact step: Preview publication and authenticated minimal, Search, then
-normal discovery validation.
-No key/configuration, Neon, provider-budget SQL, production, commit, push, or
-deployment action occurred.
+Dev Preview deployment `a8bd9e201822f0d8befab2fe3333367cc3ca0761`
+reached Ready. The authenticated minimal/no-tool probe returned application HTTP
+503 with `GEMINI_UNAVAILABLE`; its safe runtime log recorded provider status 503
+at `phase=probe-minimal`. Per the ordered stop rule, the Search probe and normal
+discovery were not run. Exact failure layer is Google service/provider HTTP 503,
+not the CareerOS request shape, Search tool, or discovery response processing;
+no source correction is indicated by this result. Next exact step: retry only
+the minimal probe after the provider service state changes, then continue the
+ordered sequence only if it succeeds. Two scoped dev commits were pushed solely
+to create the Preview diagnostic deployment. No key/configuration, Neon,
+provider-budget SQL, main, or production action occurred.
 
 ## P0 API error contract and provider-budget diagnostics (2026-09-23)
 
