@@ -103,8 +103,12 @@ Greenhouse exact success/404/error/board-only, Lever public exact success/404,
 unsupported ATS and spoofed hostname detection. Dates preserve actual provider
 publication/creation, keep update separate, and leave Recent/missing/future dates
 unknown. Discovery exceptions/missing URL never fabricate content/status/scores.
-Actual discovery executor tests preserve SDK grounding URLs/query strings, configured
-preferences/custom queries, excluded identity/contact and measured request budget.
+Discovery executor tests cover bounded human-readable role/design-system/technology/
+remote/location queries, arbitrary custom-query rejection, exclusion non-contamination,
+minimized request data, per-query external budgeting and exact query counts. Synthetic
+Brave transport fixtures cover missing
+configuration, success, zero results, malformed responses, timeout, rate limit and
+unavailability without any Gemini client or credential.
 
 Shared server/client merge tests cover ATS IDs, canonical/tracking/Greenhouse alias
 URLs, distinct requisitions, within-batch aliases, all application statuses,
@@ -122,15 +126,16 @@ choose a current public posting URL for each supported ATS; call the owner-prote
 /api/verify-ats and inspect exact provider ID, status, canonical content/URL and date
 provenance. Test board-only URL and unavailable ID separately; never assume a fixture
 posting remains public. Official API reference review is separate from this runtime
-smoke. With Gemini configured server-side, one /api/discover-jobs request using a
-synthetic SearchProfile and queryBudget 1 should retain grounding sources and return
-unassessed records; re-run with the resulting existingJobs to verify history matching.
+smoke. With an eligible Brave plan and BRAVE_SEARCH_API_KEY configured server-side,
+one /api/discover-jobs request using a synthetic SearchProfile and queryBudget 1
+should return factual unassessed leads; re-run with resulting existingJobs to verify
+history matching. The plan must permit storage of returned search-result fields.
 Do not log secrets/private records, apply, or make CI depend on live results.
 
 ### Remaining live and later-phase gates
 Security: live OAuth redirect/state/callback, Neon/Blob integration, multi-connection
 transport/locking, deployed cookies/runtime; deployed network/egress acceptance.
-ATS: manual live exact provider and Gemini grounding acceptance remain separate.
+ATS: manual live exact provider and Brave Web Search acceptance remain separate.
 Evidence: unsupported/JD-derived/cross-owner claims, manual invalidation and export.
 Integration: full authenticated browser lifecycle and truthful end-to-end workflows.
 Use synthetic Gemini/ATS/provider fixtures by default. Never log secrets or raw

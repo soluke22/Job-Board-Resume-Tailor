@@ -92,9 +92,3 @@ export function classifyGeminiError(error: unknown): GeminiFailure {
   }
   return { code: 'GEMINI_UNKNOWN', status, httpStatus: 502, message: 'Gemini request failed; retry later.' };
 }
-
-export function logGeminiFailure(failure: GeminiFailure, phase: 'discovery' | 'probe-minimal' | 'probe-search'): void {
-  const status = failure.status === undefined ? 'none' : String(failure.status);
-  const reason = failure.reason ? ` reason=${failure.reason}` : '';
-  console.warn(`Gemini request failed: category=${failure.code} status=${status}${reason} phase=${phase}`);
-}

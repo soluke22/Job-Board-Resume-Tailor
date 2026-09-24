@@ -1,5 +1,43 @@
 # Productionization execution plan
 
+## Deterministic Brave discovery migration (2026-09-24)
+
+Scope: replace Gemini/Google-grounded discovery only with a source-neutral,
+deterministic query layer and server-side Brave Web Search provider. Discovery
+sends only bounded SearchProfile-derived query parameters, then treats returned
+web results as untrusted leads before existing exact ATS verification and
+history-safe identity merging. Google-direct research is not claimed. Preserve
+owner/origin/no-store boundaries, the external budget only, all later Gemini
+workflows, ATS truthfulness, unassessed job defaults, and revisioned client
+merge protection. Remove temporary discovery Gemini probes/routes and obsolete
+discovery diagnostic coverage; do not remove the Gemini SDK.
+
+Acceptance: focused deterministic tests cover bounded query construction,
+provider configuration/success/zero/malformed/timeout/rate-limit/unavailable,
+URL and semantic dedupe, exact ATS states/date uncertainty, unassessed defaults,
+Gemini independence, and private-session preservation for SEARCH_* failures.
+Node 24 focused tests, typecheck, and build must pass. Update the environment
+example, runtime/privacy fixtures and only necessary architecture/pipeline/
+testing/deployment documentation. Commit/push may follow only after all gates and
+review pass. No deployment, production, credential, or live-provider action is authorized.
+
+Result: local implementation PASS; live browser acceptance
+CONFIGURATION_REQUIRED. Discovery now loads owner-scoped persisted preferences/jobs,
+builds at most ten deterministic queries, calls Brave Web Search without any Gemini
+client/AI budget, bounds provider data and exact ATS verification, and returns only
+UNASSESSED records. Every Brave query consumes the external budget. Searches and a
+maximum twelve verifications run concurrently behind eight-second provider deadlines.
+Greenhouse/Ashby/Lever remain exact board-scoped verifiers; Workday/company careers
+retain unsupported/unknown truth. Alias-aware identity preserves existing IDs and
+the in-flight deletion fence. Temporary Gemini probes are removed; Gemini remains for
+assessment/tailoring/artifacts. Node 24.19.0 focused 28/28 and final release 161/161
+pass with typecheck, build, harness, strict privacy zero, runtime and diff checks.
+Read-only security re-review found no remaining demonstrated Blocker/High/P2 defect.
+No eligible BRAVE_SEARCH_API_KEY/result-storage plan was configured, so no live Brave
+call, authenticated browser acceptance or dev deployment occurred. A scoped dev
+checkpoint may follow this validated result. Production source/configuration/database
+changes: none.
+
 ## Gemini discovery provider-boundary diagnosis (2026-09-24)
 
 Scope: classify only the server-side Gemini failure boundary and add a private,
