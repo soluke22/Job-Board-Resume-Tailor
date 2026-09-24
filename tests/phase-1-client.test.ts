@@ -36,6 +36,12 @@ test('private API error codes preserve a valid session for provider failures and
       { status: 401, code: 'AUTH_REQUIRED', losesAccess: true },
       { status: 403, code: 'AUTH_FORBIDDEN', losesAccess: true },
       { status: 429, code: 'PROVIDER_BUDGET_EXCEEDED', losesAccess: false },
+      { status: 502, code: 'GEMINI_AUTH_INVALID', losesAccess: false },
+      { status: 401, code: 'GEMINI_AUTH_INVALID', losesAccess: false },
+      { status: 502, code: 'GEMINI_PERMISSION_DENIED', losesAccess: false },
+      { status: 502, code: 'GEMINI_REQUEST_INVALID', losesAccess: false },
+      { status: 502, code: 'GEMINI_MODEL_NOT_FOUND', losesAccess: false },
+      { status: 502, code: 'GEMINI_PAYMENT_REQUIRED', losesAccess: false },
     ]) {
       authenticate();
       globalThis.fetch = async (_path, init) => {
