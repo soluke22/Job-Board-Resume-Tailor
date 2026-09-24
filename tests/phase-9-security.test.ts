@@ -131,7 +131,7 @@ test('provider budget and discovery responses expose safe, actionable error code
   assert.equal(success.status, 200); assert.deepEqual(await success.json(), { discoveredJobs: [], refreshedJobs: [], discoveryRequestsUsed: 1, queryBudgetUsed: 1, queryBudgetUnit: 'discovery_requests', freshnessStats: { newCount: 0, recentCount: 0, unknownCount: 0 } });
   const failedApp = express(); failedApp.use(express.json()); failedApp.post('/api/discover-jobs', createDiscoveryHandler(() => ({ models: { generateContent: async () => { throw new Error('synthetic provider failure'); } } } as any)));
   const failed = await request(failedApp, '/api/discover-jobs', { searchProfile: profile });
-  assert.equal(failed.status, 500); assert.deepEqual(await failed.json(), { error: 'Job discovery failed', code: 'DISCOVERY_FAILED' });
+  assert.equal(failed.status, 502); assert.deepEqual(await failed.json(), { error: 'Gemini request failed; retry later.', code: 'GEMINI_UNKNOWN' });
 
   const innerBudgetApp = (reserve: any) => {
     const app = express(); app.use(express.json());

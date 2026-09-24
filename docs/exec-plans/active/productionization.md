@@ -1,5 +1,45 @@
 # Productionization execution plan
 
+## Gemini discovery provider-boundary diagnosis (2026-09-24)
+
+Scope: classify only the server-side Gemini failure boundary and add a private,
+owner-authenticated diagnostic probe that is unavailable in Vercel Production.
+The probe sends static minimal or Google Search-only content, returns no model
+content, and reuses the normal server-only Gemini client and AI budget boundary.
+Add deterministic tests for the installed SDK's documented error structure and
+request shape. No Gemini key/configuration, Neon, provider-budget SQL, BUG-003,
+BUG-004, commit, push, merge, or production deployment/change is authorized.
+Acceptance: safe structured error codes/log metadata never expose secrets,
+payloads, candidates, stacks, headers, session data, or raw provider responses;
+the deployed Preview-only diagnostic can distinguish minimal versus Search calls
+after separate publication authorization; normal discovery behavior remains
+private/owner guarded.
+
+Result: local implementation and deterministic validation PASS. Installed
+`@google/genai` 2.22.0 declarations and generated source confirm the current
+`gemini-3.8-flash`, `contents`, `config.tools: [{ googleSearch: {} }]`, and
+nested `config.httpOptions` request shape; no speculative request correction
+was made. Provider-call failures now return a safe structured Gemini category
+while discovery parsing, grounding processing, and ATS work retain their
+separate generic failure boundary. The diagnostic accepts exactly `{mode}` and
+sends only `Return the word OK.`; it is owner-guarded by route order and omitted
+when `VERCEL_ENV=production`. Consolidated review correction: all upstream
+Gemini auth/permission/request/model/payment failures use safe gateway status
+502 (never browser-auth 401/403), and the client independently refuses any
+`GEMINI_*` code as a workspace-auth verdict. An exact, bounded JSON parse of
+the installed SDK's ApiError message recognizes only allowlisted
+`error.details[].reason` API-key codes; only that approved reason can reach
+the diagnostic log. Nested Node/undici cause codes are likewise allowlisted as
+timeout or transport, and static probe logs distinguish minimal from Search.
+The read-only security review's P2 correction makes `VERCEL_ENV=production` an
+unconditional veto even if `NODE_ENV` conflicts, with missing/conflicting
+environment regression coverage. Node 24.19.0 focused 30/30 and full 162/162,
+typecheck, build, strict privacy/runtime/release and whitespace checks pass.
+Next exact step: Preview publication and authenticated minimal, Search, then
+normal discovery validation.
+No key/configuration, Neon, provider-budget SQL, production, commit, push, or
+deployment action occurred.
+
 ## P0 API error contract and provider-budget diagnostics (2026-09-23)
 
 Scope: BUG-001 and BUG-002 only. Add a stable, safe API error contract so non-auth provider/application failures preserve an authenticated private workspace while explicit authentication failures continue to fail closed; classify provider-budget exhaustion separately from unexpected persistence unavailability and add regression coverage/diagnostics. Preserve existing budget transaction semantics, rate limits, origin/session/owner protections, and provenance boundaries. No migration, commit, push, deployment, configuration, or live-resource action is authorized. Acceptance: focused Node 24 regressions cover client A–E plus server discovery/auth/budget classifications; parent performs final diff, security, and full validation.

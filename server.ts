@@ -16,6 +16,7 @@ import { verifyPostingAts } from './server/atsAdapters.js';
 import { executeDiscoveryRequest, validateDiscoveryInput } from './server/discovery.js';
 import { mergeDiscoveredJobs } from './src/utils/jobIdentity.js';
 import { safeFetchText } from './server/safeFetch.js';
+import { classifyGeminiError, logGeminiFailure } from './server/geminiDiagnostics.js';
 
 
 dotenv.config();
@@ -54,6 +55,9 @@ app.use('/api', createProviderBudgetMiddleware());
 
 // Lazy initialization of GoogleGenAI
 export class ProviderBudgetUnavailable extends Error {}
+class GeminiProviderFailure extends Error {
+  constructor(readonly providerError: unknown) { super('Gemini provider request failed'); }
+}
 export async function reserveAiProviderCall(ownerId: string, reserve = reserveProviderCall): Promise<void> {
   try {
     await reserve(ownerId, 'ai');
@@ -288,6 +292,9 @@ export function createDiscoveryHandler(client = getGeminiClient): RequestHandler
       // Budget counts requests, not Google's unobservable internal query execution.
       const outcome = await executeDiscoveryRequest(prompt => ai.models.generateContent({
         model: MODEL_NAME, contents: [{text: prompt}], config: {tools: [{googleSearch: {}}]}
+      }).catch(error => {
+        if (error instanceof ProviderBudgetExceeded || error instanceof ProviderBudgetUnavailable) throw error;
+        throw new GeminiProviderFailure(error);
       }), searchProfile, queryBudget, customQueries);
       const candidates = outcome.jobs;
       const merged = mergeDiscoveredJobs(Array.isArray(existingJobs) ? existingJobs : [], candidates);
@@ -311,12 +318,59 @@ export function createDiscoveryHandler(client = getGeminiClient): RequestHandler
         res.status(503).json({ error: 'AI operation budget is temporarily unavailable; retry later', code: 'PROVIDER_UNAVAILABLE' });
         return;
       }
+      if (error instanceof GeminiProviderFailure) {
+        const failure = classifyGeminiError(error.providerError);
+        logGeminiFailure(failure, 'discovery');
+        res.status(failure.httpStatus).json({ error: failure.message, code: failure.code });
+        return;
+      }
       console.error('Private operation failed');
       res.status(500).json({ error: 'Job discovery failed', code: 'DISCOVERY_FAILED' });
     }
   };
 }
 app.post('/api/discover-jobs', createDiscoveryHandler());
+
+type GeminiProbeMode = 'minimal' | 'search';
+export function isDevOrPreviewRuntime(): boolean {
+  if (process.env.VERCEL_ENV === 'production') return false;
+  return process.env.VERCEL_ENV === 'preview' || process.env.NODE_ENV !== 'production';
+}
+export function createGeminiProbeHandler(client = getGeminiClient): RequestHandler {
+  return async (req, res): Promise<void> => {
+    const body = req.body;
+    const mode: GeminiProbeMode | undefined = body?.mode === 'minimal' || body?.mode === 'search' ? body.mode : undefined;
+    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 1 || !mode) {
+      res.status(400).json({ error: 'Invalid Gemini diagnostic probe.' }); return;
+    }
+    const ai = client(req, true);
+    if (!ai) { res.status(503).json({ error: 'AI generation is not configured.', code: 'AI_NOT_CONFIGURED' }); return; }
+    try {
+      await ai.models.generateContent({
+        model: MODEL_NAME,
+        contents: [{ text: 'Return the word OK.' }],
+        config: mode === 'search' ? { tools: [{ googleSearch: {} }] } : undefined
+      });
+      res.json({ ok: true });
+    } catch (error) {
+      if (error instanceof ProviderBudgetExceeded) {
+        res.status(429).json({ error: 'AI operation budget exceeded; retry after the current window', code: 'PROVIDER_BUDGET_EXCEEDED' });
+        return;
+      }
+      if (error instanceof ProviderBudgetUnavailable) {
+        console.warn('provider_budget_unavailable category=ai');
+        res.status(503).json({ error: 'AI operation budget is temporarily unavailable; retry later', code: 'PROVIDER_UNAVAILABLE' });
+        return;
+      }
+      const failure = classifyGeminiError(error);
+      logGeminiFailure(failure, mode === 'minimal' ? 'probe-minimal' : 'probe-search');
+      res.status(failure.httpStatus).json({ error: failure.message, code: failure.code });
+    }
+  };
+}
+// This route is registered after the owner guard and is never present in a
+// Vercel Production runtime. It carries no candidate or workspace input.
+if (isDevOrPreviewRuntime()) app.post('/api/internal/gemini-probe', createGeminiProbeHandler());
 
 // Phase 6 certified downstream artifacts use the Phase 4/5 strict adapter.
 for (const [path, operation] of [['generate-proof-pack','proof'],['generate-outreach','outreach'],['generate-answers','answers'],['generate-referral','referral']] as const) {
