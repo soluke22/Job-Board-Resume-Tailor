@@ -47,7 +47,7 @@ test('Gemini failure logs contain category/status/phase only', () => {
 });
 
 test('authenticated-only Gemini probe emits static minimal/search requests and safe errors', async () => {
-  const { createGeminiProbeHandler, isDevOrPreviewRuntime } = await import('../server');
+  const { createGeminiProbeHandler, geminiProbePageHandler, isDevOrPreviewRuntime } = await import('../server');
   const environment = { NODE_ENV: process.env.NODE_ENV, VERCEL_ENV: process.env.VERCEL_ENV };
   try {
     Object.assign(process.env, { NODE_ENV: 'production', VERCEL_ENV: 'production' });
@@ -69,11 +69,18 @@ test('authenticated-only Gemini probe emits static minimal/search requests and s
   const ai = { models: { generateContent: async (params: any) => { requests.push(params); return { text: 'OK' }; } } } as any;
   const app = express();
   app.use(express.json());
+  app.get('/api/internal/gemini-probe', geminiProbePageHandler);
   app.post('/api/internal/gemini-probe', createGeminiProbeHandler(() => ai));
   const server = app.listen(0, '127.0.0.1');
   await new Promise<void>(resolve => server.once('listening', resolve));
   const url = `http://127.0.0.1:${(server.address() as any).port}/api/internal/gemini-probe`;
   try {
+    const page = await fetch(url);
+    assert.equal(page.status, 200);
+    assert.match(page.headers.get('content-type') || '', /^text\/html/);
+    const html = await page.text();
+    assert.match(html, /Static Preview-only probes/);
+    assert.doesNotMatch(html, /candidateProfile|existingJobs|evidenceItems/);
     for (const mode of ['minimal', 'search']) {
       const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
       assert.equal(response.status, 200);

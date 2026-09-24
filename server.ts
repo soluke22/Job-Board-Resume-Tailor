@@ -368,9 +368,21 @@ export function createGeminiProbeHandler(client = getGeminiClient): RequestHandl
     }
   };
 }
+export const geminiProbePageHandler: RequestHandler = (_req, res) => {
+  res.type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Gemini diagnostic</title></head><body>
+<h1>Gemini diagnostic</h1><p>Static Preview-only probes. No candidate or workspace data is sent.</p>
+<button type="button" data-mode="minimal">Run minimal probe</button>
+<button type="button" data-mode="search">Run Search probe</button>
+<pre id="result" aria-live="polite">Not run</pre>
+<script>for(const button of document.querySelectorAll('button'))button.addEventListener('click',async()=>{const result=document.querySelector('#result');result.textContent='Running';try{const response=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:button.dataset.mode})});const body=await response.json();result.textContent=JSON.stringify({http:response.status,...body},null,2)}catch{result.textContent=JSON.stringify({http:0,error:'Probe request failed.'},null,2)}})</script>
+</body></html>`);
+};
 // This route is registered after the owner guard and is never present in a
 // Vercel Production runtime. It carries no candidate or workspace input.
-if (isDevOrPreviewRuntime()) app.post('/api/internal/gemini-probe', createGeminiProbeHandler());
+if (isDevOrPreviewRuntime()) {
+  app.get('/api/internal/gemini-probe', geminiProbePageHandler);
+  app.post('/api/internal/gemini-probe', createGeminiProbeHandler());
+}
 
 // Phase 6 certified downstream artifacts use the Phase 4/5 strict adapter.
 for (const [path, operation] of [['generate-proof-pack','proof'],['generate-outreach','outreach'],['generate-answers','answers'],['generate-referral','referral']] as const) {

@@ -23,7 +23,10 @@ was made. Provider-call failures now return a safe structured Gemini category
 while discovery parsing, grounding processing, and ATS work retain their
 separate generic failure boundary. The diagnostic accepts exactly `{mode}` and
 sends only `Return the word OK.`; it is owner-guarded by route order and omitted
-when `VERCEL_ENV=production`. Consolidated review correction: all upstream
+when `VERCEL_ENV=production`. Its same-route GET page is likewise Preview-only,
+owner-authenticated and static; it renders only safe probe status/code fields so
+authenticated browser validation does not weaken the HttpOnly session boundary.
+Consolidated review correction: all upstream
 Gemini auth/permission/request/model/payment failures use safe gateway status
 502 (never browser-auth 401/403), and the client independently refuses any
 `GEMINI_*` code as a workspace-auth verdict. An exact, bounded JSON parse of
