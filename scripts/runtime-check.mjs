@@ -22,7 +22,7 @@ const root = resolve('dist/client');
 const html = await readFile(resolve(root, 'index.html'), 'utf8');
 const asset = html.match(/src="(\/assets\/[^"/]+-[^"/]+\.js)"/)?.[1];
 assert(asset, 'Expected hashed Vite client asset'); await stat(resolve(root, '.' + asset));
-const names = ['GEMINI_API_KEY','BRAVE_SEARCH_API_KEY','DATABASE_URL','BETTER_AUTH_SECRET','BETTER_AUTH_URL','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','OWNER_EMAIL','BLOB_READ_WRITE_TOKEN','BLOB_STORE_ID','VERCEL_OIDC_TOKEN'];
+const names = ['GEMINI_API_KEY','DATABASE_URL','BETTER_AUTH_SECRET','BETTER_AUTH_URL','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','OWNER_EMAIL','BLOB_READ_WRITE_TOKEN','BLOB_STORE_ID','VERCEL_OIDC_TOKEN'];
 let bytes = 0, files = 0;
 async function scan(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {

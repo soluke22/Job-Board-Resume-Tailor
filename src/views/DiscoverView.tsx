@@ -20,6 +20,8 @@ import {
   Plus
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { apiService } from '../services/api';
+import { buildDiscoveryQueries, discoverySourcesForWorkspace, googleSearchUrl, type DiscoverySource } from '../utils/discovery';
 import {
   JobRecord,
   AtsProvider,
@@ -38,7 +40,7 @@ export const DiscoverView: React.FC = () => {
     openResumeEditor,
     logOutcome,
     searchProfile,
-    updateSearchProfile,
+    saveSearchProfile,
     setCurrentView,
     addJob
   } = useApp();
@@ -54,6 +56,13 @@ export const DiscoverView: React.FC = () => {
   const [manualUrl, setManualUrl] = useState('');
   const [manualCompany, setManualCompany] = useState('');
   const [manualTitle, setManualTitle] = useState('');
+  const [sourceCompany, setSourceCompany] = useState('');
+  const [sourceInput, setSourceInput] = useState('');
+  const [sourceError, setSourceError] = useState<string | null>(null);
+  const [sourceBusy, setSourceBusy] = useState(false);
+
+  const googleQueries = buildDiscoveryQueries(searchProfile, 10);
+  const discoverySources = discoverySourcesForWorkspace(searchProfile, jobs).filter(source => !source.removed);
 
   const filteredJobs = jobs.filter((job) => {
     if (filterFamily !== 'all' && job.primaryRoleFamily !== filterFamily) return false;
@@ -72,13 +81,40 @@ export const DiscoverView: React.FC = () => {
 
   const handleManualAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualText.trim()) return;
+    if (!manualText.trim() && !manualUrl.trim()) return;
     await addJob(manualText, manualUrl, manualCompany, manualTitle);
     setManualText('');
     setManualUrl('');
     setManualCompany('');
     setManualTitle('');
     setIsManualModalOpen(false);
+  };
+
+  const persistSource = async (source: DiscoverySource) => {
+    const sources = [...(searchProfile.discoverySources || []).filter(existing => existing.id !== source.id), source];
+    await saveSearchProfile({ ...searchProfile, discoverySources: sources });
+  };
+
+  const handleAddSource = async (event: React.FormEvent) => {
+    event.preventDefault(); setSourceError(null); setSourceBusy(true);
+    try {
+      const { source } = await apiService.validateDiscoverySource(sourceInput, sourceCompany);
+      await persistSource({ ...source, removed: false });
+      setSourceInput(''); setSourceCompany('');
+    } catch (error: any) { setSourceError(error.message || 'Discovery source validation failed'); }
+    finally { setSourceBusy(false); }
+  };
+
+  const setSourceEnabled = async (source: DiscoverySource, enabled: boolean) => {
+    setSourceError(null);
+    try { await persistSource({ ...source, origin: 'configured', enabled, removed: false }); }
+    catch (error: any) { setSourceError(error.message || 'Discovery source update failed'); }
+  };
+
+  const removeSource = async (source: DiscoverySource) => {
+    setSourceError(null);
+    try { await persistSource({ ...source, origin: 'configured', enabled: false, removed: true }); }
+    catch (error: any) { setSourceError(error.message || 'Discovery source removal failed'); }
   };
 
   const getPriorityBadgeClass = (priority?: string) => {
@@ -148,7 +184,7 @@ export const DiscoverView: React.FC = () => {
               className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center space-x-1.5 transition cursor-pointer"
             >
               <Plus className="w-4 h-4 text-emerald-400" />
-              <span>Paste JD</span>
+                <span>Add Posting</span>
             </button>
 
             <button
@@ -240,6 +276,54 @@ export const DiscoverView: React.FC = () => {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4" aria-labelledby="discovery-sources-title">
+          <div>
+            <h2 id="discovery-sources-title" className="text-base font-bold text-white">Discovery Sources</h2>
+            <p className="text-xs text-slate-400 mt-1">Keyless scans use only validated public Ashby, Greenhouse, and Lever boards. Verified jobs can contribute learned board identities.</p>
+          </div>
+          <div className="space-y-2">
+            {discoverySources.length ? discoverySources.map(source => (
+              <div key={source.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-xs">
+                <div>
+                  <div className="font-semibold text-slate-200">{source.company}</div>
+                  <div className="text-slate-500">{source.provider} · {source.boardId} · {source.origin}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setSourceEnabled(source, !source.enabled)} className={`rounded-lg border px-2.5 py-1 ${source.enabled ? 'border-emerald-700 text-emerald-300' : 'border-slate-700 text-slate-400'}`}>
+                    {source.enabled ? 'Enabled' : 'Disabled'}
+                  </button>
+                  <button type="button" onClick={() => removeSource(source)} className="rounded-lg border border-slate-700 px-2.5 py-1 text-slate-400 hover:text-rose-300">Remove</button>
+                </div>
+              </div>
+            )) : <p className="rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-400">No public boards are configured or learned yet. Google exploration and manual posting import remain available.</p>}
+          </div>
+          <form onSubmit={handleAddSource} className="grid grid-cols-1 sm:grid-cols-[1fr_1.5fr_auto] gap-2">
+            <input value={sourceCompany} onChange={event => setSourceCompany(event.target.value)} required maxLength={200} placeholder="Company label" className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" />
+            <input value={sourceInput} onChange={event => setSourceInput(event.target.value)} required placeholder="Board URL or greenhouse:board" className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" />
+            <button disabled={sourceBusy} className="rounded-xl bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 disabled:opacity-50">{sourceBusy ? 'Validating…' : 'Add Source'}</button>
+          </form>
+          {sourceError && <p role="alert" className="text-xs text-rose-300">{sourceError}</p>}
+        </section>
+
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4" aria-labelledby="broader-search-title">
+          <div>
+            <h2 id="broader-search-title" className="text-base font-bold text-white">Broader Web Search</h2>
+            <p className="text-xs text-slate-400 mt-1">Open a targeted Google search, then add useful postings back to CareerOS. CareerOS does not scrape Google or require a search API key.</p>
+          </div>
+          <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+            {googleQueries.map(query => (
+              <div key={query} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                <code className="text-[11px] text-slate-300 break-all">{query}</code>
+                <a href={googleSearchUrl(query)} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-sky-800 bg-sky-950/40 px-2.5 py-1.5 text-xs font-semibold text-sky-300">
+                  Search Google
+                </a>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
       {/* Discovered Postings List */}
       <div className="space-y-4">
         <div className="flex items-center justify-between text-xs text-slate-400 px-1">
@@ -252,7 +336,7 @@ export const DiscoverView: React.FC = () => {
             <Compass className="w-10 h-10 text-slate-600 mx-auto mb-3" />
             <h3 className="text-base font-semibold text-white">No postings match current filters</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Click &quot;Discover New Roles&quot; above to search live ATS postings or reset your filter parameters.
+              Scan a configured public board, open a targeted Google search, or add a posting URL/JD.
             </p>
           </div>
         ) : (
@@ -446,7 +530,8 @@ export const DiscoverView: React.FC = () => {
       {isManualModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white">Paste Job Posting for Verification</h3>
+            <h3 className="text-lg font-bold text-white">Add Posting</h3>
+            <p className="text-xs text-slate-400">Paste a URL, a job description, or both. Supported ATS URLs are verified canonically; every imported role remains UNASSESSED.</p>
             <form onSubmit={handleManualAdd} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -472,7 +557,7 @@ export const DiscoverView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs text-slate-300 mb-1">Direct ATS URL (Optional)</label>
+                <label className="block text-xs text-slate-300 mb-1">Posting URL</label>
                 <input
                   type="url"
                   value={manualUrl}
@@ -483,10 +568,9 @@ export const DiscoverView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs text-slate-300 mb-1">Job Description</label>
+                <label className="block text-xs text-slate-300 mb-1">Job Description (optional when URL is present)</label>
                 <textarea
                   rows={5}
-                  required
                   value={manualText}
                   onChange={(e) => setManualText(e.target.value)}
                   placeholder="Paste full job description here..."
@@ -506,7 +590,7 @@ export const DiscoverView: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold"
                 >
-                  Save &amp; Screen Role
+                  Add Unassessed Posting
                 </button>
               </div>
             </form>

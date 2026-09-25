@@ -180,7 +180,7 @@ test('actual installed route inventory protects all application, workspace and p
   const { app } = await import('../server');
   const routes = app._router.stack.filter((layer: any) => layer.route).flatMap((layer: any) => Object.keys(layer.route.methods).map(method => ({ method, path: layer.route.path })));
   const privateRoutes = routes.filter((route: any) => route.path.startsWith('/api/') && !route.path.startsWith('/api/auth/') && route.path !== '/api/health');
-  assert.equal(privateRoutes.length, 22); // 16 application APIs + 6 guarded file methods; temporary Gemini probes were removed
+  assert.equal(privateRoutes.length, 24); // 18 application APIs + 6 guarded file methods; board validation/import are owner-only
   assert.ok(privateRoutes.some((route:any)=>route.path==='/api/validate-resume'));
   await serve(app, async url => {
     for (const route of [...privateRoutes, { method: 'post', path: '/api/workspace/data' }, { method: 'post', path: '/api/workspace/evidence-approval' }, ...['data', 'import', 'export', 'audit-log'].map(path => ({ method: path === 'import' ? 'post' : 'get', path: '/api/workspace/' + path }))]) {

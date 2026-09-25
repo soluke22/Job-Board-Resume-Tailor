@@ -56,7 +56,6 @@ export. Record actual Function bundle size from Vercel output before release.
 | GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET | Private Google OAuth | Local callback credentials | Absent | Staging registered callback | Production registered callback |
 | OWNER_EMAIL | Private verified owner | Authorized test owner | Absent | Authorized staging owner | Actual owner; never public |
 | GEMINI_API_KEY | Private AI only | Optional test key | Absent | Optional synthetic-only smoke key | Production server key |
-| BRAVE_SEARCH_API_KEY | Deterministic private discovery only; plan must grant result storage | Optional test key | Absent | Staging server key | Production server key |
 | BLOB_STORE_ID | Preferred deployed Blob OIDC config | Optional | Absent | Isolated PRIVATE staging store | PRIVATE production store |
 | VERCEL_OIDC_TOKEN | Provider-managed Blob credential | Do not copy | No private store access | Vercel manages/refreshes | Vercel manages/refreshes |
 | BLOB_READ_WRITE_TOKEN | Outside-Vercel/static fallback | Isolated test-store token | Absent | Omit with working OIDC | Omit with working OIDC |
@@ -67,7 +66,7 @@ Never use `VITE_*` secrets. Resource IDs still need environment separation. Scop
 sensitive Preview variables to the explicit stable staging branch/domain, not all
 feature previews. Do not copy production DB/store/secrets into preview. Ordinary
 ephemeral previews exercise public synthetic demo with private auth unavailable.
-Public navigation and `/api/health` must not contact Neon/Blob/Gemini/Google/Brave.
+Public navigation and `/api/health` must not contact Neon/Blob/Gemini/Google or public ATS endpoints.
 
 ### Private resources, OAuth and migrations
 
@@ -221,7 +220,7 @@ and [abort semantics](https://vercel.com/docs/vercel-blob/examples#aborting-requ
 
 ## Configuration, migrations and live gates
 
-.env.example names server-only GEMINI_API_KEY, BRAVE_SEARCH_API_KEY, DATABASE_URL, BETTER_AUTH_SECRET,
+.env.example names server-only GEMINI_API_KEY, DATABASE_URL, BETTER_AUTH_SECRET,
 BETTER_AUTH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OWNER_EMAIL and
 BLOB_READ_WRITE_TOKEN. Never expose their values or use browser-prefixed secrets.
 Auth origin and registered Google callback must match the intended target.

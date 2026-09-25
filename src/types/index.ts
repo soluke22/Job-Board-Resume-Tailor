@@ -104,6 +104,7 @@ export interface SearchProfile {
   technologyStrengths: string[];
   technologyAdjacencies: string[];
   technologyGaps: string[];
+  discoverySources?: import('../utils/discovery').DiscoverySource[];
 }
 
 export type EvidenceStrength = 'Strong' | 'Moderate' | 'Weak' | 'Missing';

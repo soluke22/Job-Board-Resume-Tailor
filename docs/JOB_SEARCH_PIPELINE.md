@@ -7,23 +7,23 @@ unassessed record -> source-backed requirements -> approved owner evidence retri
 -> validated semantic matching -> deterministic qualification/coverage/priority.
 
 ### Discovery source is not canonical source
-server/discovery.ts deterministically builds at most ten human-readable queries from
+src/utils/discovery.ts deterministically builds at most ten human-readable queries from
 allowlisted SearchProfile fields. It uses role families, modifiers, technologies,
 remote/location preferences and targeted Ashby/Greenhouse/Lever domains without
-turning exclusion lists into positive terms. The browser sends only queryBudget;
-the server loads the owner-scoped persisted SearchProfile and existing jobs after the
-normal save-before-request fence. Candidate identity, contact, evidence and history
-are not accepted from the request or sent to Brave. Brave result URLs/titles/snippets remain untrusted discovery
-data; missing metadata is not fabricated. A verified provider title replaces the
-display title when available. No company identity is invented from a board slug.
+turning exclusion lists into positive terms. The UI encodes each as a normal
+`https://www.google.com/search?q=...` link. CareerOS neither calls a Google/search API
+nor scrapes or stores Google results. Candidate identity, contact, evidence and
+history never enter query construction. The owner reviews browser results and imports
+a useful posting URL or pasted JD through the manual flow.
 
-The broad-web provider is Brave Search using its independent index. This is a
-general web-search provider, not Google-direct search. Google Custom Search JSON API
-is closed to new customers and is not an appropriate new full-web dependency.
-Persisting search-result fields requires a Brave plan whose terms grant storage
-rights. Greenhouse, Ashby and Lever APIs remain board/company-scoped verification
-sources, not universal job indexes. Workday has no implemented universal public API;
-recognized Workday postings remain unsupported rather than scraped or promoted.
+Automatic discovery is separate: the server loads the owner-scoped persisted
+SearchProfile and jobs, unions validated configured sources with exact board identities
+learned from verified jobs, and scans enabled public Ashby, Greenhouse and Lever
+endpoints. Board URLs/identifiers are normalized through a fixed provider allowlist
+before validation; arbitrary hosts cannot become scan endpoints. Provider results are
+filtered only for explicit deterministic mismatches before exact posting verification.
+One unavailable board yields a failed source result while other boards can complete.
+Workday has no implemented universal public API and remains unsupported.
 
 discoveryUrl, discoveryAliases, discoverySourceUrls and discoverySummary retain
 untrusted discovery data. canonicalUrl/applyUrl come from supported provider
@@ -102,15 +102,14 @@ Classification is not fit. Removed discoveries are not returned as new active le
 unlisted/unknown/unsupported records retain visible uncertainty, not active claims.
 
 ### Request budget and failures
-queryBudget (1-10) is the maximum number of deterministic Brave Web Search queries.
-discoveryRequestsUsed and queryBudgetUsed report the exact executed query count with
-queryBudgetUnit web_search_queries. Each search query consumes an owner-scoped
-external-budget unit; no AI budget is reserved. Searches execute concurrently, at
-most twelve leads are verified concurrently, and each provider boundary has an
-eight-second deadline. Invalid budgets reject before search. Missing configuration
-and provider timeout/rate-limit/unavailability use
-SEARCH_* errors; malformed results use DISCOVERY_FAILED. These are never workspace
-authentication verdicts and never trigger a Gemini fallback.
+discoveryRequestsUsed and queryBudgetUsed report enabled public-board scans with
+queryBudgetUnit public_board_scans. Each scan reserves one owner-scoped external
+budget unit; no AI budget is reserved. Google links use the owner's browser and do not
+consume a CareerOS provider call. Board feeds are bounded to 500 entries, profile
+filtering precedes a 24-lead exact-verification cap, and provider boundaries have an
+eight-second deadline. A failed board is reported without converting the operation
+into workspace-auth loss. Zero configured sources or zero matching postings is a
+successful empty result. There is no model or general-search fallback.
 
 ### Fetch boundary
 server/safeFetch.ts serves generic verification and /api/fetch-job-url retrieval.

@@ -1,42 +1,62 @@
 # Productionization execution plan
 
-## Deterministic Brave discovery migration (2026-09-24)
+## Keyless ATS-board discovery correction (2026-09-24)
 
-Scope: replace Gemini/Google-grounded discovery only with a source-neutral,
-deterministic query layer and server-side Brave Web Search provider. Discovery
-sends only bounded SearchProfile-derived query parameters, then treats returned
-web results as untrusted leads before existing exact ATS verification and
-history-safe identity merging. Google-direct research is not claimed. Preserve
-owner/origin/no-store boundaries, the external budget only, all later Gemini
-workflows, ATS truthfulness, unassessed job defaults, and revisioned client
-merge protection. Remove temporary discovery Gemini probes/routes and obsolete
-discovery diagnostic coverage; do not remove the Gemini SDK.
+Baseline: clean tracked `dev` and freshly fetched `origin/dev` at
+`01b1bd72baa2c134161be09bb6012aa6220afa61`; `origin/main` remains
+`3309546643dd73b1c720c709fc1b45adc3a1ef41`. The known untracked
+`QA/2026-09-22-production-release.md` is unrelated and must remain untouched.
 
-Acceptance: focused deterministic tests cover bounded query construction,
-provider configuration/success/zero/malformed/timeout/rate-limit/unavailable,
-URL and semantic dedupe, exact ATS states/date uncertainty, unassessed defaults,
-Gemini independence, and private-session preservation for SEARCH_* failures.
-Node 24 focused tests, typecheck, and build must pass. Update the environment
-example, runtime/privacy fixtures and only necessary architecture/pipeline/
-testing/deployment documentation. Commit/push may follow only after all gates and
-review pass. No deployment, production, credential, or live-provider action is authorized.
+Scope: preserve the deterministic SearchProfile query builder, exact ATS
+verification, unknown-fact truthfulness, unassessed job defaults, history-safe
+dedupe, revision/deletion fences, owner/session behavior and external-only budget.
+Remove Brave and every general-web search credential/operation. Automatic discovery
+will scan only enabled owner-configured or safely learned public Greenhouse, Ashby
+and Lever boards through fixed provider endpoints. Discover will also expose at most
+ten normal `google.com/search` links for owner-reviewed broader exploration; it will
+not scrape or ingest Google results. The existing manual flow will accept a URL,
+optional pasted JD and optional owner labels, reuse exact ATS verification where
+supported, deduplicate, and persist the result as UNASSESSED. Workday remains
+UNSUPPORTED; generic company pages remain bounded UNKNOWN unless exact evidence
+supports another status. No assessment, tailoring, evidence, lifecycle, BUG-003,
+BUG-004, main, production, production configuration or production database work.
 
-Result: local implementation PASS; live browser acceptance
-CONFIGURATION_REQUIRED. Discovery now loads owner-scoped persisted preferences/jobs,
-builds at most ten deterministic queries, calls Brave Web Search without any Gemini
-client/AI budget, bounds provider data and exact ATS verification, and returns only
-UNASSESSED records. Every Brave query consumes the external budget. Searches and a
-maximum twelve verifications run concurrently behind eight-second provider deadlines.
-Greenhouse/Ashby/Lever remain exact board-scoped verifiers; Workday/company careers
-retain unsupported/unknown truth. Alias-aware identity preserves existing IDs and
-the in-flight deletion fence. Temporary Gemini probes are removed; Gemini remains for
-assessment/tailoring/artifacts. Node 24.19.0 focused 28/28 and final release 161/161
-pass with typecheck, build, harness, strict privacy zero, runtime and diff checks.
-Read-only security re-review found no remaining demonstrated Blocker/High/P2 defect.
-No eligible BRAVE_SEARCH_API_KEY/result-storage plan was configured, so no live Brave
-call, authenticated browser acceptance or dev deployment occurred. A scoped dev
-checkpoint may follow this validated result. Production source/configuration/database
-changes: none.
+Acceptance: with no Brave/Gemini/search key, boot and focused tests cover bounded
+private-data-free Google queries, standard encoded Google URLs, configured and
+learned source registries, provider/identifier allowlisting, owner add/enable/remove,
+Greenhouse/Ashby/Lever board normalization, conservative profile filtering, partial
+board failure, successful zero results, canonical dedupe, unknown date/remote facts,
+URL-only/manual-JD import, UNASSESSED defaults, no AI/search-provider calls, external
+budget classification and private-session preservation. Run Node 24 focused tests,
+full suite, typecheck, build, privacy, runtime, release and diff checks, followed by
+one bounded read-only security review. After a passing reviewed milestone, create a
+scoped dev checkpoint and push dev; deploy DEV only if local gates pass and current
+authenticated Preview configuration permits the requested browser acceptance.
+
+## Keyless ATS-board discovery correction result (2026-09-24)
+
+Implementation PASS. Removed the Brave dependency and replaced server-side
+general search with at most ten deterministic, private-data-free Google links.
+Automatic discovery uses enabled, owner-configured or learned Greenhouse,
+Ashby and Lever public boards only; Workday remains unsupported. Board records
+are learned from exact LISTED/UNLISTED ATS identities, filtered conservatively,
+normalized with unknown facts preserved, deduplicated and created UNASSESSED.
+Manual URL/JD imports use bounded public fetching and exact ATS verification
+where available. Added source management, provider validation, external-only
+budgets, and source-removal tombstones (including suppression of learned
+duplicates). Owner/session, evidence and downstream AI boundaries were
+reviewed; discovery does not call Gemini or any general-web API.
+
+Node 24.19.0 validation PASS: focused discovery 9/9, full suite 162/162,
+typecheck, build, harness, privacy scan (0 findings), runtime check, integrated
+release check and `git diff --check`. The build retains the existing >500 kB
+client chunk warning; release/runtime scripts identify actual Vercel routing
+and Function limits as external gates. A bounded read-only route/privacy/SSRF
+review found no Blocker/High regression. Browser Preview acceptance is pending:
+there is no local `.vercel` project link or confirmed live public board in the
+local test environment. Next exact step: commit and push this scoped change to
+`dev`, then inspect whether Git integration produced an authenticated Preview
+and whether a real configured public board is available before browser tests.
 
 ## Gemini discovery provider-boundary diagnosis (2026-09-24)
 

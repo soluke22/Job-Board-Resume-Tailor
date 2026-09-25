@@ -25,7 +25,9 @@ export const searchProfileSchema = object({ preferredRoleFamilies: strings, pref
   relocationAllowed: flag, clearancePolicy: z.enum(['exclude_clearance', 'open_to_clearance']),
   salaryPreference: object({ minTarget: number.optional(), minimumAcceptable: number.optional() }),
   hiringProcessPreferences: object({ dislikeAiInterviewers: flag.optional(), preferTakeHome: flag.optional(), dislikeLeetcode: flag.optional(), dislikeMultiRoundTakehome: flag.optional(), notes: text.optional() }),
-  companyExclusions: strings, technologyStrengths: strings, technologyAdjacencies: strings, technologyGaps: strings, ...review });
+  companyExclusions: strings, technologyStrengths: strings, technologyAdjacencies: strings, technologyGaps: strings,
+  discoverySources: list(z.object({ id, company: text, provider: z.enum(['ashby','greenhouse','lever']), boardId: text,
+    boardUrl: text, enabled: flag, origin: z.enum(['configured','learned']), validatedAt: text.optional(), removed: flag.optional() }).strict()).max(50).optional(), ...review });
 const verification = z.enum(['verified', 'provisional', 'session-unreviewed', 'unverified', 'manual-edit-unvalidated', 'rejected', 'requires-review']);
 export const evidenceSchema = object({ id, sourceType: text, sourceLocation: text, verificationStatus: verification,
   employer: text.optional(), role: text.optional(), period: text.optional(), context: text, rawEvidence: text,
