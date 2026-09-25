@@ -166,18 +166,28 @@ export const apiService = {
     return res.json();
   },
 
-  async discoverJobs(
-    queryBudget?: number,
-  ): Promise<{ discoveredJobs: any[]; refreshedJobs?: any[]; discoveryRequestsUsed?: number; queryBudgetUsed: number; freshnessStats: any }> {
+  async discoverJobs(): Promise<{ discoveredJobs: any[]; refreshedJobs?: any[]; discoverySources?: any[]; sourceResults?: any[]; googleSearches?: {query:string;url:string}[]; discoveryRequestsUsed?: number; queryBudgetUsed: number; freshnessStats: any }> {
     const res = await privateFetch('/api/discover-jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ queryBudget })
+      body: JSON.stringify({})
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Job discovery failed');
     }
+    return res.json();
+  },
+
+  async validateDiscoverySource(input: string, company: string): Promise<{source: import('../utils/discovery').DiscoverySource}> {
+    const res = await privateFetch('/api/discovery-sources/validate', jsonRequest({ input, company }));
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Discovery source validation failed'); }
+    return res.json();
+  },
+
+  async importJob(input: {url:string;description?:string;company?:string;title?:string}): Promise<{discoveredJobs:any[];refreshedJobs?:any[]}> {
+    const res = await privateFetch('/api/import-job', jsonRequest(input));
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Posting import failed'); }
     return res.json();
   },
 

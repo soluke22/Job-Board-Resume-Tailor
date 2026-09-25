@@ -35,6 +35,11 @@ export function sameJob(a: Partial<JobRecord>, b: Partial<JobRecord>): boolean {
 const verifiedFields = ['atsProvider','atsBoard','atsJobId','title','canonicalUrl','applyUrl','description','rawDescription','location','secondaryLocations','remoteStatus','workplaceType','employmentType','compensation','department','team','publishedAt','publicationDateSource','updatedAt','lastVerifiedAt','verificationStatus','isCurrentlyListed','freshnessBand','canonicalContentStatus','canonicalContentSource','canonicalMetadata'] as const;
 export function refreshJob(existing: JobRecord, incoming: JobRecord): JobRecord {
   const merged = {...existing};
+  if (incoming.jdSource === 'user-provided' && (incoming.rawDescription || incoming.description)) {
+    merged.description = incoming.description;
+    merged.rawDescription = incoming.rawDescription;
+    merged.jdSource = 'user-provided';
+  }
   if (['LISTED', 'UNLISTED'].includes(incoming.verificationStatus)) {
     for (const key of verifiedFields) if ((incoming as any)[key] !== undefined && (incoming as any)[key] !== '') (merged as any)[key] = (incoming as any)[key];
   } else {

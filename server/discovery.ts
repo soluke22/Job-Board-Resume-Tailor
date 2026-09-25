@@ -1,126 +1,191 @@
-import { JobRecord, SearchProfile } from '../src/types/index.js';
-import { detectAtsProvider, verifyPostingAts, JobVerificationResult } from './atsAdapters.js';
+import { randomUUID } from 'node:crypto';
+import type { JobRecord, SearchProfile } from '../src/types/index.js';
+import type { DiscoverySource, PublicBoardProvider } from '../src/utils/discovery.js';
+import { discoverySourcesForWorkspace } from '../src/utils/discovery.js';
+import { detectAtsProvider, providerDate, verifyPostingAts, type JobVerificationResult } from './atsAdapters.js';
 import { calculateFreshnessBand } from './searchEngine.js';
 import { normalizedJobUrl, mergeDiscoveredJobs } from '../src/utils/jobIdentity.js';
-import { randomUUID } from 'node:crypto';
+import { safeFetchText, validatePublicUrl } from './safeFetch.js';
 
-export interface DiscoveryLead { url: string; title?: string; description?: string; source?: 'brave-web-search' | 'web-search'; }
-export interface DiscoveryProvider { search(queries: string[]): Promise<DiscoveryLead[]>; }
-export class DiscoveryProviderError extends Error {
-  constructor(readonly code: 'SEARCH_TIMEOUT' | 'SEARCH_RATE_LIMITED' | 'SEARCH_PROVIDER_UNAVAILABLE' | 'DISCOVERY_FAILED', message: string) { super(message); }
+export interface DiscoveryLead {
+  url: string;
+  title?: string;
+  description?: string;
+  company?: string;
+  location?: string;
+  remoteStatus?: 'remote' | 'hybrid' | 'onsite' | 'unknown';
+  employmentType?: string;
+  source: 'public-board' | 'manual-web-import';
+  verification?: JobVerificationResult;
 }
 
-const values = (items: string[] | undefined, count: number) => (items || []).map(item => item.trim()).filter(Boolean).slice(0, count);
-const searchValues = (items: string[] | undefined, count: number) => values(items, count).map(item => item.replace(/"/g, '').slice(0, 80).trim()).filter(Boolean);
-const quoted = (value: string) => `"${value.replace(/"/g, '').trim()}"`;
-const ROLE_TERMS: Record<string, string[]> = {
-  'frontend-product': ['frontend engineer', 'product engineer'],
-  'ui-platform-design-systems': ['design systems engineer', 'UI platform engineer'],
-  'frontend-heavy-fullstack': ['full stack engineer', 'product engineer'],
-  'production-support-frontend': ['frontend engineer', 'production engineer'],
-  'forward-deployed-software': ['forward deployed software engineer']
-};
-const MODIFIER_TERMS: Record<string, string> = {
-  AI_PRODUCT: 'AI product', ACCESSIBILITY: 'accessibility', DEVELOPER_TOOLING: 'developer experience',
-  DESIGN_SYSTEMS: 'design systems', INTERNAL_TOOLS: 'internal tools', PRODUCTION_SUPPORT: 'production support'
-};
-const leadText = (value: unknown, maximum: number) => typeof value === 'string' ? value.trim().slice(0, maximum) || undefined : undefined;
-
-export function validateDiscoveryInput(profile: SearchProfile, budget: number) {
-  if (!profile || !Array.isArray(profile.preferredRoleFamilies) || !Array.isArray(profile.technologyStrengths)) throw new Error('Configure valid search preferences first.');
-  if (!Number.isInteger(budget) || budget < 1 || budget > 10) throw new Error('Query budget must be 1-10.');
-  for (const field of ['preferredRoleFamilies','preferredModifiers','technologyStrengths','targetSeniority','allowedEmploymentTypes','excludedEmploymentTypes','hybridLocations','excludedRolePatterns','companyExclusions'] as const) {
-    const value = profile[field];
-    if (value !== undefined && (!Array.isArray(value) || value.length > 100 || value.some(item => typeof item !== 'string' || item.length > 500))) throw new Error('Invalid search preference array.');
-  }
-  for (const field of ['remotePreference','maximumOnsiteFrequency','clearancePolicy'] as const) if (profile[field] !== undefined && (typeof profile[field] !== 'string' || profile[field].length > 100)) throw new Error('Invalid search preference.');
-  if (profile.relocationAllowed !== undefined && typeof profile.relocationAllowed !== 'boolean') throw new Error('Invalid relocation preference.');
-  for (const value of [profile.salaryPreference?.minTarget, profile.salaryPreference?.minimumAcceptable])
-    if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value))) throw new Error('Invalid salary preference.');
+export interface BoardScanResult {
+  sourceId: string;
+  status: 'SUCCESS' | 'FAILED';
+  leads: number;
 }
 
-/** Bounded search terms only: exclusions are filtering preferences, never positive searches. */
-export function buildDiscoveryQueries(profile: SearchProfile, budget: number): string[] {
-  validateDiscoveryInput(profile, budget);
-  const roleTerms = [...new Set(values(profile.preferredRoleFamilies, 5).flatMap(value => ROLE_TERMS[value] || []))];
-  if (!roleTerms.length) roleTerms.push('software engineer');
-  const modifierTerms = values(profile.preferredModifiers, 3).map(value => MODIFIER_TERMS[value]).filter(Boolean);
-  const technologies = searchValues(profile.technologyStrengths, 3);
-  const seniority = searchValues(profile.targetSeniority, 2);
-  const locations = profile.remotePreference === 'remote_only' ? ['remote'] : searchValues(profile.hybridLocations, 2);
-  const role = (index: number) => [seniority[index % Math.max(1, seniority.length)], modifierTerms[index % Math.max(1, modifierTerms.length)], roleTerms[index % roleTerms.length]].filter(Boolean).join(' ');
-  const strengths = technologies.slice(0, 2).map(quoted).join(' ');
-  const location = locations[0] ? quoted(locations[0]) : '';
-  const candidates = [
-    ...['jobs.ashbyhq.com', 'job-boards.greenhouse.io', 'jobs.lever.co'].map((domain, index) =>
-      `site:${domain} ${quoted(role(index))} ${strengths}`.trim()),
-    ...roleTerms.map((_, index) => `${quoted(role(index))} ${strengths} ${location}`.trim()),
-    ...modifierTerms.map(term => `${quoted(term)} ${technologies[0] ? quoted(technologies[0]) : ''} ${location}`.trim())
-  ];
-  return [...new Set(candidates.map(query => query.replace(/\s+/g, ' ').trim()).filter(Boolean))].slice(0, Math.min(10, budget));
+const text = (value: unknown, maximum: number) => typeof value === 'string' ? value.trim().slice(0, maximum) || undefined : undefined;
+const joined = (...parts: unknown[]) => parts.filter(part => typeof part === 'string' && part.trim()).join('\n\n') || undefined;
+
+async function providerJson(url: string, fetchImpl: typeof fetch = fetch): Promise<{ status: number; data?: any }> {
+  const response = await fetchImpl(url, { redirect: 'error', signal: AbortSignal.timeout(8000), headers: { Accept: 'application/json' } });
+  if (!response.ok) { await response.body?.cancel(); return { status: response.status }; }
+  if (!/application\/json/i.test(response.headers.get('content-type') || '')) throw new Error('Invalid board response');
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Missing board response');
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > 4 * 1024 * 1024) throw new Error('Board response too large');
+      chunks.push(value);
+    }
+  } finally { await reader.cancel(); }
+  return { status: response.status, data: JSON.parse(Buffer.concat(chunks).toString('utf8')) };
 }
 
-export function createBraveSearchProvider(apiKey = process.env.BRAVE_SEARCH_API_KEY, fetchImpl: typeof fetch = fetch): DiscoveryProvider | null {
-  if (!apiKey?.trim()) return null;
-  return { async search(queries) {
-    const batches = await Promise.all(queries.map(async query => {
-      let response: Response;
-      try {
-        response = await fetchImpl(`https://api.search.brave.com/res/v1/web/search?${new URLSearchParams({ q: query, count: '6' })}`, { method: 'GET', headers: { Accept: 'application/json', 'X-Subscription-Token': apiKey }, redirect: 'error', signal: AbortSignal.timeout(8000) });
-      } catch (error: any) {
-        if (error?.name === 'TimeoutError' || error?.name === 'AbortError') throw new DiscoveryProviderError('SEARCH_TIMEOUT', 'Search request timed out; retry later.');
-        throw new DiscoveryProviderError('SEARCH_PROVIDER_UNAVAILABLE', 'Search provider is temporarily unavailable; retry later.');
-      }
-      if (response.status === 429) { await response.body?.cancel(); throw new DiscoveryProviderError('SEARCH_RATE_LIMITED', 'Search provider is rate limited; retry later.'); }
-      if (!response.ok) { await response.body?.cancel(); throw new DiscoveryProviderError('SEARCH_PROVIDER_UNAVAILABLE', 'Search provider is temporarily unavailable; retry later.'); }
-      if (!/application\/json/i.test(response.headers.get('content-type') || '')) { await response.body?.cancel(); throw new DiscoveryProviderError('DISCOVERY_FAILED', 'Search provider returned an invalid response.'); }
-      let data: any;
-      try {
-        const reader = response.body?.getReader(); if (!reader) throw new Error('missing body');
-        const chunks: Uint8Array[] = []; let size = 0;
-        try { while (true) { const { done, value } = await reader.read(); if (done) break; size += value.length; if (size > 1024 * 1024) throw new Error('too large'); chunks.push(value); } } finally { await reader.cancel(); }
-        data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      } catch { throw new DiscoveryProviderError('DISCOVERY_FAILED', 'Search provider returned an invalid response.'); }
-      if (!Array.isArray(data?.web?.results)) throw new DiscoveryProviderError('DISCOVERY_FAILED', 'Search provider returned an invalid response.');
-      return data.web.results.slice(0, 6).flatMap((item: any) => {
-        const url = leadText(item?.url, 4000);
-        return url ? [{ url, title: leadText(item.title, 500), description: leadText(item.description, 5000), source: 'brave-web-search' as const }] : [];
-      });
-    }));
-    return batches.flat();
-  } };
+export function boardEndpoint(source: DiscoverySource): string {
+  const board = encodeURIComponent(source.boardId);
+  if (source.provider === 'ashby') return `https://api.ashbyhq.com/posting-api/job-board/${board}?includeCompensation=true`;
+  if (source.provider === 'greenhouse') return `https://boards-api.greenhouse.io/v1/boards/${board}/jobs?content=true`;
+  const eu = new URL(source.boardUrl).hostname === 'jobs.eu.lever.co';
+  return `https://${eu ? 'api.eu.lever.co' : 'api.lever.co'}/v0/postings/${board}?mode=json`;
 }
 
-export async function executeDiscoveryRequest(provider: DiscoveryProvider, profile: SearchProfile, budget: number, verify = verifyPostingAts) {
-  const queries = buildDiscoveryQueries(profile, budget);
-  return executeDiscoveryQueries(provider, queries, verify);
+/** Fixed provider endpoints only. User-supplied arbitrary hosts never reach fetch. */
+export async function scanPublicBoard(source: DiscoverySource, fetchImpl: typeof fetch = fetch): Promise<DiscoveryLead[]> {
+  const endpoint = boardEndpoint(source);
+  const { status, data } = await providerJson(endpoint, fetchImpl);
+  if (status !== 200) throw new Error('Public board unavailable');
+  const raw = source.provider === 'lever' ? data : data?.jobs;
+  if (!Array.isArray(raw)) throw new Error('Invalid public board response');
+  return raw.slice(0, 500).flatMap((job: any): DiscoveryLead[] => {
+    const url = text(source.provider === 'ashby' ? job.jobUrl : source.provider === 'greenhouse' ? job.absolute_url : job.hostedUrl, 4000);
+    const title = text(source.provider === 'lever' ? job.text : job.title, 500);
+    if (!url || !title || !normalizedJobUrl(url)) return [];
+    const remote = source.provider === 'lever' && ['remote', 'hybrid', 'onsite'].includes(job.workplaceType)
+      ? job.workplaceType : job.isRemote === true ? 'remote' : 'unknown';
+    const detected = detectAtsProvider(url);
+    const canonicalUrl = url;
+    const rawContent = source.provider === 'ashby' ? joined(job.descriptionPlain, job.descriptionHtml) : source.provider === 'greenhouse' ? joined(job.content) : joined(job.descriptionPlain || job.description, ...(job.lists || []).map((entry: any) => joined(entry.text, entry.content)), job.additionalPlain || job.additional);
+    const publishedAt = providerDate(source.provider === 'greenhouse' ? job.first_published : source.provider === 'ashby' ? job.publishedAt : typeof job.createdAt === 'number' ? job.createdAt : undefined);
+    const exactStatus = source.provider === 'ashby' ? typeof job.isListed === 'boolean' ? job.isListed ? 'LISTED' : 'UNLISTED' : 'UNKNOWN' : 'LISTED';
+    const rawDetails = {
+      atsProvider: source.provider, atsBoard: source.boardId, atsJobId: detected.jobId, title,
+      canonicalUrl, applyUrl: text(source.provider === 'greenhouse' ? job.absolute_url : job.applyUrl, 4000),
+      location: source.provider === 'greenhouse' ? job.location?.name : source.provider === 'lever' ? job.categories?.location : job.location,
+      secondaryLocations: source.provider === 'ashby' ? job.secondaryLocations?.map((entry: any) => typeof entry === 'string' ? entry : entry.location) : undefined,
+      remoteStatus: remote, workplaceType: job.workplaceType, employmentType: source.provider === 'lever' ? job.categories?.commitment : job.employmentType,
+      department: source.provider === 'greenhouse' ? job.departments?.map((entry: any) => entry.name).join(', ') : job.department || job.categories?.department,
+      team: job.team || job.categories?.team, publishedAt, updatedAt: source.provider === 'greenhouse' ? providerDate(job.updated_at) : undefined,
+      rawContent, providerMetadata: { compensation: job.compensation, salaryRange: job.salaryRange, categories: job.categories, offices: job.offices, metadata: job.metadata, payInputRanges: job.pay_input_ranges, address: job.address, secondaryLocations: job.secondaryLocations, createdAt: job.createdAt },
+      isCurrentlyListed: exactStatus === 'LISTED'
+    };
+    return [{
+      url, title, company: source.company,
+      description: text(rawContent, 12_000),
+      location: text(source.provider === 'greenhouse' ? job.location?.name : source.provider === 'lever' ? job.categories?.location : job.location, 500),
+      remoteStatus: remote, employmentType: text(source.provider === 'lever' ? job.categories?.commitment : job.employmentType, 200), source: 'public-board',
+      verification: { status: exactStatus, isListed: exactStatus === 'LISTED', lastVerifiedAt: new Date().toISOString(), canonicalUrl, applyUrl: rawDetails.applyUrl, rawDetails, verificationSource: endpoint }
+    }];
+  });
 }
 
-export async function executeDiscoveryQueries(provider: DiscoveryProvider, queries: string[], verify = verifyPostingAts) {
-  const leads = await provider.search(queries);
-  return { jobs: await buildDiscoveredJobs(leads, queries, verify), discoveryRequestsUsed: queries.length, queryBudgetUsed: queries.length, queryBudgetUnit: 'web_search_queries' as const };
+const lower = (value?: string) => value?.trim().toLowerCase() || '';
+export function matchesSearchProfile(lead: DiscoveryLead, profile: SearchProfile): boolean {
+  const title = lower(lead.title), company = lower(lead.company), employment = lower(lead.employmentType);
+  if ((profile.excludedRolePatterns || []).some(pattern => pattern.trim() && title.includes(lower(pattern)))) return false;
+  if ((profile.companyExclusions || []).some(excluded => excluded.trim() && company === lower(excluded))) return false;
+  if (employment && (profile.excludedEmploymentTypes || []).some(excluded => employment.includes(lower(excluded)))) return false;
+  if (employment && profile.allowedEmploymentTypes?.length && !profile.allowedEmploymentTypes.some(allowed => employment.includes(lower(allowed)))) return false;
+  if (profile.remotePreference === 'remote_only' && lead.remoteStatus === 'onsite') return false;
+  return true;
 }
 
-export async function buildDiscoveredJobs(leads: DiscoveryLead[], queries: string[], verify = verifyPostingAts): Promise<JobRecord[]> {
-  const records = (await Promise.all(leads.slice(0, 12).map(async lead => {
-    if (!normalizedJobUrl(lead?.url)) return undefined;
-    const url = lead.url, detected = detectAtsProvider(url);
-    let verification: JobVerificationResult = { status: 'UNKNOWN', isListed: false, lastVerifiedAt: new Date().toISOString() };
-    try { verification = await verify(url, detected.provider, detected.board, detected.jobId); } catch { /* uncertainty survives */ }
+export async function scanDiscoverySources(
+  sources: DiscoverySource[], profile: SearchProfile,
+  scan: (source: DiscoverySource) => Promise<DiscoveryLead[]> = scanPublicBoard,
+  verify = verifyPostingAts
+) {
+  const enabled = sources.filter(source => source.enabled).slice(0, 50);
+  const settled = await Promise.allSettled(enabled.map(source => scan(source)));
+  const sourceResults: BoardScanResult[] = [];
+  const leads: DiscoveryLead[] = [];
+  settled.forEach((result, index) => {
+    const source = enabled[index];
+    if (result.status === 'rejected') { sourceResults.push({ sourceId: source.id, status: 'FAILED', leads: 0 }); return; }
+    const matched = result.value.filter(lead => matchesSearchProfile(lead, profile));
+    sourceResults.push({ sourceId: source.id, status: 'SUCCESS', leads: matched.length });
+    leads.push(...matched);
+  });
+  return {
+    jobs: await buildDiscoveredJobs(leads.slice(0, 24), verify), sourceResults,
+    discoveryRequestsUsed: enabled.length, queryBudgetUsed: enabled.length, queryBudgetUnit: 'public_board_scans' as const
+  };
+}
+
+export function configuredDiscoverySources(profile: SearchProfile, jobs: JobRecord[]) {
+  return discoverySourcesForWorkspace(profile, jobs);
+}
+
+function sourceLabel(provider: PublicBoardProvider | string, channel: DiscoveryLead['source']) {
+  if (channel === 'manual-web-import') return 'Manual Web Import';
+  return provider === 'greenhouse' ? 'Greenhouse' : provider === 'ashby' ? 'Ashby' : provider === 'lever' ? 'Lever' : 'Company Careers';
+}
+
+export async function buildDiscoveredJobs(leads: DiscoveryLead[], verify = verifyPostingAts): Promise<JobRecord[]> {
+  const records = (await Promise.all(leads.map(async lead => {
+    if (!normalizedJobUrl(lead.url)) return undefined;
+    const detected = detectAtsProvider(lead.url);
+    let verification: JobVerificationResult = lead.verification || { status: 'UNKNOWN', isListed: false, lastVerifiedAt: new Date().toISOString() };
+    if (!lead.verification) try { verification = await verify(lead.url, detected.provider, detected.board, detected.jobId); } catch { /* uncertainty survives */ }
     const details = ['LISTED', 'UNLISTED'].includes(verification.status) ? verification.rawDetails || {} : {};
     const provider = details.atsProvider || detected.provider;
-    const text = typeof details.rawContent === 'string' ? details.rawContent : '';
+    const canonicalText = typeof details.rawContent === 'string' ? details.rawContent : '';
     return {
       id: `job-disc-${randomUUID()}`, atsProvider: provider, atsBoard: details.atsBoard || detected.board, atsJobId: details.atsJobId || detected.jobId,
-      company: '', title: details.title || lead.title || '', canonicalUrl: verification.canonicalUrl || '', applyUrl: verification.applyUrl || '', discoveryUrl: url,
-      discoveryTitle: lead.title, discoverySummary: lead.description, discoverySourceUrls: [url], discoveryAliases: [url], description: text, rawDescription: text,
-      canonicalContentStatus: text ? 'AVAILABLE' : verification.status === 'UNSUPPORTED' ? 'UNSUPPORTED' : 'UNAVAILABLE', canonicalContentSource: text ? verification.verificationSource || verification.canonicalUrl : undefined, canonicalMetadata: details.providerMetadata,
-      location: details.location || '', secondaryLocations: details.secondaryLocations, remoteStatus: details.remoteStatus || 'unknown', workplaceType: details.workplaceType, employmentType: details.employmentType || '', compensation: details.compensation, department: details.department, team: details.team, publishedAt: details.publishedAt, updatedAt: details.updatedAt,
+      company: lead.company || '', title: details.title || lead.title || '', canonicalUrl: verification.canonicalUrl || '', applyUrl: verification.applyUrl || '', discoveryUrl: lead.url,
+      discoveryTitle: lead.title, discoveryCompany: lead.company, discoverySummary: lead.description, discoverySourceUrls: [lead.url], discoveryAliases: [lead.url], description: canonicalText, rawDescription: canonicalText,
+      canonicalContentStatus: canonicalText ? 'AVAILABLE' : verification.status === 'UNSUPPORTED' ? 'UNSUPPORTED' : 'UNAVAILABLE', canonicalContentSource: canonicalText ? verification.verificationSource || verification.canonicalUrl : undefined, canonicalMetadata: details.providerMetadata,
+      location: details.location || lead.location || '', secondaryLocations: details.secondaryLocations, remoteStatus: details.remoteStatus || lead.remoteStatus || 'unknown', workplaceType: details.workplaceType, employmentType: details.employmentType || lead.employmentType || '', compensation: details.compensation, department: details.department, team: details.team, publishedAt: details.publishedAt, updatedAt: details.updatedAt,
       publicationDateSource: details.publishedAt ? `${provider}:${provider === 'greenhouse' ? 'first_published' : provider === 'lever' ? 'createdAt (creation, optional public v0 field)' : 'publishedAt (last published)'}` : undefined,
       firstSeenAt: new Date().toISOString(), lastVerifiedAt: verification.lastVerifiedAt, verificationStatus: verification.status, isCurrentlyListed: verification.status === 'LISTED', freshnessBand: calculateFreshnessBand(details.publishedAt),
-      sourceChannel: lead.source === 'brave-web-search' ? 'Brave Web Search' : 'Web Search Lead', searchQuery: queries.join('\n'), primaryRoleFamily: undefined, roleModifiers: [], seniority: 'Unspecified',
-      hardRequirements: [], preferredRequirements: [], technologies: [], responsibilities: [], hiringSignals: [], hardBlockers: [], softGaps: [], assessmentStatus: 'UNASSESSED', applicationPriority: 'UNASSESSED', priorityReason: 'Not assessed; Phase 4 deferred.', applicationStatus: 'DISCOVERED'
+      sourceChannel: sourceLabel(provider, lead.source), primaryRoleFamily: undefined, roleModifiers: [], seniority: 'Unspecified',
+      hardRequirements: [], preferredRequirements: [], technologies: [], responsibilities: [], hiringSignals: [], hardBlockers: [], softGaps: [], assessmentStatus: 'UNASSESSED', applicationPriority: 'UNASSESSED', priorityReason: 'Not assessed; explicit assessment required.', applicationStatus: 'DISCOVERED'
     } as JobRecord;
   }))).filter((record): record is JobRecord => !!record);
   return mergeDiscoveredJobs([], records).newJobs;
+}
+
+export async function buildManualImportedJob(
+  input: { url: string; description?: string; company?: string; title?: string }, verify = verifyPostingAts,
+  fetchPage = safeFetchText
+) {
+  const publicUrl = validatePublicUrl(input.url).href;
+  const lead: DiscoveryLead = { url: publicUrl, company: text(input.company, 200), title: text(input.title, 500), source: 'manual-web-import' };
+  const [job] = await buildDiscoveredJobs([lead], verify);
+  if (!job) throw new Error('Invalid posting URL.');
+  const supplied = text(input.description, 200_000);
+  if (supplied) {
+    job.description = supplied; job.rawDescription = supplied; job.jdSource = 'user-provided';
+    if (job.canonicalContentStatus !== 'AVAILABLE') job.canonicalContentStatus = 'UNAVAILABLE';
+  } else if (job.canonicalContentStatus !== 'AVAILABLE') {
+    try {
+      const page = await fetchPage(publicUrl);
+      if (page.status >= 200 && page.status < 300) {
+        const fetched = page.text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+          .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim().slice(0, 15_000);
+        if (fetched) { job.description = fetched; job.rawDescription = fetched; }
+      }
+    } catch { /* URL remains importable with explicitly unknown content. */ }
+  }
+  job.sourceUrl = publicUrl; job.sourceChannel = 'Manual Web Import';
+  job.company ||= text(input.company, 200) || ''; job.title ||= text(input.title, 500) || '';
+  return job;
 }

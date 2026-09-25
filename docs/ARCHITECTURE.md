@@ -52,13 +52,18 @@ preserve a verified session. Stale responses are rejected by generation.
 Public demo rendering remains independent of auth/database configuration.
 
 ## Discovery, AI and ATS boundaries
-Discovery is deterministic and does not instantiate an AI client. A bounded query
-builder sends only allowlisted SearchProfile-derived queries to the configured
-server-side Brave Web Search API, then treats results as untrusted leads requiring
-exact ATS or company-page verification. Google Custom Search is not used or claimed
-as full-web Google search. Missing BRAVE_SEARCH_API_KEY returns an explicit
-configuration error; it never falls back to Gemini. Discovery consumes the external
-provider budget only.
+Discovery is deterministic and does not instantiate an AI client. Automatic
+discovery scans owner-enabled public Ashby, Greenhouse and Lever boards through
+fixed provider endpoints. The source registry combines validated owner configuration
+with exact board identities learned from already-verified jobs; unknown board IDs are
+never inferred from company names. Each board scan consumes the external provider
+budget only. No general-search API or credential is required.
+
+A bounded allowlisted SearchProfile query builder separately creates normal
+`google.com/search` links for owner-reviewed broader exploration. CareerOS does not
+request, scrape or ingest Google result pages. The owner imports a useful URL or JD
+through the manual flow, where exact ATS verification, canonical dedupe and
+UNASSESSED defaults apply before any AI workflow.
 
 Gemini initializes server-side from GEMINI_API_KEY for analysis, evidence matches,
 plans, resumes, letters, evaluations, proof packs and outreach through owner-protected

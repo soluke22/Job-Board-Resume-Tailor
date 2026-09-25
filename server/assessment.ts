@@ -4,6 +4,7 @@ import { extractionSchema, semanticMatchesSchema, type Extraction, type Requirem
 import type { EvidenceItem, JobRecord, SearchProfile, FitAssessment, ParsedJob, RequirementMatch } from '../src/types/index.js';
 import { redactAiPayload, isSensitiveCandidateText } from './privacy.js';
 import { calculateFreshnessBand } from './searchEngine.js';
+import { assessmentSearchProfile } from '../src/utils/discovery.js';
 
 export const ALGORITHM_VERSION = 'phase4.1-v3';
 export class AssessmentError extends Error {}
@@ -20,7 +21,7 @@ export function assessmentSource(job: JobRecord): {text: string; source: 'canoni
 }
 export function assessmentMetadata(job: JobRecord, evidence: EvidenceItem[], profile: SearchProfile | null): AssessmentMetadata {
   const source = assessmentSource(job);
-  return {algorithmVersion: ALGORITHM_VERSION, jdHash: fingerprint(source.text), evidenceFingerprint: fingerprint(eligibleEvidence(evidence).map(e => ({id:e.id,rawEvidence:e.rawEvidence,technologies:e.technologies,responsibilities:e.responsibilities,supportedVerbs:e.supportedVerbs,context:e.context,employer:e.employer,role:e.role,period:e.period,sourceType:e.sourceType,sourceLocation:e.sourceLocation}))), profileFingerprint: fingerprint({profile,verificationStatus:job.verificationStatus,publishedAt:job.publishedAt,freshnessBand:job.publishedAt?calculateFreshnessBand(job.publishedAt):job.freshnessBand,compensation:job.compensation}), assessedAt: new Date().toISOString(), source:source.source};
+  return {algorithmVersion: ALGORITHM_VERSION, jdHash: fingerprint(source.text), evidenceFingerprint: fingerprint(eligibleEvidence(evidence).map(e => ({id:e.id,rawEvidence:e.rawEvidence,technologies:e.technologies,responsibilities:e.responsibilities,supportedVerbs:e.supportedVerbs,context:e.context,employer:e.employer,role:e.role,period:e.period,sourceType:e.sourceType,sourceLocation:e.sourceLocation}))), profileFingerprint: fingerprint({profile:assessmentSearchProfile(profile),verificationStatus:job.verificationStatus,publishedAt:job.publishedAt,freshnessBand:job.publishedAt?calculateFreshnessBand(job.publishedAt):job.freshnessBand,compensation:job.compensation}), assessedAt: new Date().toISOString(), source:source.source};
 }
 export function isCurrent(previous: AssessmentMetadata | undefined, current: AssessmentMetadata) {
   return !!previous && ['algorithmVersion','jdHash','evidenceFingerprint','profileFingerprint','source'].every(k => previous[k as keyof AssessmentMetadata] === current[k as keyof AssessmentMetadata]);

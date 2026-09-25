@@ -13,7 +13,8 @@ import { installPrivateFiles } from './server/privateFiles.js';
 import { createWorkspaceRouter } from './server/workspaceRoutes.js';
 import { redactAiPayload } from './server/privacy.js';
 import { verifyPostingAts } from './server/atsAdapters.js';
-import { buildDiscoveryQueries, createBraveSearchProvider, DiscoveryProvider, DiscoveryProviderError, executeDiscoveryQueries } from './server/discovery.js';
+import { buildManualImportedJob, configuredDiscoverySources, scanDiscoverySources, scanPublicBoard } from './server/discovery.js';
+import { buildDiscoveryQueries, googleSearchUrl, parseDiscoverySource } from './src/utils/discovery.js';
 import { mergeDiscoveredJobs } from './src/utils/jobIdentity.js';
 import { safeFetchText } from './server/safeFetch.js';
 import { classifyGeminiError } from './server/geminiDiagnostics.js';
@@ -274,44 +275,39 @@ app.post('/api/verify-ats', async (req: Request, res: Response): Promise<void> =
 });
 
 // ==========================================
-// 12. Deterministic Web Search Job Discovery Engine
+// 12. Keyless public-board discovery and manual posting ingestion
 // ==========================================
 type DiscoveryWorkspace = { searchProfile: import('./src/types/index.js').SearchProfile | null; jobs: import('./src/types/index.js').JobRecord[] };
 export function createDiscoveryHandler(
-  providerFactory: () => DiscoveryProvider | null = createBraveSearchProvider,
   reserve = reserveProviderCall,
   readWorkspace: (ownerId: string) => Promise<DiscoveryWorkspace> = async ownerId => {
     const workspace = await createWorkspaceRepository().read(ownerId);
     return { searchProfile: workspace.searchProfile, jobs: workspace.jobs };
-  }
+  },
+  scan: typeof scanPublicBoard = scanPublicBoard
 ): RequestHandler {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { queryBudget = 4 } = req.body;
-      if (Object.keys(req.body).some(key => key !== 'queryBudget')) { res.status(400).json({ error: 'Discovery accepts only a query budget.' }); return; }
-
-      const provider = providerFactory();
-      if (!provider) {
-        res.status(503).json({
-          error: 'Web search discovery is not configured.',
-          code: 'SEARCH_PROVIDER_CONFIGURATION_REQUIRED'
-        });
-        return;
-      }
+      if (Object.keys(req.body).length) { res.status(400).json({ error: 'Board discovery accepts no caller-supplied search context.' }); return; }
 
       const workspace = await readWorkspace(req.res!.locals.ownerId);
       const searchProfile = workspace.searchProfile;
       const existingJobs = workspace.jobs;
+      if (!searchProfile) { res.status(400).json({ error: 'Configure valid search preferences first.' }); return; }
       let queries: string[];
-      try { queries = buildDiscoveryQueries(searchProfile, queryBudget); }
+      try { queries = buildDiscoveryQueries(searchProfile, 10); }
       catch (error) { res.status(400).json({error: (error as Error).message}); return; }
-      for (let index = 1; index < queries.length; index++) await reserveExternalProviderCall(req.res!.locals.ownerId, reserve);
-      const outcome = await executeDiscoveryQueries(provider, queries);
+      const sources = configuredDiscoverySources(searchProfile, existingJobs);
+      for (const source of sources.filter(source => source.enabled)) await reserveExternalProviderCall(req.res!.locals.ownerId, reserve);
+      const outcome = await scanDiscoverySources(sources, searchProfile, scan);
       const candidates = outcome.jobs;
       const merged = mergeDiscoveredJobs(Array.isArray(existingJobs) ? existingJobs : [], candidates);
       res.json({
         discoveredJobs: merged.newJobs.filter(j => j.verificationStatus !== 'NOT_LISTED'),
         refreshedJobs: merged.refreshedJobs,
+        discoverySources: sources,
+        sourceResults: outcome.sourceResults,
+        googleSearches: queries.map(query => ({ query, url: googleSearchUrl(query) })),
         discoveryRequestsUsed: outcome.discoveryRequestsUsed, queryBudgetUsed: outcome.queryBudgetUsed, queryBudgetUnit: outcome.queryBudgetUnit,
         freshnessStats: {
           newCount: merged.newJobs.filter(j => j.freshnessBand === 'NEW').length,
@@ -329,17 +325,37 @@ export function createDiscoveryHandler(
         res.status(503).json({ error: 'External operation budget is temporarily unavailable; retry later', code: 'PROVIDER_UNAVAILABLE' });
         return;
       }
-      if (error instanceof DiscoveryProviderError) {
-        const status = error.code === 'SEARCH_TIMEOUT' ? 504 : error.code === 'SEARCH_RATE_LIMITED' ? 429 : error.code === 'SEARCH_PROVIDER_UNAVAILABLE' ? 503 : 502;
-        res.status(status).json({ error: error.message, code: error.code });
-        return;
-      }
       console.error('Private operation failed');
       res.status(500).json({ error: 'Job discovery failed', code: 'DISCOVERY_FAILED' });
     }
   };
 }
 app.post('/api/discover-jobs', createDiscoveryHandler());
+
+app.post('/api/discovery-sources/validate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (Object.keys(req.body).some(key => !['input', 'company'].includes(key))) { res.status(400).json({ error: 'Only a board URL/identifier and company label are accepted.' }); return; }
+    const source = parseDiscoverySource(req.body.input, req.body.company);
+    await scanPublicBoard(source);
+    res.json({ source: { ...source, validatedAt: new Date().toISOString() } });
+  } catch {
+    res.status(400).json({ error: 'The supported public board could not be validated.' });
+  }
+});
+
+app.post('/api/import-job', async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (Object.keys(req.body).some(key => !['url', 'description', 'company', 'title'].includes(key)) || typeof req.body.url !== 'string') {
+      res.status(400).json({ error: 'A posting URL and optional pasted job fields are accepted.' }); return;
+    }
+    const workspace = await createWorkspaceRepository().read(req.res!.locals.ownerId);
+    const imported = await buildManualImportedJob(req.body);
+    const merged = mergeDiscoveredJobs(workspace.jobs, [imported]);
+    res.json({ discoveredJobs: merged.newJobs, refreshedJobs: merged.refreshedJobs });
+  } catch {
+    res.status(400).json({ error: 'The posting URL could not be imported safely.' });
+  }
+});
 
 // Phase 6 certified downstream artifacts use the Phase 4/5 strict adapter.
 for (const [path, operation] of [['generate-proof-pack','proof'],['generate-outreach','outreach'],['generate-answers','answers'],['generate-referral','referral']] as const) {

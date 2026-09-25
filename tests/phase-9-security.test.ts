@@ -17,7 +17,6 @@ import { DEFAULT_PRIVATE_PROFILE } from '../src/data/privateSeedTemplate';
 import { assessJob } from '../server/assessment';
 import { isSensitiveCandidateText } from '../server/privacy';
 import { persistenceDb, syntheticEvidence } from './helpers/persistence';
-import { DiscoveryProviderError } from '../server/discovery';
 
 function nested(depth: number) { let value: any = {}; while (depth--) value = { child: value }; return value; }
 
@@ -73,8 +72,8 @@ test('bounded JSON rejects nested metadata, pollution keys and large node counts
 });
 
 test('provider budgets persist across instances, isolate owners, serialize concurrent reservations and roll back denied windows', async () => {
-  for (const path of ['/fetch-job-url', '/fetch-job-url/', '/FETCH-JOB-URL', '/verify-ats/', '/DISCOVER-JOBS/']) assert.equal(isBudgetedExternalPath(path), true);
-  assert.equal(isBudgetedExternalPath('/health'), false);
+  for (const path of ['/fetch-job-url', '/fetch-job-url/', '/FETCH-JOB-URL', '/verify-ats/', '/discovery-sources/validate', '/import-job']) assert.equal(isBudgetedExternalPath(path), true);
+  for (const path of ['/health', '/discover-jobs']) assert.equal(isBudgetedExternalPath(path), false);
   const { pg, db } = await persistenceDb();
   const reserve = createProviderBudget(() => db as any);
   const second = createProviderBudget(() => db as any);
@@ -114,29 +113,32 @@ test('provider budget and discovery responses expose safe, actionable error code
     const app = express(); app.use(express.json());
     app.use('/api', (_req, res, next) => { res.locals.ownerId = 'synthetic-owner'; next(); });
     app.use('/api', createProviderBudgetMiddleware(reserve));
-    app.post('/api/discover-jobs', (_req, res) => res.json({ ok: true }));
+    app.post('/api/import-job', (_req, res) => res.json({ ok: true }));
     return app;
   };
-  assert.deepEqual(await (await request(budgetApp(async () => {}), '/api/discover-jobs')).json(), { ok: true });
-  const exhausted = await request(budgetApp(async () => { throw new ProviderBudgetExceeded(); }), '/api/discover-jobs');
+  assert.deepEqual(await (await request(budgetApp(async () => {}), '/api/import-job')).json(), { ok: true });
+  const exhausted = await request(budgetApp(async () => { throw new ProviderBudgetExceeded(); }), '/api/import-job');
   assert.equal(exhausted.status, 429); assert.deepEqual(await exhausted.json(), { error: 'External operation budget exceeded; retry after the current window', code: 'PROVIDER_BUDGET_EXCEEDED' });
-  const unavailable = await request(budgetApp(async () => { throw new Error('synthetic persistence outage'); }), '/api/discover-jobs');
+  const unavailable = await request(budgetApp(async () => { throw new Error('synthetic persistence outage'); }), '/api/import-job');
   assert.equal(unavailable.status, 503); assert.deepEqual(await unavailable.json(), { error: 'External operation budget is temporarily unavailable; retry later', code: 'PROVIDER_UNAVAILABLE' });
 
-  const profile = { preferredRoleFamilies: [], technologyStrengths: [], remotePreference: 'any' };
-  const missingApp = express(); missingApp.use(express.json()); missingApp.post('/api/discover-jobs', createDiscoveryHandler(() => null));
+  const profile = { preferredRoleFamilies: [], preferredModifiers: [], technologyStrengths: [], targetSeniority: [], remotePreference: 'any', discoverySources: [] };
+  const readEmptyWorkspace = async () => ({ searchProfile: profile as any, jobs: [] });
+  const missingApp = express(); missingApp.use(express.json()); missingApp.use((_req, res, next) => { res.locals.ownerId = 'synthetic-owner'; next(); }); missingApp.post('/api/discover-jobs', createDiscoveryHandler(async () => {}, readEmptyWorkspace));
   const missing = await request(missingApp, '/api/discover-jobs');
-  assert.equal(missing.status, 503); assert.deepEqual(await missing.json(), { error: 'Web search discovery is not configured.', code: 'SEARCH_PROVIDER_CONFIGURATION_REQUIRED' });
-  let searched = 0, additionalReservations = 0;
-  const readWorkspace = async () => ({ searchProfile: profile as any, jobs: [] });
-  const successApp = express(); successApp.use(express.json()); successApp.use((_req, res, next) => { res.locals.ownerId = 'synthetic-owner'; next(); }); successApp.post('/api/discover-jobs', createDiscoveryHandler(() => ({ search: async () => { searched++; return []; } }), async () => { additionalReservations++; }, readWorkspace));
+  assert.equal(missing.status, 200); assert.deepEqual((await missing.json()).sourceResults, []);
+  let scanned = 0, additionalReservations = 0;
+  const source = {id:'greenhouse:job-boards.greenhouse.io:synthetic',company:'Synthetic',provider:'greenhouse',boardId:'synthetic',boardUrl:'https://job-boards.greenhouse.io/synthetic',enabled:true,origin:'configured'};
+  const readWorkspace = async () => ({ searchProfile: {...profile,discoverySources:[source]} as any, jobs: [] });
+  const successApp = express(); successApp.use(express.json()); successApp.use((_req, res, next) => { res.locals.ownerId = 'synthetic-owner'; next(); }); successApp.post('/api/discover-jobs', createDiscoveryHandler(async () => { additionalReservations++; }, readWorkspace, async () => { scanned++; return []; }));
   const success = await request(successApp, '/api/discover-jobs');
-  assert.equal(success.status, 200); assert.equal(searched, 1); assert.equal(additionalReservations, 3); assert.deepEqual(await success.json(), { discoveredJobs: [], refreshedJobs: [], discoveryRequestsUsed: 4, queryBudgetUsed: 4, queryBudgetUnit: 'web_search_queries', freshnessStats: { newCount: 0, recentCount: 0, unknownCount: 0 } });
+  const successBody:any = await success.json();
+  assert.equal(success.status, 200); assert.equal(scanned, 1); assert.equal(additionalReservations, 1); assert.equal(successBody.queryBudgetUnit, 'public_board_scans'); assert.equal(successBody.googleSearches.length <= 10, true); assert.deepEqual(successBody.sourceResults, [{sourceId:source.id,status:'SUCCESS',leads:0}]);
   const custom = await request(successApp, '/api/discover-jobs', { customQueries: ['private arbitrary text'] });
-  assert.equal(custom.status, 400); assert.deepEqual(await custom.json(), { error: 'Discovery accepts only a query budget.' }); assert.equal(searched, 1);
-  const failedApp = express(); failedApp.use(express.json()); failedApp.use((_req, res, next) => { res.locals.ownerId = 'synthetic-owner'; next(); }); failedApp.post('/api/discover-jobs', createDiscoveryHandler(() => ({ search: async () => { throw new DiscoveryProviderError('SEARCH_PROVIDER_UNAVAILABLE', 'Search provider is temporarily unavailable; retry later.'); } }), async () => {}, readWorkspace));
+  assert.equal(custom.status, 400); assert.deepEqual(await custom.json(), { error: 'Board discovery accepts no caller-supplied search context.' }); assert.equal(scanned, 1);
+  const failedApp = express(); failedApp.use(express.json()); failedApp.use((_req, res, next) => { res.locals.ownerId = 'synthetic-owner'; next(); }); failedApp.post('/api/discover-jobs', createDiscoveryHandler(async () => {}, readWorkspace, async () => { throw new Error('private board failure'); }));
   const failed = await request(failedApp, '/api/discover-jobs');
-  assert.equal(failed.status, 503); assert.deepEqual(await failed.json(), { error: 'Search provider is temporarily unavailable; retry later.', code: 'SEARCH_PROVIDER_UNAVAILABLE' });
+  assert.equal(failed.status, 200); assert.deepEqual((await failed.json()).sourceResults, [{sourceId:source.id,status:'FAILED',leads:0}]);
 });
 
 test('exact mutation Origin rejects missing, null, lookalike, scheme, port and multiple values while GET remains authorized', async () => {
@@ -175,7 +177,7 @@ test('production legacy gap fence, malformed API errors and budget wiring preser
   const source = await readFile('server.ts', 'utf8');
   assert.match(source, /await reserveAiProviderCall\(req\.res!\.locals\.ownerId\)/);
   const discoverySource = source.slice(source.indexOf('export function createDiscoveryHandler'), source.indexOf('// Phase 6 certified downstream artifacts'));
-  assert.doesNotMatch(discoverySource, /getGeminiClient|GoogleGenAI|generateContent|googleSearch|reserveAiProviderCall|GEMINI_API_KEY/);
+  assert.doesNotMatch(discoverySource, /getGeminiClient|GoogleGenAI|generateContent|reserveAiProviderCall|GEMINI_API_KEY|Brave|BRAVE_SEARCH_API_KEY/);
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(r => server.once('listening', r));
   try {
     const response = await fetch(`http://127.0.0.1:${(server.address() as any).port}/api/workspace/data`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{bad' });

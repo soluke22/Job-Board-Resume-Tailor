@@ -22,5 +22,5 @@ export function createProviderBudget(database: () => Pick<ReturnType<typeof getD
 }
 export const reserveProviderCall = createProviderBudget();
 export function isBudgetedExternalPath(path: string) {
-  return ['/fetch-job-url', '/verify-ats', '/discover-jobs'].includes(path.toLowerCase().replace(/\/+$/, ''));
+  return ['/fetch-job-url', '/verify-ats', '/discovery-sources/validate', '/import-job'].includes(path.toLowerCase().replace(/\/+$/, ''));
 }

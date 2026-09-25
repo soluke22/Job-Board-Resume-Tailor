@@ -5,6 +5,7 @@ import { invalidateEditedResume } from '../utils/resumeReadiness';
 import { evidenceReviewContent, preserveEvidenceReview, unreviewedEvidence } from '../utils/evidenceReview';
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { mergeDiscoveredJobs } from '../utils/jobIdentity';
+import { assessmentSearchProfile } from '../utils/discovery';
 import {
   CandidateProfile,
   EvidenceItem,
@@ -156,7 +157,7 @@ export function planEvidenceAddition(currentEvidence: EvidenceItem[], item: Evid
 }
 
 export function planSearchProfilePersistence(nextProfile: SearchProfile, currentProfile: SearchProfile, currentJobs: JobRecord[]) {
-  return { searchProfile: nextProfile, jobs: JSON.stringify(nextProfile) === JSON.stringify(currentProfile) ? currentJobs : currentJobs.map(job => invalidateJobArtifacts(job.fit ? { ...job, assessmentStatus: 'STALE' } : job, 'Assessment source changed; reassess and regenerate before use')) };
+  return { searchProfile: nextProfile, jobs: JSON.stringify(assessmentSearchProfile(nextProfile)) === JSON.stringify(assessmentSearchProfile(currentProfile)) ? currentJobs : currentJobs.map(job => invalidateJobArtifacts(job.fit ? { ...job, assessmentStatus: 'STALE' } : job, 'Assessment source changed; reassess and regenerate before use')) };
 }
 
 export function planMasterResumePersistence(nextResume: TailoredResume, currentResume: TailoredResume, currentJobs: JobRecord[]) {
@@ -512,7 +513,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSearchProfile = (newSearchProfile: SearchProfile) => {
-    if (JSON.stringify(newSearchProfile) !== JSON.stringify(searchProfile)) setJobs(jobs.map(j=>invalidateJobArtifacts(j.fit?{...j,assessmentStatus:'STALE'}:j,'Assessment source changed; reassess and regenerate before use')));
+    if (JSON.stringify(assessmentSearchProfile(newSearchProfile)) !== JSON.stringify(assessmentSearchProfile(searchProfile))) setJobs(jobs.map(j=>invalidateJobArtifacts(j.fit?{...j,assessmentStatus:'STALE'}:j,'Assessment source changed; reassess and regenerate before use')));
     setSearchProfileState(newSearchProfile);
     storageService.saveSearchProfile(newSearchProfile, workspaceMode);
   };
@@ -587,11 +588,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Job Search & Discovery
-  const discoverJobs = async (queryBudget = 3): Promise<void> => {
+  const discoverJobs = async (): Promise<void> => {
     setIsDiscovering(true);
     setError(null);
     try {
-      const res = await apiService.discoverJobs(queryBudget);
+      const res = await apiService.discoverJobs();
       const newDiscovered = res.discoveredJobs || [];
 
       // Read the latest cache after the await: an in-flight search must not undo
@@ -643,6 +644,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     userProvided = true
   ): Promise<JobRecord> => {
     const effectiveUrl = sourceUrl || '';
+    if (effectiveUrl && workspaceMode === 'PRIVATE_WORKSPACE') {
+      const response = await apiService.importJob({ url: effectiveUrl, description: rawDescription || undefined, company, title });
+      const incoming = [...(response.refreshedJobs || []), ...(response.discoveredJobs || [])] as JobRecord[];
+      if (!incoming.length) throw new Error('The posting matched no importable job.');
+      const currentJobs = storageService.getJobs(workspaceMode);
+      const merged = mergeDiscoveredJobs(currentJobs, incoming);
+      setJobs(merged.jobs);
+      const imported = merged.jobs.find(job => incoming.some(candidate => candidate.id === job.id)) || incoming[0];
+      setActiveJobId(imported.id);
+      return imported;
+    }
     const newJob: JobRecord = {
       id: `job-${crypto.randomUUID()}`,
       atsProvider: 'company-careers',
@@ -662,11 +674,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       verificationStatus: 'UNKNOWN',
       isCurrentlyListed: false,
       freshnessBand: 'UNKNOWN',
-      sourceChannel: 'Direct User Input',
+      sourceChannel: effectiveUrl ? 'Manual Web Import' : 'Direct User Input',
       applicationPriority: 'UNASSESSED',
       assessmentStatus: 'UNASSESSED',
       priorityReason: 'User imported target role; not assessed',
-      applicationStatus: 'SHORTLISTED',
+      applicationStatus: 'DISCOVERED',
       status: 'Imported',
       primaryRoleFamily: undefined,
       roleModifiers: [],
@@ -681,7 +693,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const currentJobs = storageService.getJobs(workspaceMode);
-    const updated = planJobCreation(currentJobs, newJob);
+    const updated = mergeDiscoveredJobs(currentJobs, [newJob]).jobs;
     if (workspaceMode === 'PRIVATE_WORKSPACE') {
       const snapshot = () => JSON.stringify(storageService.getJobs(workspaceMode));
       const outcome = await acknowledgeWorkspaceMutation({

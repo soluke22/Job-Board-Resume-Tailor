@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { verifyPostingAts, detectAtsProvider, genericPageResult, verifyGenericPage } from '../server/atsAdapters';
-import { buildDiscoveredJobs, buildDiscoveryQueries, createBraveSearchProvider, DiscoveryProviderError, executeDiscoveryRequest } from '../server/discovery';
+import { boardEndpoint, buildDiscoveredJobs, buildManualImportedJob, matchesSearchProfile, scanDiscoverySources, scanPublicBoard } from '../server/discovery';
+import { buildDiscoveryQueries, discoverySourcesForWorkspace, googleSearchUrl, parseDiscoverySource } from '../src/utils/discovery';
 import { calculateFreshnessBand } from '../server/searchEngine';
 import { mergeDiscoveredJobs, sameJob, normalizedJobUrl } from '../src/utils/jobIdentity';
 import { safeFetchText, validatePublicUrl, blockedAddress } from '../server/safeFetch';
 import { jobSchema } from '../server/db/workspaceValidation';
 
-const fixture = {url: 'https://jobs.ashbyhq.com/synthetic/id', canonicalUrl: 'https://jobs.ashbyhq.com/synthetic/id', title: 'Engineer', description: 'Search snippet', source: 'brave-web-search' as const};
+const fixture = {url: 'https://jobs.ashbyhq.com/synthetic/id', canonicalUrl: 'https://jobs.ashbyhq.com/synthetic/id', title: 'Engineer', company: 'Synthetic Company', description: 'Board summary', source: 'public-board' as const};
 const json = (data: any, status = 200) => new Response(JSON.stringify(data), {status, headers: {'content-type': 'application/json'}});
 test('exact provider contracts and dates', async () => {
   const original = globalThis.fetch;
@@ -16,7 +17,7 @@ test('exact provider contracts and dates', async () => {
     const ashby = {jobUrl: fixture.url, applyUrl: fixture.url + '/application', title: 'Canonical title', isListed: true, descriptionPlain: 'Actual posting content', publishedAt: '2026-08-01T00:00:00Z'};
     globalThis.fetch = async () => json({jobs: [ashby]});
     assert.equal((await verifyPostingAts(fixture.canonicalUrl)).status, 'LISTED');
-    const records = await buildDiscoveredJobs([fixture], ['actual query']);
+    const records = await buildDiscoveredJobs([fixture]);
     assert.equal(records[0].description, ashby.descriptionPlain);
     assert.equal(records[0].publishedAt, '2026-08-01T00:00:00.000Z');
     assert.notEqual(records[0].firstSeenAt, records[0].publishedAt);
@@ -63,7 +64,7 @@ test('exact provider contracts and dates', async () => {
   } finally { globalThis.fetch = original; }
 });
 test('unknown dates, exceptions and missing URL never fabricate facts', async () => {
-  const [job] = await buildDiscoveredJobs([fixture], [], async () => {throw new Error('failure');});
+  const [job] = await buildDiscoveredJobs([fixture], async () => {throw new Error('failure');});
   assert.equal(job.verificationStatus, 'UNKNOWN'); assert.equal(job.isCurrentlyListed, false);
   assert.equal(job.publishedAt, undefined); assert.equal(job.freshnessBand, 'UNKNOWN');
   assert.equal(job.description, ''); assert.equal(job.canonicalUrl, ''); assert.equal(job.location, '');
@@ -73,7 +74,7 @@ test('unknown dates, exceptions and missing URL never fabricate facts', async ()
   assert.equal(calculateFreshnessBand(undefined, new Date().toISOString()), 'UNKNOWN');
   assert.equal(calculateFreshnessBand('Recent'), 'UNKNOWN');
   assert.equal(calculateFreshnessBand('2999-01-01'), 'UNKNOWN');
-  assert.deepEqual(await buildDiscoveredJobs([{title: 'Missing URL'} as any], []), []);
+  assert.deepEqual(await buildDiscoveredJobs([{title: 'Missing URL'} as any]), []);
   const queries = buildDiscoveryQueries({preferredRoleFamilies: ['frontend-product', 'ui-platform-design-systems'], preferredModifiers: ['DESIGN_SYSTEMS'], technologyStrengths: ['React', 'TypeScript'], targetSeniority: ['Senior'], remotePreference: 'remote_only', excludedRolePatterns: ['Tailwind'], companyExclusions: ['Excluded Co']} as any, 10);
   assert.ok(queries.some(query => query.includes('React'))); assert.ok(queries.some(query => query.includes('TypeScript'))); assert.ok(queries.some(query => query.includes('remote')));
   const joined = queries.join('\n');
@@ -81,44 +82,51 @@ test('unknown dates, exceptions and missing URL never fabricate facts', async ()
   assert.doesNotMatch(joined, /frontend-product|ui-platform-design-systems|DESIGN_SYSTEMS/);
   assert.ok(!joined.includes('Tailwind')); assert.ok(!joined.includes('Excluded Co')); assert.ok(queries.length <= 10);
 });
-test('Brave provider handles configuration, success, zero results and safe failure classes', async () => {
-  assert.equal(createBraveSearchProvider(''), null);
-  let request: { url?: string; init?: RequestInit } = {};
-  const success = createBraveSearchProvider('synthetic-key', (async (input, init) => {
-    request = { url: String(input), init };
-    return json({ web: { results: [{ url: fixture.url, title: fixture.title, description: fixture.description }] } });
-  }) as typeof fetch)!;
-  assert.deepEqual(await success.search(['frontend query']), [{ url: fixture.url, title: fixture.title, description: fixture.description, source: fixture.source }]);
-  assert.match(request.url!, /q=frontend\+query/); assert.equal((request.init?.headers as Record<string, string>)['X-Subscription-Token'], 'synthetic-key');
-  const zero = createBraveSearchProvider('synthetic-key', (async () => json({ web: { results: [] } })) as typeof fetch)!;
-  assert.deepEqual(await zero.search(['query']), []);
-  const malformed = createBraveSearchProvider('synthetic-key', (async () => json({ unexpected: true })) as typeof fetch)!;
-  await assert.rejects(malformed.search(['query']), (error: any) => error instanceof DiscoveryProviderError && error.code === 'DISCOVERY_FAILED');
-  const limited = createBraveSearchProvider('synthetic-key', (async () => json({}, 429)) as typeof fetch)!;
-  await assert.rejects(limited.search(['query']), (error: any) => error instanceof DiscoveryProviderError && error.code === 'SEARCH_RATE_LIMITED');
-  const unavailable = createBraveSearchProvider('synthetic-key', async () => { throw new TypeError('private transport detail'); })!;
-  await assert.rejects(unavailable.search(['query']), (error: any) => error instanceof DiscoveryProviderError && error.code === 'SEARCH_PROVIDER_UNAVAILABLE' && !error.message.includes('private transport detail'));
-  const timeout = createBraveSearchProvider('synthetic-key', async () => { throw new DOMException('private timeout detail', 'TimeoutError'); })!;
-  await assert.rejects(timeout.search(['query']), (error: any) => error instanceof DiscoveryProviderError && error.code === 'SEARCH_TIMEOUT' && !error.message.includes('private timeout detail'));
-  const oversized = createBraveSearchProvider('synthetic-key', (async () => json({ web: { results: [{ url: fixture.url, title: 'x'.repeat(200_001), description: 'y'.repeat(200_001) }] } })) as typeof fetch)!;
-  const [bounded] = await oversized.search(['query']); assert.equal(bounded.title?.length, 500); assert.equal(bounded.description?.length, 5000);
-  const [persistable] = await buildDiscoveredJobs([bounded], [], async () => ({ status: 'UNKNOWN', isListed: false, lastVerifiedAt: '2026-09-24' }));
-  assert.equal(jobSchema.safeParse(persistable).success, true);
+test('keyless public board registry, provider endpoints and partial failures are deterministic', async () => {
+  const configured = parseDiscoverySource('greenhouse:synthetic', 'Synthetic Company');
+  assert.match(boardEndpoint(configured), /boards-api\.greenhouse\.io\/v1\/boards\/synthetic\/jobs/);
+  assert.throws(() => parseDiscoverySource('https://evil.example.org/board', 'Synthetic Company'));
+  assert.throws(() => parseDiscoverySource('http://jobs.lever.co/synthetic', 'Synthetic Company'));
+  const ashby = parseDiscoverySource('https://jobs.ashbyhq.com/synthetic', 'Synthetic Company');
+  const lever = parseDiscoverySource('lever-eu:synthetic', 'Synthetic EU');
+  const ashbyLeads = await scanPublicBoard(ashby, (async () => json({jobs:[{jobUrl:fixture.url,title:'Frontend Engineer',location:'Remote',isRemote:true}]})) as typeof fetch);
+  const greenhouseLeads = await scanPublicBoard(configured, (async () => json({jobs:[{absolute_url:'https://job-boards.greenhouse.io/synthetic/jobs/123',title:'Product Engineer',location:{name:'Washington, DC'}}]})) as typeof fetch);
+  const leverLeads = await scanPublicBoard(lever, (async () => json([{hostedUrl:'https://jobs.eu.lever.co/synthetic/id',text:'UI Engineer',workplaceType:'remote',categories:{commitment:'full-time'}}])) as typeof fetch);
+  assert.deepEqual([ashbyLeads.length, greenhouseLeads.length, leverLeads.length], [1,1,1]);
+  const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'remote_only',excludedRolePatterns:['sales'],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
+  const outcome = await scanDiscoverySources([ashby, configured], profile, async source => source.provider === 'greenhouse' ? Promise.reject(new Error('down')) : ashbyLeads, async () => ({status:'UNKNOWN',isListed:false,lastVerifiedAt:'2026-09-24'}));
+  assert.deepEqual(outcome.sourceResults.map(result => result.status), ['SUCCESS','FAILED']);
+  assert.equal(outcome.jobs.length, 1); assert.equal(outcome.queryBudgetUnit, 'public_board_scans');
+  assert.equal(matchesSearchProfile({...fixture,title:'Sales Engineer'}, profile), false);
+  assert.equal(matchesSearchProfile({...fixture,remoteStatus:'unknown'}, profile), true);
+  assert.equal(matchesSearchProfile({...fixture,remoteStatus:'onsite'}, profile), false);
 });
-test('deterministic provider queries use configured preferences only', async () => {
+test('deterministic Google queries use configured preferences only', () => {
   const profile = {preferredRoleFamilies: [], technologyStrengths: ['SyntheticTech'], remotePreference: 'any', name: 'PRIVATE_IDENTITY', email: 'PRIVATE_CONTACT', salaryPreference: {minTarget: 123, email: 'PRIVATE_NESTED_CONTACT'}} as any;
-  let calls = 0;
-  const provider = { search: async (queries: string[]) => { calls++; assert.ok(queries.join('\n').includes('SyntheticTech')); assert.ok(!queries.join('\n').includes('PRIVATE_')); return [fixture]; } };
-  const verify = async () => ({status: 'UNKNOWN' as const, isListed: false, lastVerifiedAt: '2026-09-12'});
-  const outcome = await executeDiscoveryRequest(provider, profile, 4, verify);
-  assert.equal(calls, 1); assert.ok(outcome.discoveryRequestsUsed <= 4); assert.equal(outcome.queryBudgetUnit, 'web_search_queries');
-  assert.deepEqual(outcome.jobs[0].discoverySourceUrls, [fixture.url]);
-  for (const budget of [0, -1, 11, 1.5]) await assert.rejects(executeDiscoveryRequest(provider, profile, budget));
-  assert.equal(calls, 1);
+  const queries = buildDiscoveryQueries(profile, 10);
+  assert.ok(queries.join('\n').includes('SyntheticTech')); assert.ok(!queries.join('\n').includes('PRIVATE_'));
+  assert.ok(queries.length <= 10); assert.match(googleSearchUrl(queries[0]), /^https:\/\/www\.google\.com\/search\?q=/);
+  assert.equal(new URL(googleSearchUrl(queries[0])).searchParams.get('q'), queries[0]);
+  for (const maximum of [0, -1, 11, 1.5]) assert.throws(() => buildDiscoveryQueries(profile, maximum));
+});
+test('verified jobs teach board sources and manual URL/JD imports remain unassessed', async () => {
+  const verified = async () => ({status:'LISTED' as const,isListed:true,lastVerifiedAt:'2026-09-24',canonicalUrl:fixture.url,rawDetails:{atsProvider:'ashby',atsBoard:'synthetic',atsJobId:'id',title:'Canonical Engineer',rawContent:'Canonical JD'}});
+  const imported = await buildManualImportedJob({url:fixture.url,description:'Owner pasted JD',company:'Synthetic Company',title:'Fallback title'}, verified);
+  assert.equal(imported.sourceChannel, 'Manual Web Import'); assert.equal(imported.jdSource, 'user-provided');
+  assert.equal(imported.description, 'Owner pasted JD'); assert.equal(imported.assessmentStatus, 'UNASSESSED'); assert.equal(imported.applicationPriority, 'UNASSESSED');
+  const profile = {discoverySources:[]} as any;
+  const learned = discoverySourcesForWorkspace(profile, [imported]);
+  assert.equal(learned.length, 1); assert.equal(learned[0].origin, 'learned'); assert.equal(learned[0].boardId, 'synthetic');
+  const disabled = {...learned[0],origin:'configured' as const,enabled:false};
+  assert.equal(discoverySourcesForWorkspace({discoverySources:[disabled]} as any,[imported])[0].enabled,false,'owner override wins over learned source');
+  assert.deepEqual(discoverySourcesForWorkspace({discoverySources:[{...disabled,removed:true}]} as any,[imported]),[], 'removed configured source must suppress its learned counterpart');
+  const generic = await buildManualImportedJob({url:'https://careers.example.org/job',company:'Synthetic Company',title:'Role'}, async () => ({status:'UNKNOWN',isListed:false,lastVerifiedAt:'2026-09-24'}), async url => ({status:200,url,text:'<main>Fetched public JD</main>'}));
+  assert.equal(generic.description,'Fetched public JD'); assert.equal(generic.jdSource,undefined); assert.equal(generic.assessmentStatus,'UNASSESSED');
+  await assert.rejects(buildManualImportedJob({url:'http://127.0.0.1/private'}));
 });
 test('identity hierarchy and history-safe canonical refresh', async () => {
   const verify = async () => ({status: 'LISTED' as const, isListed: true, lastVerifiedAt: '2026-09-12', canonicalUrl: fixture.canonicalUrl, rawDetails: {rawContent: 'JD'}});
-  const [a] = await buildDiscoveredJobs([fixture], [], verify);
+  const [a] = await buildDiscoveredJobs([fixture], verify);
   const applied = {...a, id: 'existing', applicationStatus: 'APPLIED' as const, firstSeenAt: '2026-01-01', notes: 'keep', statusHistory: [{from: 'DISCOVERED' as const, to: 'APPLIED' as const, timestamp: '2026-01-02'}]};
   const merged = mergeDiscoveredJobs([applied], [{...a, description: 'better JD'}]);
   assert.equal(merged.newJobs.length, 0); assert.equal(merged.jobs[0].id, 'existing');
@@ -157,7 +165,7 @@ test('company and redirect aliases require authoritative exact verification', as
   const linked = await verifyGenericPage(alias, async () => ({status: 200, text: `<link href="${fixture.url}" rel="canonical">`, url: alias}), verify);
   assert.equal(linked.status, 'LISTED');
   const verifyAlias = async () => linked;
-  const jobs = await buildDiscoveredJobs([fixture, {...fixture, url: alias}], [], verifyAlias);
+  const jobs = await buildDiscoveredJobs([fixture, {...fixture, url: alias}], verifyAlias);
   assert.equal(jobs.length, 1); assert.equal(jobs[0].atsProvider, 'ashby');
   assert.ok(jobs[0].discoveryAliases?.includes(alias));
   assert.equal((await verifyGenericPage(alias, async () => {throw new Error('failure');})).status, 'UNKNOWN');

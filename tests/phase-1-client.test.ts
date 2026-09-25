@@ -44,7 +44,6 @@ test('private API error codes preserve a valid session for provider failures and
       { status: 502, code: 'GEMINI_PAYMENT_REQUIRED', losesAccess: false },
       { status: 401, code: 'SEARCH_PROVIDER_UNAVAILABLE', losesAccess: false },
       { status: 429, code: 'SEARCH_RATE_LIMITED', losesAccess: false },
-      { status: 503, code: 'SEARCH_PROVIDER_CONFIGURATION_REQUIRED', losesAccess: false },
     ]) {
       authenticate();
       globalThis.fetch = async (_path, init) => {
