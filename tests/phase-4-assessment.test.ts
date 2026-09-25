@@ -21,6 +21,7 @@ const scored=(strength='Strong',p=profile,j=job)=>{const c=contract();return sco
 test('source sufficiency: canonical, explicit user provided, discovery snippets fail closed',()=>{
   assert.equal(assessmentSource(job).source,'canonical');
   assert.equal(assessmentSource({...job,canonicalContentStatus:'UNAVAILABLE',jdSource:'user-provided'}).source,'user-provided');
+  assert.equal(assessmentSource({...job,jdSource:'user-provided'}).source,'user-provided','explicit user provenance wins over stale canonical availability');
   assert.throws(()=>assessmentSource({...job,canonicalContentStatus:'UNAVAILABLE'}),/INSUFFICIENT_JD/);
 });
 test('enabled verified owner snapshot records only; every nonapproved state excluded',()=>{
