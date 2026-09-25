@@ -42,6 +42,7 @@ export function refreshJob(existing: JobRecord, incoming: JobRecord): JobRecord 
   }
   if (['LISTED', 'UNLISTED'].includes(incoming.verificationStatus)) {
     for (const key of verifiedFields) if ((incoming as any)[key] !== undefined && (incoming as any)[key] !== '') (merged as any)[key] = (incoming as any)[key];
+    if (!merged.company && incoming.company) merged.company = incoming.company;
   } else {
     merged.verificationStatus = incoming.verificationStatus;
     merged.isCurrentlyListed = incoming.isCurrentlyListed;

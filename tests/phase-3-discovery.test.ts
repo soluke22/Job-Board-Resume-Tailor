@@ -15,11 +15,13 @@ const json = (data: any, status = 200) => new Response(JSON.stringify(data), {st
 test('exact provider contracts and dates', async () => {
   const original = globalThis.fetch;
   try {
-    const ashby = {jobUrl: fixture.url, applyUrl: fixture.url + '/application', title: 'Canonical title', isListed: true, descriptionPlain: 'Actual posting content', publishedAt: '2026-08-01T00:00:00Z'};
+    const ashby = {jobUrl: fixture.url, applyUrl: fixture.url + '/application', title: 'Canonical title', companyName: 'Canonical Company', isListed: true, descriptionPlain: 'Actual posting content', publishedAt: '2026-08-01T00:00:00Z'};
     globalThis.fetch = async () => json({jobs: [ashby]});
     assert.equal((await verifyPostingAts(fixture.canonicalUrl)).status, 'LISTED');
     const records = await buildDiscoveredJobs([fixture]);
     assert.equal(records[0].description, ashby.descriptionPlain);
+    assert.equal(records[0].company, fixture.company, 'an existing board label is not overwritten');
+    assert.equal((await buildManualImportedJob({url:fixture.url}, async url => verifyPostingAts(url))).company, 'Canonical Company');
     assert.equal(records[0].publishedAt, '2026-08-01T00:00:00.000Z');
     assert.notEqual(records[0].firstSeenAt, records[0].publishedAt);
     assert.equal(records[0].qualificationFit, undefined);
@@ -38,9 +40,10 @@ test('exact provider contracts and dates', async () => {
     assert.equal((await verifyPostingAts('https://jobs.ashbyhq.com/synthetic')).status, 'UNKNOWN');
     const gh = 'https://job-boards.greenhouse.io/synthetic/jobs/123';
     let calls = 0;
-    globalThis.fetch = async () => {calls++; return json({id: 123, title: 'Engineer', absolute_url: gh, content: 'Actual GH content', updated_at: '2026-08-01T00:00:00Z'});};
+    globalThis.fetch = async () => {calls++; return json({id: 123, title: 'Engineer', companyName: 'Greenhouse Company', absolute_url: gh, content: 'Actual GH content', updated_at: '2026-08-01T00:00:00Z'});};
     const greenhouse = await verifyPostingAts(gh);
     assert.equal(greenhouse.status, 'LISTED');
+    assert.equal(greenhouse.rawDetails.company, 'Greenhouse Company');
     assert.equal(greenhouse.rawDetails.publishedAt, undefined);
     assert.equal(greenhouse.rawDetails.updatedAt, '2026-08-01T00:00:00.000Z');
     assert.equal((await verifyPostingAts('https://job-boards.greenhouse.io/synthetic')).status, 'UNKNOWN');
@@ -52,9 +55,10 @@ test('exact provider contracts and dates', async () => {
     globalThis.fetch = async () => json({jobs: [{id: 123}]});
     assert.equal((await verifyPostingAts(gh)).status, 'UNKNOWN');
     const lever = 'https://jobs.lever.co/synthetic/id';
-    globalThis.fetch = async () => json({id: 'id', text: 'Engineer', hostedUrl: lever, descriptionPlain: 'Lever description', createdAt: 1754006400000});
+    globalThis.fetch = async () => json({id: 'id', text: 'Engineer', company: 'Lever Company', hostedUrl: lever, descriptionPlain: 'Lever description', createdAt: 1754006400000});
     const lv = await verifyPostingAts(lever);
     assert.equal(lv.status, 'LISTED'); assert.equal(lv.rawDetails.publishedAt, '2025-08-01T00:00:00.000Z');
+    assert.equal(lv.rawDetails.company, 'Lever Company');
     globalThis.fetch = async () => json({}, 404);
     assert.equal((await verifyPostingAts(lever)).status, 'NOT_LISTED');
     globalThis.fetch = async () => {throw new Error('network');};
@@ -113,7 +117,7 @@ test('deterministic Google queries use configured preferences only', () => {
   for (const maximum of [0, -1, 11, 1.5]) assert.throws(() => buildDiscoveryQueries(profile, maximum));
 });
 test('verified jobs teach board sources and manual URL/JD imports remain unassessed', async () => {
-  const verified = async () => ({status:'LISTED' as const,isListed:true,lastVerifiedAt:'2026-09-24',canonicalUrl:fixture.url,rawDetails:{atsProvider:'ashby',atsBoard:'synthetic',atsJobId:'id',title:'Canonical Engineer',rawContent:'Canonical JD'}});
+  const verified = async () => ({status:'LISTED' as const,isListed:true,lastVerifiedAt:'2026-09-24',canonicalUrl:fixture.url,rawDetails:{atsProvider:'ashby',atsBoard:'synthetic',atsJobId:'id',title:'Canonical Engineer',rawContent:'Synthetic canonical JD'}});
   const imported = await buildManualImportedJob({url:fixture.url,description:'Owner pasted JD',company:'Synthetic Company',title:'Fallback title'}, verified);
   assert.equal(imported.sourceChannel, 'Manual Web Import'); assert.equal(imported.jdSource, 'user-provided');
   assert.equal(imported.canonicalContentStatus, 'UNAVAILABLE'); assert.equal(assessmentSource(imported).source, 'user-provided');
@@ -128,6 +132,24 @@ test('verified jobs teach board sources and manual URL/JD imports remain unasses
   assert.equal(generic.description,'Fetched public JD'); assert.equal(generic.jdSource,undefined); assert.equal(generic.assessmentStatus,'UNASSESSED');
   await assert.rejects(buildManualImportedJob({url:'http://127.0.0.1/private'}));
 });
+test('exact Ashby page metadata fills a blank URL-only company without inventing missing facts', async () => {
+  const url = 'https://jobs.ashbyhq.com/synthetic-board/00000000-0000-4000-8000-000000000001';
+  const title = 'Synthetic Infrastructure Engineer';
+  const verify = async () => ({status:'LISTED' as const,isListed:true,lastVerifiedAt:'2026-09-25',canonicalUrl:url,rawDetails:{atsProvider:'ashby',atsBoard:'synthetic-board',atsJobId:'00000000-0000-4000-8000-000000000001',title,rawContent:'Synthetic canonical JD'}});
+  let pages = 0;
+  const page = async () => { pages++; return {status:200,url,text:`<script type="application/ld+json">${JSON.stringify({'@type':'JobPosting',title,hiringOrganization:{'@type':'Organization',name:'Synthetic Company'}})}</script>`}; };
+  const imported = await buildManualImportedJob({url}, verify, page);
+  assert.equal(imported.company, 'Synthetic Company'); assert.equal(imported.assessmentStatus, 'UNASSESSED');
+  assert.equal(imported.qualificationFit, undefined); assert.equal(pages, 1);
+  const retained = await buildManualImportedJob({url,company:'Owner Reviewed Company'}, verify, page);
+  assert.equal(retained.company, 'Owner Reviewed Company'); assert.equal(pages, 1);
+  const meta = await buildManualImportedJob({url}, verify, async () => ({status:200,url,text:`<meta name="title" content="${title} @ Synthetic Company">`}));
+  assert.equal(meta.company, 'Synthetic Company');
+  const unknown = await buildManualImportedJob({url}, verify, async () => ({status:200,url,text:'<meta name="title" content="Unrelated title @ Invented Company">'}));
+  assert.equal(unknown.company, '');
+  const redirected = await buildManualImportedJob({url}, verify, async () => ({status:200,url:'https://example.org/other',text:`<meta name="title" content="${title} @ Wrong Company">`}));
+  assert.equal(redirected.company, '');
+});
 test('identity hierarchy and history-safe canonical refresh', async () => {
   const verify = async () => ({status: 'LISTED' as const, isListed: true, lastVerifiedAt: '2026-09-12', canonicalUrl: fixture.canonicalUrl, rawDetails: {rawContent: 'JD'}});
   const [a] = await buildDiscoveredJobs([fixture], verify);
@@ -136,6 +158,8 @@ test('identity hierarchy and history-safe canonical refresh', async () => {
   assert.equal(merged.newJobs.length, 0); assert.equal(merged.jobs[0].id, 'existing');
   assert.equal(merged.jobs[0].applicationStatus, 'APPLIED'); assert.equal(merged.jobs[0].firstSeenAt, '2026-01-01');
   assert.deepEqual(merged.jobs[0].statusHistory, applied.statusHistory); assert.equal(merged.jobs[0].notes, 'keep');
+  assert.equal(mergeDiscoveredJobs([{...applied,company:''}], [{...a,company:'Verified Company'}]).jobs[0].company, 'Verified Company');
+  assert.equal(mergeDiscoveredJobs([applied], [{...a,company:'Weaker Company'}]).jobs[0].company, fixture.company);
   assert.equal(merged.jobs[0].description, 'better JD');
   const latest = {...applied, applicationStatus: 'REJECTED' as const, notes: 'edited during discovery'};
   const lateResult = mergeDiscoveredJobs([latest], merged.refreshedJobs);

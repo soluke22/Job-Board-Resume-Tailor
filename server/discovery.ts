@@ -140,6 +140,25 @@ function sourceLabel(provider: PublicBoardProvider | string, channel: DiscoveryL
   return provider === 'greenhouse' ? 'Greenhouse' : provider === 'ashby' ? 'Ashby' : provider === 'lever' ? 'Lever' : 'Company Careers';
 }
 
+function canonicalAshbyCompany(html: string, title: string): string | undefined {
+  for (const match of html.matchAll(/<script\b(?=[^>]*\btype=["']application\/ld\+json["'])[^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const data = JSON.parse(match[1]);
+      const postings = Array.isArray(data) ? data : Array.isArray(data?.['@graph']) ? data['@graph'] : [data];
+      for (const posting of postings) {
+        if (posting?.['@type'] !== 'JobPosting' || posting.title !== title) continue;
+        const name = posting.hiringOrganization?.name;
+        if (typeof name === 'string' && name.trim()) return name.trim().slice(0, 200);
+      }
+    } catch { /* Malformed optional metadata is not a company fact. */ }
+  }
+  const meta = html.match(/<meta\b(?=[^>]*\bname=["']title["'])[^>]*>/i)?.[0];
+  const value = meta?.match(/\bcontent=["']([^"']+)["']/i)?.[1];
+  const prefix = `${title} @ `;
+  if (value?.startsWith(prefix)) return value.slice(prefix.length).trim().slice(0, 200) || undefined;
+  return undefined;
+}
+
 export async function buildDiscoveredJobs(leads: DiscoveryLead[], verify = verifyPostingAts): Promise<JobRecord[]> {
   const records = (await Promise.all(leads.map(async lead => {
     if (!normalizedJobUrl(lead.url)) return undefined;
@@ -151,7 +170,7 @@ export async function buildDiscoveredJobs(leads: DiscoveryLead[], verify = verif
     const canonicalText = typeof details.rawContent === 'string' ? details.rawContent : '';
     return {
       id: `job-disc-${randomUUID()}`, atsProvider: provider, atsBoard: details.atsBoard || detected.board, atsJobId: details.atsJobId || detected.jobId,
-      company: lead.company || '', title: details.title || lead.title || '', canonicalUrl: verification.canonicalUrl || '', applyUrl: verification.applyUrl || '', discoveryUrl: lead.url,
+      company: lead.company || text(details.company, 200) || '', title: details.title || lead.title || '', canonicalUrl: verification.canonicalUrl || '', applyUrl: verification.applyUrl || '', discoveryUrl: lead.url,
       discoveryTitle: lead.title, discoveryCompany: lead.company, discoverySummary: lead.description, discoverySourceUrls: [lead.url], discoveryAliases: [lead.url], description: canonicalText, rawDescription: canonicalText,
       canonicalContentStatus: canonicalText ? 'AVAILABLE' : verification.status === 'UNSUPPORTED' ? 'UNSUPPORTED' : 'UNAVAILABLE', canonicalContentSource: canonicalText ? verification.verificationSource || verification.canonicalUrl : undefined, canonicalMetadata: details.providerMetadata,
       location: details.location || lead.location || '', secondaryLocations: details.secondaryLocations, remoteStatus: details.remoteStatus || lead.remoteStatus || 'unknown', workplaceType: details.workplaceType, employmentType: details.employmentType || lead.employmentType || '', compensation: details.compensation, department: details.department, team: details.team, publishedAt: details.publishedAt, updatedAt: details.updatedAt,
@@ -172,6 +191,16 @@ export async function buildManualImportedJob(
   const lead: DiscoveryLead = { url: publicUrl, company: text(input.company, 200), title: text(input.title, 500), source: 'manual-web-import' };
   const [job] = await buildDiscoveredJobs([lead], verify);
   if (!job) throw new Error('Invalid posting URL.');
+  if (!job.company && job.atsProvider === 'ashby' && ['LISTED', 'UNLISTED'].includes(job.verificationStatus) && job.canonicalUrl) {
+    const identity = detectAtsProvider(job.canonicalUrl);
+    if (identity.provider === 'ashby' && identity.board === job.atsBoard && identity.jobId === job.atsJobId) {
+      try {
+        const page = await fetchPage(job.canonicalUrl);
+        if (page.status === 200 && normalizedJobUrl(page.url) === normalizedJobUrl(job.canonicalUrl))
+          job.company = canonicalAshbyCompany(page.text, job.title) || '';
+      } catch { /* Missing page metadata does not fabricate a company. */ }
+    }
+  }
   const supplied = text(input.description, 200_000);
   if (supplied) {
     job.description = supplied; job.rawDescription = supplied; job.jdSource = 'user-provided';
