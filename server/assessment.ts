@@ -15,8 +15,8 @@ export function eligibleEvidence(records: EvidenceItem[]): EvidenceItem[] {
   return records.filter(e => e.enabled && e.verificationStatus === 'verified' && !e.requiresUserReview).sort((a,b) => a.id.localeCompare(b.id));
 }
 export function assessmentSource(job: JobRecord): {text: string; source: 'canonical' | 'user-provided'} {
-  if (job.canonicalContentStatus === 'AVAILABLE' && job.description.trim()) return {text: job.description, source: 'canonical'};
   if (job.jdSource === 'user-provided' && (job.rawDescription || job.description).trim()) return {text: job.rawDescription || job.description, source: 'user-provided'};
+  if (job.canonicalContentStatus === 'AVAILABLE' && job.description.trim()) return {text: job.description, source: 'canonical'};
   throw new AssessmentError('INSUFFICIENT_JD: canonical content or explicitly supplied user JD required.');
 }
 export function assessmentMetadata(job: JobRecord, evidence: EvidenceItem[], profile: SearchProfile | null): AssessmentMetadata {

@@ -51,12 +51,19 @@ Node 24.19.0 validation PASS: focused discovery 9/9, full suite 162/162,
 typecheck, build, harness, privacy scan (0 findings), runtime check, integrated
 release check and `git diff --check`. The build retains the existing >500 kB
 client chunk warning; release/runtime scripts identify actual Vercel routing
-and Function limits as external gates. A bounded read-only route/privacy/SSRF
-review found no Blocker/High regression. Browser Preview acceptance is pending:
-there is no local `.vercel` project link or confirmed live public board in the
-local test environment. Next exact step: commit and push this scoped change to
-`dev`, then inspect whether Git integration produced an authenticated Preview
-and whether a real configured public board is available before browser tests.
+and Function limits as external gates. The first bounded read-only route/privacy/SSRF
+review found two Medium provenance defects; both were fixed and verified by the
+reviewer. Board feed rows now require exact provider, board and job identity
+alignment before receiving listing authority. Pasted JDs are marked unavailable
+as canonical, their canonical content source is cleared, and explicit
+user-provided provenance takes precedence over stale canonical flags. The
+correction release check passes again (162/162 tests). The pushed Preview for
+`ec473be8919d4597d6eca2d0c2297bcaf630b760` reached Ready; the Google link opened
+a normal Google results tab. Private workspace/source scan/import/Pipeline/reload
+acceptance is waiting for the owner to sign into the visible Preview manually.
+Next exact step: commit and push this reviewed security correction, then use
+the resulting Preview after manual owner sign-in and when an actual configured
+public board is available.
 
 ## Gemini discovery provider-boundary diagnosis (2026-09-24)
 

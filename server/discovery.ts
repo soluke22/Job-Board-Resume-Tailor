@@ -67,9 +67,12 @@ export async function scanPublicBoard(source: DiscoverySource, fetchImpl: typeof
     const url = text(source.provider === 'ashby' ? job.jobUrl : source.provider === 'greenhouse' ? job.absolute_url : job.hostedUrl, 4000);
     const title = text(source.provider === 'lever' ? job.text : job.title, 500);
     if (!url || !title || !normalizedJobUrl(url)) return [];
+    const detected = detectAtsProvider(url);
+    // A row in a public feed cannot confer listing authority on a URL owned by
+    // another host, ATS provider, or board.
+    if (detected.provider !== source.provider || detected.board !== source.boardId || !detected.jobId) return [];
     const remote = source.provider === 'lever' && ['remote', 'hybrid', 'onsite'].includes(job.workplaceType)
       ? job.workplaceType : job.isRemote === true ? 'remote' : 'unknown';
-    const detected = detectAtsProvider(url);
     const canonicalUrl = url;
     const rawContent = source.provider === 'ashby' ? joined(job.descriptionPlain, job.descriptionHtml) : source.provider === 'greenhouse' ? joined(job.content) : joined(job.descriptionPlain || job.description, ...(job.lists || []).map((entry: any) => joined(entry.text, entry.content)), job.additionalPlain || job.additional);
     const publishedAt = providerDate(source.provider === 'greenhouse' ? job.first_published : source.provider === 'ashby' ? job.publishedAt : typeof job.createdAt === 'number' ? job.createdAt : undefined);
@@ -172,7 +175,8 @@ export async function buildManualImportedJob(
   const supplied = text(input.description, 200_000);
   if (supplied) {
     job.description = supplied; job.rawDescription = supplied; job.jdSource = 'user-provided';
-    if (job.canonicalContentStatus !== 'AVAILABLE') job.canonicalContentStatus = 'UNAVAILABLE';
+    job.canonicalContentStatus = 'UNAVAILABLE';
+    job.canonicalContentSource = undefined;
   } else if (job.canonicalContentStatus !== 'AVAILABLE') {
     try {
       const page = await fetchPage(publicUrl);

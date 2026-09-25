@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { verifyPostingAts, detectAtsProvider, genericPageResult, verifyGenericPage } from '../server/atsAdapters';
+import { assessmentSource } from '../server/assessment';
 import { boardEndpoint, buildDiscoveredJobs, buildManualImportedJob, matchesSearchProfile, scanDiscoverySources, scanPublicBoard } from '../server/discovery';
 import { buildDiscoveryQueries, discoverySourcesForWorkspace, googleSearchUrl, parseDiscoverySource } from '../src/utils/discovery';
 import { calculateFreshnessBand } from '../server/searchEngine';
@@ -93,6 +94,8 @@ test('keyless public board registry, provider endpoints and partial failures are
   const greenhouseLeads = await scanPublicBoard(configured, (async () => json({jobs:[{absolute_url:'https://job-boards.greenhouse.io/synthetic/jobs/123',title:'Product Engineer',location:{name:'Washington, DC'}}]})) as typeof fetch);
   const leverLeads = await scanPublicBoard(lever, (async () => json([{hostedUrl:'https://jobs.eu.lever.co/synthetic/id',text:'UI Engineer',workplaceType:'remote',categories:{commitment:'full-time'}}])) as typeof fetch);
   assert.deepEqual([ashbyLeads.length, greenhouseLeads.length, leverLeads.length], [1,1,1]);
+  assert.deepEqual(await scanPublicBoard(configured, (async () => json({jobs:[{absolute_url:'https://evil.example/fake',title:'Forged Engineer'}]})) as typeof fetch), [], 'foreign hosts in board data do not inherit LISTED authority');
+  assert.deepEqual(await scanPublicBoard(configured, (async () => json({jobs:[{absolute_url:'https://job-boards.greenhouse.io/other-board/jobs/123',title:'Cross-board Engineer'}]})) as typeof fetch), [], 'a different board cannot inherit the configured board identity');
   const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'remote_only',excludedRolePatterns:['sales'],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
   const outcome = await scanDiscoverySources([ashby, configured], profile, async source => source.provider === 'greenhouse' ? Promise.reject(new Error('down')) : ashbyLeads, async () => ({status:'UNKNOWN',isListed:false,lastVerifiedAt:'2026-09-24'}));
   assert.deepEqual(outcome.sourceResults.map(result => result.status), ['SUCCESS','FAILED']);
@@ -113,6 +116,7 @@ test('verified jobs teach board sources and manual URL/JD imports remain unasses
   const verified = async () => ({status:'LISTED' as const,isListed:true,lastVerifiedAt:'2026-09-24',canonicalUrl:fixture.url,rawDetails:{atsProvider:'ashby',atsBoard:'synthetic',atsJobId:'id',title:'Canonical Engineer',rawContent:'Canonical JD'}});
   const imported = await buildManualImportedJob({url:fixture.url,description:'Owner pasted JD',company:'Synthetic Company',title:'Fallback title'}, verified);
   assert.equal(imported.sourceChannel, 'Manual Web Import'); assert.equal(imported.jdSource, 'user-provided');
+  assert.equal(imported.canonicalContentStatus, 'UNAVAILABLE'); assert.equal(assessmentSource(imported).source, 'user-provided');
   assert.equal(imported.description, 'Owner pasted JD'); assert.equal(imported.assessmentStatus, 'UNASSESSED'); assert.equal(imported.applicationPriority, 'UNASSESSED');
   const profile = {discoverySources:[]} as any;
   const learned = discoverySourcesForWorkspace(profile, [imported]);
