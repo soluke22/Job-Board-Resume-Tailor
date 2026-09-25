@@ -4,7 +4,22 @@
 
 Baseline: `dev` and `origin/dev` at `a6f92e15a5f34780706537779bb5f39258202490`; preserve the unrelated untracked `QA/2026-09-22-production-release.md`. Scope: correct only verified company metadata for URL-only ATS ingestion, add focused regressions, configure 3–6 verified public boards through the owner-facing DEV flow, then run one board scan, duplicate import, and reload acceptance. Company must come from exact provider fields or exact canonical ATS page metadata, never board slug or JD prose; an existing nonblank owner label survives. Unknown remains blank. Validate with Node 24 focused/full tests, typecheck, build, privacy/runtime/release/diff checks and one bounded read-only security review. No auth, Google, production, main, Vercel configuration, or manual Neon change. Record results and the next exact step here before a scoped dev checkpoint.
 
-## Keyless ATS-board discovery correction (2026-09-24)
+Result: company ingestion passed under SHA-bound private DEV acceptance. The bounded
+  manual ATS fallback reads only exact verified canonical metadata through
+  `safeFetchText`; optional provider company fields and existing owner labels are
+  preserved, missing company remains blank, imports stay UNASSESSED, and canonical
+  identity dedupe preserves one record across scan/import/reload. Specific source
+  labels, posting identities, job counts and owner activity are intentionally excluded
+  from this public plan.
+  
+  Board acceptance was partial because the former global first-source slice allowed a
+  prolific source to consume the verification/save cap before other processed sources
+  could contribute qualifying candidates. The UI also omitted per-source outcomes, so
+  provider success versus empty/failure could not be claimed. This technical defect
+  motivated the later deterministic round-robin/source-result correction. Private DEV
+  runtime details remain outside the repository.
+  
+  ## Keyless ATS-board discovery correction (2026-09-24)
 
 Baseline: clean tracked `dev` and freshly fetched `origin/dev` at
 `01b1bd72baa2c134161be09bb6012aa6220afa61`; `origin/main` remains
