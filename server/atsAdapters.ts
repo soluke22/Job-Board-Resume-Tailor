@@ -73,6 +73,7 @@ function adapter(provider: 'ashby' | 'greenhouse' | 'lever', hosts: string[]): A
           } : undefined;
         const rawDetails = {
           atsProvider: provider, atsBoard: board, atsJobId: jobId, title: provider === 'lever' ? j.text : j.title,
+          company: typeof j.companyName === 'string' ? j.companyName.trim() : typeof j.company === 'string' ? j.company.trim() : undefined,
           canonicalUrl, applyUrl,
           location: provider === 'greenhouse' ? j.location?.name : provider === 'lever' ? j.categories?.location : j.location,
           secondaryLocations: provider === 'ashby' ? j.secondaryLocations?.map((x: any) => typeof x === 'string' ? x : x.location) : undefined,
