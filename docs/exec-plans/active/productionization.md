@@ -1,6 +1,22 @@
 # Productionization execution plan
 
-## DEV keyless-discovery release hardening (2026-09-25)
+## Private master-resume audit boundary (2026-10-01)
+  
+  An owner-specific resume/evidence review was performed outside the application
+  runtime. Its candidate material, evidence judgments and editing instructions are
+  private and must not be recorded in public source. The public architectural finding
+  is limited to this: the repository has no canonical editable resume document or PDF
+  generator; owner-scoped `masterResume` data lives in private persistence, browser
+  print is the current PDF path, and evidence authority still requires explicit owner
+  review through the established provenance workflow.
+  
+  The former candidate-specific manual change set was an invalid public artifact and
+  has been removed. Generic repository policy now lives in
+  `docs/manual-follow-up/resume-editing-boundary.md`. Mechanical privacy validation at
+  the time did not establish semantic safety; subsequent release review requires both
+  scanner results and human semantic inspection of documentation and fixtures.
+  
+  ## DEV keyless-discovery release hardening (2026-09-25)
 
 Baseline: `dev` and `origin/dev` at `a6f92e15a5f34780706537779bb5f39258202490`; preserve the unrelated untracked `QA/2026-09-22-production-release.md`. Scope: correct only verified company metadata for URL-only ATS ingestion, add focused regressions, configure 3–6 verified public boards through the owner-facing DEV flow, then run one board scan, duplicate import, and reload acceptance. Company must come from exact provider fields or exact canonical ATS page metadata, never board slug or JD prose; an existing nonblank owner label survives. Unknown remains blank. Validate with Node 24 focused/full tests, typecheck, build, privacy/runtime/release/diff checks and one bounded read-only security review. No auth, Google, production, main, Vercel configuration, or manual Neon change. Record results and the next exact step here before a scoped dev checkpoint.
 
