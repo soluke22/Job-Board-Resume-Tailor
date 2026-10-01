@@ -35,6 +35,9 @@ export const DiscoverView: React.FC = () => {
     jobs,
     discoverJobs,
     isDiscovering,
+    discoverySourceResults,
+    workspaceMode,
+    authSession,
     verifyAtsStatus,
     openJobDetail,
     openResumeEditor,
@@ -206,6 +209,16 @@ export const DiscoverView: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {workspaceMode === 'PRIVATE_WORKSPACE' && authSession.isAuthenticated && discoverySourceResults.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2" aria-label="Latest discovery source outcomes">
+            {discoverySourceResults.map(result => (
+              <span key={result.sourceId} className={`rounded-lg border px-2.5 py-1 text-[11px] ${result.status === 'SUCCESS' ? 'border-emerald-800/70 bg-emerald-950/30 text-emerald-200' : 'border-amber-800/70 bg-amber-950/30 text-amber-200'}`}>
+                {result.sourceId}: {result.status === 'SUCCESS' ? `${result.selected} selected from ${result.profileAccepted} accepted (${result.fetched} fetched)` : 'scan failed'}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Filters and Search Query */}
         <div className="mt-6 pt-5 border-t border-slate-800/80 flex flex-wrap items-center gap-3">

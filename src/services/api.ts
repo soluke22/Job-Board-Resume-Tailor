@@ -23,7 +23,7 @@ function accessLost(response: Response, data?: SafeApiError) {
   const code = typeof data?.code === 'string' ? data.code : undefined;
   // Provider errors are never authentication verdicts for the private workspace,
   // even if an upstream service accidentally uses an auth-like HTTP status.
-  const providerFailure = code?.startsWith('GEMINI_') === true || code?.startsWith('SEARCH_') === true;
+  const providerFailure = code?.startsWith('GEMINI_') === true || code?.startsWith('OLLAMA_') === true || code?.startsWith('SEARCH_') === true;
   const authLoss = !providerFailure && (response.status === 401 ||
     (response.status === 403 && code === 'AUTH_FORBIDDEN') ||
     code === 'AUTH_UNAVAILABLE');
@@ -166,7 +166,7 @@ export const apiService = {
     return res.json();
   },
 
-  async discoverJobs(): Promise<{ discoveredJobs: any[]; refreshedJobs?: any[]; discoverySources?: any[]; sourceResults?: any[]; googleSearches?: {query:string;url:string}[]; discoveryRequestsUsed?: number; queryBudgetUsed: number; freshnessStats: any }> {
+  async discoverJobs(): Promise<{ discoveredJobs: any[]; refreshedJobs?: any[]; discoverySources?: any[]; sourceResults?: Array<{sourceId:string;status:'SUCCESS'|'FAILED';fetched:number;profileAccepted:number;selected:number}>; googleSearches?: {query:string;url:string}[]; discoveryRequestsUsed?: number; queryBudgetUsed: number; freshnessStats: any }> {
     const res = await privateFetch('/api/discover-jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

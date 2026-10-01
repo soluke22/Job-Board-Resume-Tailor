@@ -200,9 +200,10 @@ test('Phase 6 owner repository resolves sources, persists revisioned artifacts, 
   }finally{await pg.close();}
 });
 
-test('Phase 6 routes use strict structured Gemini output and current UI has review/copy fences',async()=>{
+test('Phase 6 routes use the strict provider-neutral structured boundary and current UI has review/copy fences',async()=>{
   const server=await readFile('server.ts','utf8');const downstream=server.slice(server.indexOf('// Phase 6 certified'));
-  assert.match(downstream,/responseJsonSchema:geminiJsonSchema\(schema\)/);assert.match(downstream,/timeout:30000/);assert.doesNotMatch(downstream,/extractCleanJson/);
+  const provider=await readFile('server/llmProvider.ts','utf8');
+  assert.match(downstream,/createArtifactHandler\(operation, structuredModel\)/);assert.match(provider,/responseJsonSchema: jsonSchema\(schema\)/);assert.match(provider,/timeout: 30_000/);assert.match(provider,/format: jsonSchema\(schema\)/);assert.doesNotMatch(provider,/extractCleanJson/);
   const ui=await readFile('src/views/OutreachView.tsx','utf8');assert.match(ui,/canCopyArtifact\(ans\)/);assert.match(ui,/ArtifactStatus artifact=\{ans\}/);
   assert.equal(ARTIFACT_VERSION,'phase6-extractive-v1');assert.equal(fingerprint('text')===fingerprint('text'),true);
 });

@@ -114,6 +114,16 @@ test('workspace requests handle JSON and empty or non-JSON responses without exp
   } finally { globalThis.fetch = original; loseAccess(); }
 });
 
+test('private discovery outcomes clear across transitions and never render in public mode', async () => {
+  const context = await readFile('src/context/AppContext.tsx', 'utf8');
+  const view = await readFile('src/views/DiscoverView.tsx', 'utf8');
+  const discovery = context.slice(context.indexOf('const discoverJobs'), context.indexOf('const verifyAtsStatus'));
+  assert.match(discovery, /setDiscoverySourceResults\(\[\]\);/);
+  assert.match(discovery, /catch \(err: any\) \{\s*setDiscoverySourceResults\(\[\]\);/);
+  assert.match(context.slice(context.indexOf('const reloadDataForMode'), context.indexOf('const setWorkspaceMode')), /setDiscoverySourceResults\(\[\]\);/);
+  assert.match(view, /workspaceMode === 'PRIVATE_WORKSPACE' && authSession\.isAuthenticated && discoverySourceResults\.length > 0/);
+});
+
 test('auth modal Escape and backdrop decisions dismiss only while idle and only on the backdrop', async () => {
   assert.equal(shouldDismissAuthModal('escape', false), true);
   assert.equal(shouldDismissAuthModal('backdrop', false, true), true);

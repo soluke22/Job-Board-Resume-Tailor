@@ -4,6 +4,7 @@ import { workspaceRepository, WorkspaceConflict } from './workspaceRepository.js
 import { ArtifactError, generateProof, generateMessage, generateAnswers, questionSchema } from './artifactProvenance.js';
 import { ResumeError } from './resumeProvenance.js';
 import type { StructuredModel } from './assessment.js';
+import { safeProviderError } from './providerErrors.js';
 
 const requestSchema=z.object({jobId:z.string().min(1).max(200),questions:z.array(z.union([z.string().min(1).max(2000),questionSchema])).min(1).max(20).optional(),
   contactName:z.string().max(100).optional(),relationship:z.string().max(200).optional(),overrideReason:z.string().min(1).max(1000).optional()}).strict();
@@ -26,6 +27,7 @@ export function createArtifactHandler(operation:'proof'|'outreach'|'answers'|'re
       res.json({data,revision:data.revision,job:data.jobs.find((j:any)=>j.id===job.id)});
     }catch(error){
       if(error instanceof WorkspaceConflict){res.status(409).json({error:'Workspace changed; reload before retrying artifact generation'});return;}
+      const provider=safeProviderError(error);if(provider){res.status(provider.status).json(provider.body);return;}
       res.status(422).json({error:error instanceof ArtifactError || error instanceof ResumeError?error.message:'Artifact failed structured validation or service unavailable; previous artifact preserved'});
     }
   };

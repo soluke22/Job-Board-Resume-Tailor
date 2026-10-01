@@ -1,5 +1,77 @@
 # Productionization execution plan
 
+## Deterministic board fairness and local Ollama provider boundary (2026-10-01)
+
+Baseline: local `dev` at `27adb3b2e93030cec8e085bfc7303e9fc2a3096a`, ahead of
+freshly fetched `origin/dev` (`9564246f8ba453bd8daf8d96aa86dae9d66f0404`), with the
+unrelated untracked `QA/2026-09-22-production-release.md` preserved. Scope is limited
+to deterministic enabled-board result allocation and an explicit developer-only local
+Ollama structured-model provider. Expected files: `server/discovery.ts`, `server.ts`,
+`server/llmProvider.ts`, narrow provider diagnostics if needed, client discovery
+response/context/view files, focused discovery/security/provider tests, `.env.example`,
+and the architecture/testing/deployment documentation.
+
+Part A design: each source keeps its existing normalization and profile filtering;
+the results are then globally deduplicated by the current canonical posting identity
+(supported provider + board + job id, normalized URL, conservative fallback), retaining
+deterministic first-source attribution. Deterministic round-robin draws from those
+per-source queues before the global 24 cap. Existing final build and workspace merge
+deduplication remains defense in depth. Per-source results expose only `sourceId`, safe
+`SUCCESS`/`FAILED` status, and numeric `fetched`, `profileAccepted`, and `selected`
+outcomes; they never expose an upstream response, body, error, or count presented as
+saved after workspace merging. The private UI distinguishes a successful zero from a
+failed source.
+
+Part B design: a provider-neutral structured-model boundary centralizes the three
+structured assessment/resume/artifact adapters. Gemini remains the default. Only
+explicit `LLM_PROVIDER=ollama` selects Ollama; the model comes from `OLLAMA_MODEL`
+(defaulted in the provider configuration boundary to `qwen3:14b`), not business logic.
+Ollama uses the fixed loopback `http://127.0.0.1:11434/api/generate`, JSON Schema
+format, `stream:false`, temperature zero, bounded 30-second no-redirect transport,
+bounded parsing, and schema validation. Failures are safely classified without prompt,
+model-output, body, or raw diagnostic logging, and never fall back to Gemini. The
+existing owner-scoped AI budget reserves once per invocation for either provider.
+Legacy non-structured cover letters remain Gemini-only and fail safely as unsupported
+when Ollama is explicitly selected.
+
+Acceptance: deterministic tests demonstrate fairness, duplicate attribution, zero and
+failure sources, under/over-cap behavior, UNASSESSED persistence, existing merge
+dedupe, and truthful source outcomes. Provider tests use injected fetch with no daemon
+and cover exact request/schema, success, malformed/schema-invalid output, timeout,
+connection and model-not-found failures, no fallback, and non-sensitive diagnostics.
+Run focused tests plus Node 24 typecheck, build, harness, privacy, and release checks
+as feasible. Protected boundaries: no auth/owner/session weakening, no arbitrary-host
+or request-controlled URL, no cloud fallback, no production/configuration/deployment
+switch, no private workspace or canonical-resume data, and no resume/provenance rewrite.
+
+Result: PASS. Discovery now normalizes and filters each enabled source, applies the
+existing canonical identity semantics before work allocation, preserves first-source
+duplicate attribution, and round-robins selected jobs through the 24 cap. Source
+results are safe `fetched`/`profileAccepted`/`selected` counts with `SUCCESS`/`FAILED`,
+flowed through the private API/context into a concise Discover view status. Existing
+final workspace merge remains in place, and all created records remain UNASSESSED.
+
+Structured assessment, resume and artifact routes now use one provider boundary.
+Gemini remains default; explicit Ollama uses only the fixed loopback generate endpoint
+with configured model/default, schema output, non-streaming temperature-zero requests,
+30-second no-redirect transport, bounded parsing and no fallback. Legacy cover letters
+return a safe unsupported response in explicit Ollama mode rather than invoking Gemini.
+The established AI budget reserves once per actual provider request. Documentation
+limits Ollama to developer-local loopback operation and provides no deployed switch.
+
+Security correction gate CLEAR: discovery outcomes clear on every workspace transition,
+private-view clearance/logout/public-demo reset, new scan and failed scan, and render
+only in authenticated private mode. The shared mapper returns only approved provider or
+budget status/code/message pairs; reader aborts classify as `OLLAMA_TIMEOUT`.
+Deterministic handler-boundary coverage proves the mapper without private detail.
+
+Bundled Node 24.19.0 `npm run release:check` PASS: full suite 175/175, typecheck,
+build, harness, strict privacy scan and runtime check all pass. `git diff --check`
+passes. Existing Rollup annotation and >500 kB client-chunk warnings are non-failing.
+Next exact step: conduct scoped checkpoint commit/review only; do not push, deploy, or
+change configuration. No Ollama daemon/model download, live provider call, or
+canonical-resume edit occurred.
+
 ## Private master-resume audit boundary (2026-10-01)
   
   An owner-specific resume/evidence review was performed outside the application

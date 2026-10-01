@@ -1,14 +1,12 @@
 import { createArtifactHandler } from './server/artifactRoutes.js';
 import { z } from 'zod';
-import { AssessmentError } from './server/assessment.js';
 import { createAssessmentHandler } from './server/assessmentRoutes.js';
 import { createResumeHandler } from './server/resumeRoutes.js';
 import express, { Request, Response, NextFunction, RequestHandler } from 'express';
 import dotenv from 'dotenv';
-import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { installAuth, requireWorkspaceOwner, privateNoStore } from './server/auth.js';
 import { assertBoundedJson } from './server/inputBounds.js';
-import { reserveProviderCall, ProviderBudgetExceeded, isBudgetedExternalPath } from './server/providerBudget.js';
+import { reserveProviderCall, ProviderBudgetExceeded, ProviderBudgetUnavailable, isBudgetedExternalPath } from './server/providerBudget.js';
 import { installPrivateFiles } from './server/privateFiles.js';
 import { createWorkspaceRouter } from './server/workspaceRoutes.js';
 import { redactAiPayload } from './server/privacy.js';
@@ -17,8 +15,8 @@ import { buildManualImportedJob, configuredDiscoverySources, scanDiscoverySource
 import { buildDiscoveryQueries, googleSearchUrl, parseDiscoverySource } from './src/utils/discovery.js';
 import { mergeDiscoveredJobs } from './src/utils/jobIdentity.js';
 import { safeFetchText } from './server/safeFetch.js';
-import { classifyGeminiError } from './server/geminiDiagnostics.js';
 import { createWorkspaceRepository } from './server/workspaceRepository.js';
+import { createStructuredModel, legacyGeminiClient, selectedLlmProvider } from './server/llmProvider.js';
 
 
 dotenv.config();
@@ -55,11 +53,6 @@ export function createProviderBudgetMiddleware(reserve = reserveProviderCall): R
 }
 app.use('/api', createProviderBudgetMiddleware());
 
-// Lazy initialization of GoogleGenAI
-export class ProviderBudgetUnavailable extends Error {}
-class GeminiProviderFailure extends Error {
-  constructor(readonly providerError: unknown) { super('Gemini provider request failed'); }
-}
 export async function reserveAiProviderCall(ownerId: string, reserve = reserveProviderCall): Promise<void> {
   try {
     await reserve(ownerId, 'ai');
@@ -76,28 +69,6 @@ export async function reserveExternalProviderCall(ownerId: string, reserve = res
     throw new ProviderBudgetUnavailable();
   }
 }
-function getGeminiClient(req: Request, alreadyMinimized = false): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return null;
-  }
-  const client = new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build'
-      }
-    }
-  });
-  const generate = client.models.generateContent.bind(client.models);
-  client.models.generateContent = async (params: any) => {
-    await reserveAiProviderCall(req.res!.locals.ownerId);
-    const bounded = { ...params, config: { ...params.config, httpOptions: { ...params.config?.httpOptions, timeout: 30000 } } };
-    return generate(alreadyMinimized ? bounded : redactAiPayload(bounded, req.body?.candidateProfile));
-  };
-  return client;
-}
-
 const MODEL_NAME = 'gemini-3.8-flash';
 
 // ==========================================
@@ -147,13 +118,8 @@ app.post('/api/fetch-job-url', async (req: Request, res: Response): Promise<void
 // ==========================================
 // 1. Analyze Job & Classify Role Family & Multi-Factor Fit
 // ==========================================
-function geminiJsonSchema(schema: z.ZodType) { const { ['$schema']: dialect, ...json } = z.toJSONSchema(schema); return json; }
-const assessmentHandler = createAssessmentHandler((req) => async (schema, system, data) => {
-  const ai = getGeminiClient(req, true);
-  if (!ai) throw new AssessmentError('Gemini is not configured; no assessment produced');
-  const response = await ai.models.generateContent({model:MODEL_NAME,contents:JSON.stringify(data),config:{systemInstruction:system,responseMimeType:'application/json',responseJsonSchema:geminiJsonSchema(schema),thinkingConfig:{thinkingLevel:ThinkingLevel.MEDIUM},httpOptions:{timeout:30000}}});
-  return schema.parse(JSON.parse(response.text || ''));
-});
+const structuredModel = (req: Request) => createStructuredModel(req, { reserveAiCall: reserveAiProviderCall });
+const assessmentHandler = createAssessmentHandler(structuredModel);
 app.post('/api/analyze-job', assessmentHandler);
 // Compatibility route uses the same persisted deterministic assessment, never a second scoring path.
 app.post('/api/match-evidence', assessmentHandler);
@@ -169,12 +135,7 @@ app.post('/api/gap-interview', (_req, res) => {
 // ==========================================
 // 4. Tailoring Plan
 // ==========================================
-const resumeModel = (req: Request) => async (schema: z.ZodType, system: string, data: unknown) => {
-  const ai = getGeminiClient(req, true);
-  if (!ai) throw new Error('Gemini is not configured');
-  const response = await ai.models.generateContent({model:MODEL_NAME,contents:JSON.stringify(data),config:{systemInstruction:system,responseMimeType:'application/json',responseJsonSchema:geminiJsonSchema(schema),thinkingConfig:{thinkingLevel:ThinkingLevel.MEDIUM},httpOptions:{timeout:30000}}});
-  return schema.parse(JSON.parse(response.text || ''));
-};
+const resumeModel = structuredModel;
 app.post('/api/generate-plan', createResumeHandler('plan', resumeModel));
 app.post('/api/generate-resume', createResumeHandler('generate', resumeModel));
 app.post('/api/evaluate-resume', createResumeHandler('evaluate', resumeModel));
@@ -188,7 +149,11 @@ app.post('/api/generate-cover-letter', async (req: Request, res: Response): Prom
   try {
     const { parsedJob, candidateProfile, tailoredResume } = req.body;
 
-    const ai = getGeminiClient(req);
+    if (selectedLlmProvider() === 'ollama') {
+      res.status(503).json({ error: 'Cover letters are unavailable with the local structured-model provider.', code: 'OLLAMA_UNSUPPORTED_OPERATION' });
+      return;
+    }
+    const ai = legacyGeminiClient();
     if (!ai) {
       res.status(503).json({
         error:
@@ -221,13 +186,14 @@ Return JSON:
   "evidenceThemesUsed": string[]
 }`;
 
-    const response = await ai.models.generateContent({
+    await reserveAiProviderCall(req.res!.locals.ownerId);
+    const response = await ai.models.generateContent(redactAiPayload({
       model: MODEL_NAME,
       contents: [{ text: prompt }],
       config: {
         responseMimeType: 'application/json', httpOptions: { timeout: 30000 }
       }
-    });
+    }, candidateProfile));
 
     const generated = z.object({ paragraphs: z.array(z.string().max(6000)).min(3).max(4), evidenceThemesUsed: z.array(z.string().max(500)).max(20) }).strict().parse(JSON.parse(response.text || ''));
     const candidateName =
@@ -359,12 +325,7 @@ app.post('/api/import-job', async (req: Request, res: Response): Promise<void> =
 
 // Phase 6 certified downstream artifacts use the Phase 4/5 strict adapter.
 for (const [path, operation] of [['generate-proof-pack','proof'],['generate-outreach','outreach'],['generate-answers','answers'],['generate-referral','referral']] as const) {
-  app.post(`/api/${path}`, createArtifactHandler(operation, (req) => async (schema, system, data) => {
-    const ai=getGeminiClient(req,true);
-    if(!ai)throw new AssessmentError('Gemini is not configured; no artifact produced');
-    const response=await ai.models.generateContent({model:MODEL_NAME,contents:JSON.stringify(data),config:{systemInstruction:system,responseMimeType:'application/json',responseJsonSchema:geminiJsonSchema(schema),thinkingConfig:{thinkingLevel:ThinkingLevel.MEDIUM},httpOptions:{timeout:30000}}});
-    return schema.parse(JSON.parse(response.text || ''));
-  }));
+  app.post(`/api/${path}`, createArtifactHandler(operation, structuredModel));
 }
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Unknown API route' }));

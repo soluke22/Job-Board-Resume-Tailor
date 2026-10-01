@@ -5,6 +5,7 @@ import { workspaceRepository, WorkspaceConflict } from './workspaceRepository.js
 import { currentJob, buildPlan, generateResume, inspectResume, revalidateResume, evaluationFor, generationSchema, validateClaim, ResumeError } from './resumeProvenance.js';
 import type { StructuredModel } from './assessment.js';
 import { redactAiPayload, isSensitiveCandidateText } from './privacy.js';
+import { safeProviderError } from './providerErrors.js';
 
 const requestSchema=z.object({jobId:z.string().min(1).max(200),claimId:z.string().min(1).max(200).optional()}).strict();
 export function createResumeHandler(operation:'plan'|'generate'|'evaluate'|'validate'|'regenerate'|'export', modelForRequest:(req:Request)=>StructuredModel,repository=workspaceRepository) {
@@ -58,6 +59,7 @@ export function createResumeHandler(operation:'plan'|'generate'|'evaluate'|'vali
       res.json({resume,evaluation,job:updated});
     }catch(error){
       if(error instanceof WorkspaceConflict){res.status(409).json({error:'Workspace changed; reload before retrying resume validation'});return;}
+      const provider=safeProviderError(error);if(provider){res.status(provider.status).json(provider.body);return;}
       res.status(422).json({error:error instanceof ResumeError?error.message:'Resume operation failed validation or service unavailable; prior artifact preserved'});
     }
   };

@@ -6,6 +6,8 @@ import type { EvidenceItem, JobRecord, SearchProfile } from '../src/types';
 import { persistenceDb, syntheticJob, syntheticEvidence, approveAllEvidence } from './helpers/persistence';
 import { createWorkspaceRepository } from '../server/workspaceRepository';
 import { createAssessmentHandler } from '../server/assessmentRoutes';
+import { LlmProviderFailure } from '../server/llmProvider';
+import { ProviderBudgetExceeded, ProviderBudgetUnavailable } from '../server/providerBudget';
 import { and, eq } from 'drizzle-orm';
 import { jobs as jobsTable } from '../server/db/schema';
 
@@ -164,6 +166,22 @@ test('real owner repository certification, caller forgery, stale history and HTT
     assert.equal(bad.jobs[0].fit.qualificationFit,10,'historical assessment retained');
     const changed=await repo.save('owner-a',{evidence:[{...syntheticEvidence('e'),rawEvidence:'Different React scope'}]},bad.revision);
     assert.equal(changed.jobs[0].assessmentStatus,'STALE');
+  } finally {await pg.close();}
+});
+test('assessment handler maps structured provider and AI-budget failures without private detail',async()=>{
+  const {pg,db}=await persistenceDb();const repo=createWorkspaceRepository(()=>db as any);
+  const persisted={...syntheticJob(),...job,applicationPriority:'UNASSESSED',qualificationFit:undefined,evidenceCoverage:undefined,fit:undefined};
+  try {
+    await repo.save('owner-a',{jobs:[persisted],evidence:[{...syntheticEvidence('e'),...evidence(),sourceType:'manual-entry'}],searchProfile:profile},0);
+    await approveAllEvidence(repo,'owner-a');
+    const invoke=async(error:Error)=>{
+      const handler=createAssessmentHandler(()=>async()=>{throw error;},repo);let status=200,payload:any;
+      const response={locals:{ownerId:'owner-a'},set:()=>response,status:(value:number)=>{status=value;return response;},json:(value:any)=>{payload=value;return response;}};
+      await handler({body:{jobId:'j'}} as any,response as any);return {status,payload};
+    };
+    assert.deepEqual(await invoke(new LlmProviderFailure('OLLAMA_INVALID_OUTPUT','Local model returned invalid structured output.')), {status:502,payload:{error:'Local model returned invalid structured output.',code:'OLLAMA_INVALID_OUTPUT'}});
+    assert.deepEqual(await invoke(new ProviderBudgetExceeded('private budget detail')), {status:429,payload:{error:'AI operation budget exceeded; retry after the current window',code:'PROVIDER_BUDGET_EXCEEDED'}});
+    assert.deepEqual(await invoke(new ProviderBudgetUnavailable('private outage detail')), {status:503,payload:{error:'AI operation budget is temporarily unavailable; retry later',code:'PROVIDER_UNAVAILABLE'}});
   } finally {await pg.close();}
 });
 test('malicious score/priority and malformed model output fail strict contracts',()=>{

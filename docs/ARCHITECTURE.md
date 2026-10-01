@@ -57,7 +57,11 @@ discovery scans owner-enabled public Ashby, Greenhouse and Lever boards through
 fixed provider endpoints. The source registry combines validated owner configuration
 with exact board identities learned from already-verified jobs; unknown board IDs are
 never inferred from company names. Each board scan consumes the external provider
-budget only. No general-search API or credential is required.
+  budget only. No general-search API or credential is required. Each enabled source
+is normalized and profile-filtered, globally canonical-identity-deduplicated with
+deterministic first-source attribution, then selected in deterministic round-robin
+order before the global 24 verification cap. Source outcomes report only safe fetched,
+profile-accepted and selected counts, never payloads/errors or workspace-save counts.
 
 A bounded allowlisted SearchProfile query builder separately creates normal
 `google.com/search` links for owner-reviewed broader exploration. CareerOS does not
@@ -65,9 +69,13 @@ request, scrape or ingest Google result pages. The owner imports a useful URL or
 through the manual flow, where exact ATS verification, canonical dedupe and
 UNASSESSED defaults apply before any AI workflow.
 
-Gemini initializes server-side from GEMINI_API_KEY for analysis, evidence matches,
-plans, resumes, letters, evaluations, proof packs and outreach through owner-protected
-API routes. AI outputs remain
+The structured-model boundary defaults to Gemini from server-only `GEMINI_API_KEY`
+for analysis, evidence matches, plans, resumes, evaluations, proof packs and outreach
+through owner-protected API routes. A developer may explicitly choose local Ollama
+with `LLM_PROVIDER=ollama` and `OLLAMA_MODEL`; it is fixed to loopback
+`127.0.0.1:11434/api/generate`, uses strict JSON Schema output, and never falls back
+to Gemini. Legacy cover letters remain Gemini-only and fail closed under that local
+mode. AI outputs remain
 untrusted; route authorization does not establish semantic candidate provenance.
 JSON parsing and redaction are not sufficient evidence validation.
 Discovery uses server/discovery.ts and exact public ATS adapters, preserving

@@ -108,6 +108,36 @@ test('keyless public board registry, provider endpoints and partial failures are
   assert.equal(matchesSearchProfile({...fixture,remoteStatus:'unknown'}, profile), true);
   assert.equal(matchesSearchProfile({...fixture,remoteStatus:'onsite'}, profile), false);
 });
+test('board discovery deduplicates before a deterministic fair global cap with truthful source outcomes', async () => {
+  const first = parseDiscoverySource('ashby:first', 'First');
+  const second = parseDiscoverySource('greenhouse:second', 'Second');
+  const third = parseDiscoverySource('lever:third', 'Third');
+  const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'any',excludedRolePatterns:[],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
+  const leads = (source: string, count: number) => Array.from({length: count}, (_, index) => ({
+    url: source === 'first' ? `https://jobs.ashbyhq.com/first/${index}` : source === 'second' ? `https://job-boards.greenhouse.io/second/jobs/${index}` : `https://jobs.lever.co/third/${index}`,
+    title: `Engineer ${index}`, company: source, location: 'Remote', source: 'public-board' as const
+  }));
+  const scan = async (source: any) => source === first ? leads('first', 30) : source === second ? [...leads('second', 4), {...leads('first', 1)[0], company: 'duplicate'}] : leads('third', 0);
+  const verify = async () => ({status:'UNKNOWN' as const,isListed:false,lastVerifiedAt:'2026-10-01'});
+  const outcome = await scanDiscoverySources([first, second, third], profile, scan, verify);
+  const repeat = await scanDiscoverySources([first, second, third], profile, scan, verify);
+  assert.equal(outcome.jobs.length, 24);
+  assert.deepEqual(outcome.sourceResults, [
+    {sourceId:first.id,status:'SUCCESS',fetched:30,profileAccepted:30,selected:20},
+    {sourceId:second.id,status:'SUCCESS',fetched:5,profileAccepted:5,selected:4},
+    {sourceId:third.id,status:'SUCCESS',fetched:0,profileAccepted:0,selected:0}
+  ]);
+  assert.deepEqual(outcome.sourceResults, repeat.sourceResults, 'same source order and rows yield the same allocation');
+  assert.deepEqual(outcome.jobs.map(job => [job.atsProvider, job.atsBoard, job.atsJobId]), repeat.jobs.map(job => [job.atsProvider, job.atsBoard, job.atsJobId]));
+  assert.ok(outcome.jobs.every(job => job.assessmentStatus === 'UNASSESSED' && job.applicationPriority === 'UNASSESSED'));
+  const underCap = await scanDiscoverySources([first, second], profile, async source => source === first ? leads('first', 1) : leads('second', 1), verify);
+  assert.deepEqual(underCap.sourceResults.map(result => result.selected), [1,1]);
+  const failed = await scanDiscoverySources([first, second], profile, async source => source === first ? leads('first', 1) : Promise.reject(new Error('synthetic')), verify);
+  assert.deepEqual(failed.sourceResults, [
+    {sourceId:first.id,status:'SUCCESS',fetched:1,profileAccepted:1,selected:1},
+    {sourceId:second.id,status:'FAILED',fetched:0,profileAccepted:0,selected:0}
+  ]);
+});
 test('deterministic Google queries use configured preferences only', () => {
   const profile = {preferredRoleFamilies: [], technologyStrengths: ['SyntheticTech'], remotePreference: 'any', name: 'PRIVATE_IDENTITY', email: 'PRIVATE_CONTACT', salaryPreference: {minTarget: 123, email: 'PRIVATE_NESTED_CONTACT'}} as any;
   const queries = buildDiscoveryQueries(profile, 10);

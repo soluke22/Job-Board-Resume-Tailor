@@ -4,7 +4,7 @@ import type { DiscoverySource, PublicBoardProvider } from '../src/utils/discover
 import { discoverySourcesForWorkspace } from '../src/utils/discovery.js';
 import { detectAtsProvider, providerDate, verifyPostingAts, type JobVerificationResult } from './atsAdapters.js';
 import { calculateFreshnessBand } from './searchEngine.js';
-import { normalizedJobUrl, mergeDiscoveredJobs } from '../src/utils/jobIdentity.js';
+import { normalizedJobUrl, mergeDiscoveredJobs, sameJob } from '../src/utils/jobIdentity.js';
 import { safeFetchText, validatePublicUrl } from './safeFetch.js';
 
 export interface DiscoveryLead {
@@ -22,7 +22,12 @@ export interface DiscoveryLead {
 export interface BoardScanResult {
   sourceId: string;
   status: 'SUCCESS' | 'FAILED';
-  leads: number;
+  /** Board rows returned before profile filtering. */
+  fetched: number;
+  /** Rows accepted by the deterministic owner profile. */
+  profileAccepted: number;
+  /** Unique rows selected for verification before the global cap/workspace merge. */
+  selected: number;
 }
 
 const text = (value: unknown, maximum: number) => typeof value === 'string' ? value.trim().slice(0, maximum) || undefined : undefined;
@@ -117,16 +122,59 @@ export async function scanDiscoverySources(
   const enabled = sources.filter(source => source.enabled).slice(0, 50);
   const settled = await Promise.allSettled(enabled.map(source => scan(source)));
   const sourceResults: BoardScanResult[] = [];
-  const leads: DiscoveryLead[] = [];
+  const queues: Array<{ sourceIndex: number; leads: DiscoveryLead[] }> = [];
+  const unique: Array<{ sourceIndex: number; lead: DiscoveryLead }> = [];
+
+  // This mirrors jobIdentity.sameJob's strong ATS identity, normalized URL, and
+  // conservative company/title/location fallback rules before verification work is
+  // allocated. It preserves the first enabled source's attribution for duplicates.
+  const identity = (lead: DiscoveryLead): Partial<JobRecord> => {
+    const detected = detectAtsProvider(lead.url);
+    return {
+      atsProvider: detected.provider,
+      atsBoard: detected.board,
+      atsJobId: detected.jobId,
+      canonicalUrl: lead.verification?.canonicalUrl || lead.url,
+      discoveryUrl: lead.url,
+      company: lead.company,
+      title: lead.title,
+      location: lead.location
+    };
+  };
   settled.forEach((result, index) => {
     const source = enabled[index];
-    if (result.status === 'rejected') { sourceResults.push({ sourceId: source.id, status: 'FAILED', leads: 0 }); return; }
+    if (result.status === 'rejected') {
+      sourceResults.push({ sourceId: source.id, status: 'FAILED', fetched: 0, profileAccepted: 0, selected: 0 });
+      return;
+    }
     const matched = result.value.filter(lead => matchesSearchProfile(lead, profile));
-    sourceResults.push({ sourceId: source.id, status: 'SUCCESS', leads: matched.length });
-    leads.push(...matched);
+    sourceResults.push({ sourceId: source.id, status: 'SUCCESS', fetched: result.value.length, profileAccepted: matched.length, selected: 0 });
+    const queue: DiscoveryLead[] = [];
+    for (const lead of matched) {
+      if (unique.some(entry => sameJob(identity(entry.lead), identity(lead)))) continue;
+      unique.push({ sourceIndex: index, lead });
+      queue.push(lead);
+    }
+    queues.push({ sourceIndex: index, leads: queue });
   });
+
+  // Round-robin only after per-source normalization/filtering and global identity
+  // dedupe. A prolific first source therefore cannot consume the whole cap.
+  const selected: DiscoveryLead[] = [];
+  while (selected.length < 24) {
+    let progressed = false;
+    for (const queue of queues) {
+      const lead = queue.leads.shift();
+      if (!lead) continue;
+      selected.push(lead);
+      sourceResults[queue.sourceIndex].selected++;
+      progressed = true;
+      if (selected.length === 24) break;
+    }
+    if (!progressed) break;
+  }
   return {
-    jobs: await buildDiscoveredJobs(leads.slice(0, 24), verify), sourceResults,
+    jobs: await buildDiscoveredJobs(selected, verify), sourceResults,
     discoveryRequestsUsed: enabled.length, queryBudgetUsed: enabled.length, queryBudgetUnit: 'public_board_scans' as const
   };
 }

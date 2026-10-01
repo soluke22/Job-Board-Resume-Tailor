@@ -196,6 +196,7 @@ interface AppContextType {
   isAnalyzing: boolean;
   isGenerating: boolean;
   isDiscovering: boolean;
+  discoverySourceResults: Array<{sourceId:string;status:'SUCCESS'|'FAILED';fetched:number;profileAccepted:number;selected:number}>;
   error: string | null;
   clearError: () => void;
 
@@ -317,6 +318,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
+  const [discoverySourceResults, setDiscoverySourceResults] = useState<Array<{sourceId:string;status:'SUCCESS'|'FAILED';fetched:number;profileAccepted:number;selected:number}>>([]);
   const [error, setError] = useState<string | null>(null);
 
   const clearError = () => setError(null);
@@ -325,6 +327,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Synchronize state when workspaceMode changes
   const reloadDataForMode = (mode: WorkspaceMode) => {
+    setDiscoverySourceResults([]);
     setProfileState(storageService.getProfile(mode));
     setSearchProfileState(storageService.getSearchProfile(mode));
     setEvidenceState(storageService.getEvidence(mode));
@@ -591,9 +594,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const discoverJobs = async (): Promise<void> => {
     setIsDiscovering(true);
     setError(null);
+    setDiscoverySourceResults([]);
     try {
       const res = await apiService.discoverJobs();
       const newDiscovered = res.discoveredJobs || [];
+      setDiscoverySourceResults(res.sourceResults || []);
 
       // Read the latest cache after the await: an in-flight search must not undo
       // application edits or resurrect a history record deleted meanwhile.
@@ -603,6 +608,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setJobs(merged.jobs);
       if (merged.newJobs[0]) setActiveJobId(merged.newJobs[0].id);
     } catch (err: any) {
+      setDiscoverySourceResults([]);
       console.error('Job discovery failed:');
       setError(err.message || 'Job discovery encountered an error');
     } finally {
@@ -1089,6 +1095,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAnalyzing,
         isGenerating,
         isDiscovering,
+        discoverySourceResults,
         error,
         clearError,
         setActiveJobId,

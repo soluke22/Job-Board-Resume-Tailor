@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { assessJob, AssessmentError, type StructuredModel } from './assessment.js';
 import { workspaceRepository, WorkspaceConflict } from './workspaceRepository.js';
 import type { JobRecord } from '../src/types/index.js';
+import { safeProviderError } from './providerErrors.js';
 
 const requestSchema=z.object({jobId:z.string().min(1).max(200)}).strict();
 export function createAssessmentHandler(modelForRequest:(req:Request)=>StructuredModel, repository=workspaceRepository) {
@@ -21,6 +22,7 @@ export function createAssessmentHandler(modelForRequest:(req:Request)=>Structure
       res.json({...result,job:updated});
     } catch(error) {
       if(error instanceof WorkspaceConflict){res.status(409).json({error:'Workspace changed during assessment; reload and retry'});return;}
+      const provider=safeProviderError(error);if(provider){res.status(provider.status).json(provider.body);return;}
       res.status(422).json({error:error instanceof AssessmentError?error.message:'Assessment failed validation or service unavailable; no new assessment produced'});
     }
   };

@@ -56,6 +56,7 @@ export. Record actual Function bundle size from Vercel output before release.
 | GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET | Private Google OAuth | Local callback credentials | Absent | Staging registered callback | Production registered callback |
 | OWNER_EMAIL | Private verified owner | Authorized test owner | Absent | Authorized staging owner | Actual owner; never public |
 | GEMINI_API_KEY | Private AI only | Optional test key | Absent | Optional synthetic-only smoke key | Production server key |
+| LLM_PROVIDER / OLLAMA_MODEL | Developer-only local structured-model opt-in | `ollama` / local model if intentionally used | Absent | Absent | Absent |
 | BLOB_STORE_ID | Preferred deployed Blob OIDC config | Optional | Absent | Isolated PRIVATE staging store | PRIVATE production store |
 | VERCEL_OIDC_TOKEN | Provider-managed Blob credential | Do not copy | No private store access | Vercel manages/refreshes | Vercel manages/refreshes |
 | BLOB_READ_WRITE_TOKEN | Outside-Vercel/static fallback | Isolated test-store token | Absent | Omit with working OIDC | Omit with working OIDC |
@@ -66,6 +67,10 @@ Never use `VITE_*` secrets. Resource IDs still need environment separation. Scop
 sensitive Preview variables to the explicit stable staging branch/domain, not all
 feature previews. Do not copy production DB/store/secrets into preview. Ordinary
 ephemeral previews exercise public synthetic demo with private auth unavailable.
+Ollama is not a deployed provider configuration: its unauthenticated local API must
+remain at the fixed default loopback binding (`127.0.0.1:11434`), never `0.0.0.0`.
+The application accepts no endpoint override and never falls back from explicit local
+mode to a cloud provider.
 Public navigation and `/api/health` must not contact Neon/Blob/Gemini/Google or public ATS endpoints.
 
 ### Private resources, OAuth and migrations

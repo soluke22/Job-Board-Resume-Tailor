@@ -108,7 +108,9 @@ remote/location queries, standard encoded Google URLs, private-data exclusion,
 arbitrary caller-query rejection and no search credential. Synthetic public-board
 fixtures cover Ashby, Greenhouse and Lever normalization, fixed endpoint allowlisting,
 configured/learned source precedence, conservative filtering, successful empty scans,
-partial failure and per-board external budgeting without any Gemini client or key.
+partial failure, canonical duplicate first-source attribution, deterministic round-robin
+fairness under/over the 24 cap, truthful safe source outcomes and per-board external
+budgeting without any Gemini client or key.
 
 Shared server/client merge tests cover ATS IDs, canonical/tracking/Greenhouse alias
 URLs, distinct requisitions, within-batch aliases, all application statuses,
@@ -142,6 +144,12 @@ Integration: full authenticated browser lifecycle and truthful end-to-end workfl
 Use synthetic Gemini/ATS/provider fixtures by default. Never log secrets or raw
 private workspace records. Build/static scanning cannot certify complete privacy.
 Results and reviewer findings belong in the active plan and phase acceptance matrices.
+
+Local provider coverage: `node --import tsx --test tests/llm-provider.test.ts` injects
+fetch and never contacts a daemon. It asserts the fixed loopback generate URL, exact
+non-streaming JSON-Schema request, model configuration, bounded structured parsing,
+safe timeout/connection/model/output classifications, one AI-budget reservation and
+no Gemini fallback. Do not use real candidate data to test a local daemon.
 
 ## Phase 5 resume provenance coverage
 Phase 4.1 focused calibration: node --import tsx --test tests/phase-4-1-calibration.test.ts.
