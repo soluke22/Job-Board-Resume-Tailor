@@ -30,7 +30,7 @@ test('production Node shell and source Node serverless adapter work without priv
     for (const path of ['/api/workspace/data', '/api/private/files']) {
       const response = await fetch(url + path); assert.equal(response.status, 503);
       assert.match(response.headers.get('cache-control')!, /private.*no-store/);
-      assert.deepEqual(await response.json(), { error: 'Private authentication is unavailable' });
+      assert.deepEqual(await response.json(), { error: 'Private authentication is unavailable', code: 'AUTH_UNAVAILABLE' });
     }
   } finally {
     if (child.exitCode === null) { const exited = new Promise<void>(resolve => child.once('exit', () => resolve())); child.kill(); await exited; }
