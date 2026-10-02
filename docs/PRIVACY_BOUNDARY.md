@@ -7,6 +7,14 @@ career evidence, imports, resumes, jobs/applications, interviews, outreach, audi
 records, private source files and exports. Never copy private contents into docs,
 tests, screenshots, logs or public artifacts.
 
+Release privacy requires both mechanical scanning and semantic review. Regex and
+credential-shape rules cannot determine whether otherwise ordinary employer,
+school, project, posting or accomplishment text describes the real owner. Every
+public release must therefore review tracked documentation, fixtures and acceptance
+records for candidate- or workspace-specific meaning. Owner-specific resume editing
+instructions stay outside the repository; see
+[the resume editing boundary](manual-follow-up/resume-editing-boundary.md).
+
 ## Current State — Phase 1 implementation
 Better Auth provides Google OAuth only. Email/password is disabled. The current
 Google profile, user creation and session creation must match the server-only

@@ -210,7 +210,7 @@ test('deterministic Google queries use configured preferences only', () => {
   for (const maximum of [0, -1, 11, 1.5]) assert.throws(() => buildDiscoveryQueries(profile, maximum));
 });
 test('verified jobs teach board sources and manual URL/JD imports remain unassessed', async () => {
-  const verified = async () => ({status:'LISTED' as const,isListed:true,lastVerifiedAt:'2026-09-24',canonicalUrl:fixture.url,rawDetails:{atsProvider:'ashby',atsBoard:'synthetic',atsJobId:'id',title:'Canonical Engineer',rawContent:'Synthetic canonical JD'}});
+  const verified = async () => ({status:'LISTED' as const,isListed:true,lastVerifiedAt:'2026-09-24',canonicalUrl:fixture.url,rawDetails:{atsProvider:'ashby',atsBoard:'synthetic',atsJobId:'id',title:'Canonical Engineer',rawContent:'Canonical JD'}});
   const imported = await buildManualImportedJob({url:fixture.url,description:'Owner pasted JD',company:'Synthetic Company',title:'Fallback title'}, verified);
   assert.equal(imported.sourceChannel, 'Manual Web Import'); assert.equal(imported.jdSource, 'user-provided');
   assert.equal(imported.canonicalContentStatus, 'UNAVAILABLE'); assert.equal(assessmentSource(imported).source, 'user-provided');

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { readFile, mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { readFile, mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -99,6 +99,33 @@ test('provider budgets persist across instances, isolate owners, serialize concu
     await assert.rejects(createProviderBudget(() => { throw new Error('Synthetic DB outage'); })('owner-a', 'ai'));
     await assert.rejects(reserve('', 'ai', instant));
   } finally { await pg.close(); }
+});
+
+test('release privacy scan enforces semantic public-fixture structure without storing private markers', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'phase9-synthetic-semantic-scan-'));
+  try {
+    const docs = join(root, 'docs', 'manual-follow-up');
+    const tests = join(root, 'tests');
+    await mkdir(docs, { recursive: true }); await mkdir(tests, { recursive: true });
+    const nested = join(docs, 'private'); await mkdir(nested);
+    await writeFile(join(nested, 'resume-editing-boundary.md'), '# Misplaced owner notes');
+    const prohibitedFixture = ['https://jobs.ashbyhq.com', 'contest-board', '00000000-0000-4000-8000-000000000001'].join('/');
+    await writeFile(join(tests, 'posting.test.ts'), `const url = '${prohibitedFixture}';`);
+    const blocked = spawnSync(process.execPath, [resolve('scripts/privacy-scan.mjs'), '--strict', '--root', root], { encoding: 'utf8' });
+    assert.equal(blocked.status, 1);
+    assert.match(blocked.stdout, /owner-specific manual follow-up file/);
+    assert.match(blocked.stdout, /non-synthetic ATS fixture identity/);
+    assert.doesNotMatch(blocked.stdout, /contest-board|00000000/);
+    await rm(nested, { recursive: true }); await rm(join(tests, 'posting.test.ts'));
+    await writeFile(join(docs, 'resume-editing-boundary.md'), '# Generic boundary');
+    await writeFile(join(tests, 'posting.test.ts'), "const url = 'https://jobs.ashbyhq.com/synthetic-board/00000000-0000-4000-8000-000000000001';");
+    const clean = spawnSync(process.execPath, [resolve('scripts/privacy-scan.mjs'), '--strict', '--root', root], { encoding: 'utf8' });
+    assert.equal(clean.status, 0); assert.match(clean.stdout, /0 finding/);
+  } finally {
+    assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep));
+    assert.ok(root.includes('phase9-synthetic-semantic-scan-'));
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('provider budget and discovery responses expose safe, actionable error codes', async () => {

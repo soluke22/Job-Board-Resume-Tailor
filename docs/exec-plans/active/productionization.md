@@ -1,5 +1,57 @@
 # Productionization execution plan
 
+## Public-repository semantic privacy remediation (2026-10-02)
+
+Baseline: local `dev` and `origin/dev` at
+`2d4091587a7c15c3c30c056a7d68911ffd6339f1`, with the unrelated untracked
+`QA/2026-09-22-production-release.md` preserved. The formal release audit found
+that public documentation and a discovery fixture contained owner-specific career
+or private-workspace material that mechanical credential/PII scanning could not
+classify semantically.
+
+Scope: remove the candidate-specific manual resume artifact, retain only a generic
+resume-editing boundary, redact owner-specific resume and DEV acceptance details
+from this public plan, replace the live ATS posting identity with a wholly synthetic
+provider-shaped fixture, generalize employer-specific schema/type nomenclature, and
+add structural privacy rules for manual-follow-up files and UUID-shaped ATS test
+identities. Preserve application behavior, deterministic discovery coverage, public
+synthetic demo data, main, production and remote refs.
+
+Acceptance: focused discovery/provider/privacy tests and the complete Node 24 release
+composition pass; current tracked source receives a fresh semantic review; one local
+checkpoint commit records only this remediation. History exposure is then mapped
+read-only across local/remote branches and tags, followed by a precise unexecuted
+rewrite plan. No push, history rewrite, ref deletion or force update is authorized.
+
+Result: current-tree remediation PASS. The candidate-specific manual artifact was
+removed, the retained editing guidance is generic, owner/workspace details in this
+plan were redacted, and the provider-shaped discovery fixture now uses an explicitly
+synthetic board and UUID. Candidate- and employer-specific legacy schema/type labels
+were replaced with generic candidate/employment/experience labels; loose
+persisted-object parsing continues to preserve unknown legacy metadata without
+requiring the private names in source.
+Structural regression coverage rejects owner-specific
+manual-follow-up files and non-synthetic UUID ATS fixtures without echoing matched
+values. Node 24 focused discovery/provider/privacy coverage passes 33/33; the full
+suite and release composition pass 180/180 with typecheck, build, harness, strict
+privacy (zero findings), runtime and diff checks passing. The remaining release
+blocker is historical reachability of the removed material; bounded independent
+security/privacy review found no remaining current-tree finding after its two
+structural-scanner bypass probes were corrected and regression-tested. Mapping and a precise
+unexecuted rewrite/coordination plan follow the local checkpoint.
+
+History mapping: pushed `origin/dev` retains the removed resume artifact, redacted
+plan sections, live ATS fixture and legacy candidate/employer-specific schema labels
+through its pre-cleanup tip. `origin/main` does not contain the resume, acceptance or
+live-fixture categories, but it does retain the legacy schema labels introduced in
+the initial application commit. No tags or other remote branches exist; a local-only
+backup branch also retains those schema objects. The smallest complete future purge
+therefore requires separately authorized, compatibility-preserving rewrites of both
+`refs/heads/dev` and `refs/heads/main`, plus local clone/backup cleanup. The local
+installation does not currently include `git-filter-repo`. Next exact step: obtain
+explicit authorization for an isolated-mirror rewrite and force-with-lease update of
+those two refs using pinned old remote SHAs; do not publish this checkpoint first.
+
 ## Discovery dedupe availability correction (2026-10-01)
 
 Baseline: local `dev` at `e4961d9e548c67c0b96f611e60b57d12439b5cb7`,
@@ -120,41 +172,41 @@ change configuration. No Ollama daemon/model download, live provider call, or
 canonical-resume edit occurred.
 
 ## Private master-resume audit boundary (2026-10-01)
-  
-  An owner-specific resume/evidence review was performed outside the application
-  runtime. Its candidate material, evidence judgments and editing instructions are
-  private and must not be recorded in public source. The public architectural finding
-  is limited to this: the repository has no canonical editable resume document or PDF
-  generator; owner-scoped `masterResume` data lives in private persistence, browser
-  print is the current PDF path, and evidence authority still requires explicit owner
-  review through the established provenance workflow.
-  
-  The former candidate-specific manual change set was an invalid public artifact and
-  has been removed. Generic repository policy now lives in
-  `docs/manual-follow-up/resume-editing-boundary.md`. Mechanical privacy validation at
-  the time did not establish semantic safety; subsequent release review requires both
-  scanner results and human semantic inspection of documentation and fixtures.
-  
-  ## DEV keyless-discovery release hardening (2026-09-25)
+
+An owner-specific resume/evidence review was performed outside the application
+runtime. Its candidate material, evidence judgments and editing instructions are
+private and must not be recorded in public source. The public architectural finding
+is limited to this: the repository has no canonical editable resume document or PDF
+generator; owner-scoped `masterResume` data lives in private persistence, browser
+print is the current PDF path, and evidence authority still requires explicit owner
+review through the established provenance workflow.
+
+The former candidate-specific manual change set was an invalid public artifact and
+has been removed. Generic repository policy now lives in
+`docs/manual-follow-up/resume-editing-boundary.md`. Mechanical privacy validation at
+the time did not establish semantic safety; subsequent release review requires both
+scanner results and human semantic inspection of documentation and fixtures.
+
+## DEV keyless-discovery release hardening (2026-09-25)
 
 Baseline: `dev` and `origin/dev` at `a6f92e15a5f34780706537779bb5f39258202490`; preserve the unrelated untracked `QA/2026-09-22-production-release.md`. Scope: correct only verified company metadata for URL-only ATS ingestion, add focused regressions, configure 3–6 verified public boards through the owner-facing DEV flow, then run one board scan, duplicate import, and reload acceptance. Company must come from exact provider fields or exact canonical ATS page metadata, never board slug or JD prose; an existing nonblank owner label survives. Unknown remains blank. Validate with Node 24 focused/full tests, typecheck, build, privacy/runtime/release/diff checks and one bounded read-only security review. No auth, Google, production, main, Vercel configuration, or manual Neon change. Record results and the next exact step here before a scoped dev checkpoint.
 
 Result: company ingestion passed under SHA-bound private DEV acceptance. The bounded
-  manual ATS fallback reads only exact verified canonical metadata through
-  `safeFetchText`; optional provider company fields and existing owner labels are
-  preserved, missing company remains blank, imports stay UNASSESSED, and canonical
-  identity dedupe preserves one record across scan/import/reload. Specific source
-  labels, posting identities, job counts and owner activity are intentionally excluded
-  from this public plan.
-  
-  Board acceptance was partial because the former global first-source slice allowed a
-  prolific source to consume the verification/save cap before other processed sources
-  could contribute qualifying candidates. The UI also omitted per-source outcomes, so
-  provider success versus empty/failure could not be claimed. This technical defect
-  motivated the later deterministic round-robin/source-result correction. Private DEV
-  runtime details remain outside the repository.
-  
-  ## Keyless ATS-board discovery correction (2026-09-24)
+manual ATS fallback reads only exact verified canonical metadata through
+`safeFetchText`; optional provider company fields and existing owner labels are
+preserved, missing company remains blank, imports stay UNASSESSED, and canonical
+identity dedupe preserves one record across scan/import/reload. Specific source
+labels, posting identities, job counts and owner activity are intentionally excluded
+from this public plan.
+
+Board acceptance was partial because the former global first-source slice allowed a
+prolific source to consume the verification/save cap before other processed sources
+could contribute qualifying candidates. The UI also omitted per-source outcomes, so
+provider success versus empty/failure could not be claimed. This technical defect
+motivated the later deterministic round-robin/source-result correction. Private DEV
+runtime details remain outside the repository.
+
+## Keyless ATS-board discovery correction (2026-09-24)
 
 Baseline: clean tracked `dev` and freshly fetched `origin/dev` at
 `01b1bd72baa2c134161be09bb6012aa6220afa61`; `origin/main` remains

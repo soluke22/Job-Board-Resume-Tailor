@@ -28,6 +28,10 @@ The committed node:test suite runs through tsx; PGlite tests workspace contracts
 - npm run harness:check: router/doc/skill/agent integrity and negative fixtures.
 - npm run privacy:scan: bounded source/client artifact privacy triage; use
   --strict --require-build at release. Paths/rules only, no matched private text.
+- Privacy triage is mechanical, not a semantic classifier. Release review must also
+  inspect tracked docs, tests, fixtures and acceptance records for real candidate or
+  owner-workspace meaning. Candidate-specific manual follow-up documents and
+  non-synthetic UUID-shaped ATS fixtures fail the structural scanner policy.
 - node scripts/validate-evidence.mjs <synthetic-json-file>: evidence reference
   integrity; ID validation does not prove semantic candidate provenance.
 - npm run release:check: typecheck, build, harness, strict public-artifact privacy
