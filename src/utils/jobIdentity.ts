@@ -13,19 +13,19 @@ export function normalizedJobUrl(input?: string): string | undefined {
     return u.href;
   } catch { return undefined; }
 }
-function atsKey(j: Partial<JobRecord>) {
+export function supportedAtsIdentityKey(j: Partial<JobRecord>) {
   return j.atsJobId && j.atsBoard && ['ashby', 'greenhouse', 'lever'].includes(j.atsProvider || '')
     ? `${j.atsProvider}:${j.atsBoard}:${j.atsJobId}` : undefined;
 }
 const normalize = (s?: string) => s?.trim().toLowerCase().replace(/\s+/g, ' ');
-function urlSet(job: Partial<JobRecord>): Set<string> {
+export function normalizedJobUrls(job: Partial<JobRecord>): Set<string> {
   return new Set([job.canonicalUrl, job.sourceUrl, job.discoveryUrl, ...(job.discoveryAliases || [])]
     .map(normalizedJobUrl).filter((url): url is string => !!url));
 }
 export function sameJob(a: Partial<JobRecord>, b: Partial<JobRecord>): boolean {
-  const ak = atsKey(a), bk = atsKey(b);
+  const ak = supportedAtsIdentityKey(a), bk = supportedAtsIdentityKey(b);
   if (ak && bk) return ak === bk; // Different requisitions are never title-merged.
-  const aUrls = urlSet(a), bUrls = urlSet(b);
+  const aUrls = normalizedJobUrls(a), bUrls = normalizedJobUrls(b);
   if ([...aUrls].some(url => bUrls.has(url))) return true;
   // Fallback only without conflicting strong identities/URLs and with known location.
   if (ak || bk || aUrls.size && bUrls.size) return false;

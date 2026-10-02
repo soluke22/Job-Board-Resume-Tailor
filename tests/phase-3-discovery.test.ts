@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { verifyPostingAts, detectAtsProvider, genericPageResult, verifyGenericPage } from '../server/atsAdapters';
 import { assessmentSource } from '../server/assessment';
-import { boardEndpoint, buildDiscoveredJobs, buildManualImportedJob, matchesSearchProfile, scanDiscoverySources, scanPublicBoard } from '../server/discovery';
+import { boardEndpoint, buildDiscoveredJobs, buildManualImportedJob, deduplicateDiscoveryLeads, matchesSearchProfile, scanDiscoverySources, scanPublicBoard } from '../server/discovery';
 import { buildDiscoveryQueries, discoverySourcesForWorkspace, googleSearchUrl, parseDiscoverySource } from '../src/utils/discovery';
 import { calculateFreshnessBand } from '../server/searchEngine';
 import { mergeDiscoveredJobs, sameJob, normalizedJobUrl } from '../src/utils/jobIdentity';
@@ -137,6 +137,69 @@ test('board discovery deduplicates before a deterministic fair global cap with t
     {sourceId:first.id,status:'SUCCESS',fetched:1,profileAccepted:1,selected:1},
     {sourceId:second.id,status:'FAILED',fetched:0,profileAccepted:0,selected:0}
   ]);
+});
+test('supported maximum strong identities use bounded indexed dedupe before fair selection', async () => {
+  const sourceCount = 50, leadsPerSource = 500;
+  const sources = Array.from({length: sourceCount}, (_, index) => parseDiscoverySource(`ashby:board-${index}`, `Company ${index}`));
+  const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'any',excludedRolePatterns:[],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
+  const scan = async (source: any) => Array.from({length: leadsPerSource}, (_, index) => ({
+    url: `https://jobs.ashbyhq.com/${source.boardId}/${index}`,
+    title: `Engineer ${index}`, company: source.company, location: 'Remote', source: 'public-board' as const
+  }));
+  const verify = async () => ({status:'UNKNOWN' as const,isListed:false,lastVerifiedAt:'2026-10-01'});
+  const outcome = await scanDiscoverySources(sources, profile, scan, verify);
+  assert.equal(outcome.jobs.length, 24);
+  assert.deepEqual(outcome.sourceResults.map(result => result.selected), [...Array(24).fill(1), ...Array(26).fill(0)]);
+  assert.deepEqual(outcome.dedupeStats, {
+    candidateTraversals: 25_000,
+    atsIdentityLookups: 25_000,
+    urlIdentityLookups: 25_000,
+    fallbackSameJobComparisons: 0,
+    acceptedUnique: 25_000
+  });
+});
+test('mass strong duplicates collapse with first-source attribution and bounded lookups', async () => {
+  const sources = Array.from({length: 50}, (_, index) => parseDiscoverySource(`ashby:source-${index}`, `Company ${index}`));
+  const shared = Array.from({length: 500}, (_, index) => ({
+    url: `https://jobs.ashbyhq.com/shared/${index}`, title: `Engineer ${index}`, company: 'First', location: 'Remote', source: 'public-board' as const
+  }));
+  const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'any',excludedRolePatterns:[],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
+  const outcome = await scanDiscoverySources(sources, profile, async () => shared, async () => ({status:'UNKNOWN' as const,isListed:false,lastVerifiedAt:'2026-10-01'}));
+  assert.equal(outcome.jobs.length, 24);
+  assert.deepEqual(outcome.sourceResults.map(result => result.selected), [24, ...Array(49).fill(0)]);
+  assert.deepEqual(outcome.dedupeStats, {
+    candidateTraversals: 25_000,
+    atsIdentityLookups: 25_000,
+    urlIdentityLookups: 500,
+    fallbackSameJobComparisons: 0,
+    acceptedUnique: 500
+  });
+});
+test('mixed strong and weak identities isolate conservative fallback comparisons', () => {
+  const strong = {url:'https://jobs.ashbyhq.com/strong/1',title:'Strong',company:'Strong Co',location:'Remote',source:'public-board' as const};
+  const weakUrl = {url:'https://careers.example.org/jobs/1',title:'Weak URL',company:'Weak Co',location:'Remote',source:'public-board' as const};
+  const weakNoUrl = {url:'not-a-url',title:'Weak fallback',company:'Weak Co',location:'Remote',source:'public-board' as const};
+  const outcome = deduplicateDiscoveryLeads([
+    [strong, {...strong}],
+    [weakUrl, {...weakUrl}],
+    [weakNoUrl, {...weakNoUrl}]
+  ]);
+  assert.deepEqual(outcome.queues.map(queue => queue.leads.length), [1,1,1]);
+  assert.deepEqual(outcome.stats, {
+    candidateTraversals: 6,
+    atsIdentityLookups: 2,
+    urlIdentityLookups: 3,
+    fallbackSameJobComparisons: 3,
+    acceptedUnique: 3
+  });
+});
+test('small weak-only input retains conservative sameJob fallback behavior', () => {
+  const base = {url:'invalid-url',title:'Engineer',company:'Weak Co',location:'Remote',source:'public-board' as const};
+  const outcome = deduplicateDiscoveryLeads([[base, {...base}, {...base,title:'Designer'}]]);
+  assert.deepEqual(outcome.queues[0].leads.map(lead => lead.title), ['Engineer','Designer']);
+  assert.equal(outcome.stats.atsIdentityLookups, 0);
+  assert.equal(outcome.stats.urlIdentityLookups, 0);
+  assert.equal(outcome.stats.fallbackSameJobComparisons, 2);
 });
 test('deterministic Google queries use configured preferences only', () => {
   const profile = {preferredRoleFamilies: [], technologyStrengths: ['SyntheticTech'], remotePreference: 'any', name: 'PRIVATE_IDENTITY', email: 'PRIVATE_CONTACT', salaryPreference: {minTarget: 123, email: 'PRIVATE_NESTED_CONTACT'}} as any;

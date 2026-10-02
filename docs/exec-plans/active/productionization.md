@@ -1,5 +1,52 @@
 # Productionization execution plan
 
+## Discovery dedupe availability correction (2026-10-01)
+
+Baseline: local `dev` at `e4961d9e548c67c0b96f611e60b57d12439b5cb7`,
+with the unrelated untracked `QA/2026-09-22-production-release.md` preserved.
+Independent publication review demonstrated a HIGH availability defect in the
+pre-cap cross-source dedupe: every accepted lead was retained in an array and every
+later lead used `unique.some(...sameJob...)`. The supported 50 sources x 500 rows
+could therefore perform 312,487,500 pairwise comparisons before selecting 24 jobs.
+
+Corrective design: preserve the existing `sameJob` identity hierarchy rather than
+replace it. Export its existing supported ATS key and normalized URL-set helpers;
+the discovery allocator indexes provider + board + posting ID and every normalized
+canonical/discovery URL. Strong records use only indexed lookups, retain the first
+deterministic source, and never enter the global fallback scan. Only records without
+a supported ATS identity enter a bounded weak-record collection; URL matches remain
+indexed, while `sameJob` is retained for the conservative company/title/location
+cases that cannot be represented by a strong key. Source/row traversal order,
+profile filtering, round-robin allocation, the final 24 cap, final/workspace merge,
+UNASSESSED defaults and `sourceResults` meanings remain unchanged.
+
+Supported-bound acceptance: deterministic fixtures cover 50 sources x 500 unique
+strong identities, mass cross-source duplicates, mixed strong/weak identities,
+small weak-only fallback and the existing prolific-source fairness case. Internal
+test-only-visible statistics record candidate traversal, ATS/URL index lookups and
+fallback `sameJob` comparisons; the maximum strong case must remain linear with zero
+fallback comparisons and no wall-clock assertion. Protected boundaries: no network,
+provider trust/status, canonical URL construction, company metadata, source registry,
+UI/API output, auth/private data, persistence, assessment/resume/evidence, Ollama,
+Gemini, production configuration, main, deployment or publication change.
+
+Result: PASS / independent review CLEAR. The supported 50 x 500 unique-strong case
+traverses 25,000 candidates with 25,000 ATS-key lookups, 25,000 normalized-URL
+lookups, zero fallback comparisons and 24 round-robin selections. The 25,000-row
+mass-duplicate case uses 25,000 ATS lookups, 500 URL lookups, zero fallback
+comparisons and retains 500 first-source records. Mixed and small weak-only fixtures
+preserve conservative fallback behavior; the prior fairness/source-result/
+UNASSESSED tests remain intact. Independent review also checked 575 ordered identity
+cases against the former sequential algorithm, including conflicting strong IDs and
+strong/weak aliases, with exact equivalence. Node 24.19.0 focused discovery 15/15,
+provider 9/9 and full/release suite 179/179 pass; typecheck, build, harness, strict
+privacy zero, runtime and diff checks pass. Known limitation: an artificial large
+weak-only input without supported ATS identities may retain quadratic conservative
+fallback; supported public-board rows are exact provider/board/job identities and use
+the indexed path. Next exact step after the local checkpoint: repeat the previously
+authorized independent review, then dev push and SHA-bound DEV Preview discovery
+acceptance. Do not push or deploy in this correction task.
+
 ## Deterministic board fairness and local Ollama provider boundary (2026-10-01)
 
 Baseline: local `dev` at `27adb3b2e93030cec8e085bfc7303e9fc2a3096a`, ahead of

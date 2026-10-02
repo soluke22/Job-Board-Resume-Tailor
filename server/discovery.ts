@@ -4,7 +4,7 @@ import type { DiscoverySource, PublicBoardProvider } from '../src/utils/discover
 import { discoverySourcesForWorkspace } from '../src/utils/discovery.js';
 import { detectAtsProvider, providerDate, verifyPostingAts, type JobVerificationResult } from './atsAdapters.js';
 import { calculateFreshnessBand } from './searchEngine.js';
-import { normalizedJobUrl, mergeDiscoveredJobs, sameJob } from '../src/utils/jobIdentity.js';
+import { normalizedJobUrl, normalizedJobUrls, supportedAtsIdentityKey, mergeDiscoveredJobs, sameJob } from '../src/utils/jobIdentity.js';
 import { safeFetchText, validatePublicUrl } from './safeFetch.js';
 
 export interface DiscoveryLead {
@@ -29,6 +29,16 @@ export interface BoardScanResult {
   /** Unique rows selected for verification before the global cap/workspace merge. */
   selected: number;
 }
+
+export interface DiscoveryDedupeStats {
+  candidateTraversals: number;
+  atsIdentityLookups: number;
+  urlIdentityLookups: number;
+  fallbackSameJobComparisons: number;
+  acceptedUnique: number;
+}
+
+interface DiscoveryQueue { sourceIndex: number; leads: DiscoveryLead[] }
 
 const text = (value: unknown, maximum: number) => typeof value === 'string' ? value.trim().slice(0, maximum) || undefined : undefined;
 const joined = (...parts: unknown[]) => parts.filter(part => typeof part === 'string' && part.trim()).join('\n\n') || undefined;
@@ -114,6 +124,84 @@ export function matchesSearchProfile(lead: DiscoveryLead, profile: SearchProfile
   return true;
 }
 
+function discoveryIdentity(lead: DiscoveryLead): Partial<JobRecord> {
+  const detected = detectAtsProvider(lead.url);
+  return {
+    atsProvider: detected.provider,
+    atsBoard: detected.board,
+    atsJobId: detected.jobId,
+    canonicalUrl: lead.verification?.canonicalUrl || lead.url,
+    discoveryUrl: lead.url,
+    company: lead.company,
+    title: lead.title,
+    location: lead.location
+  };
+}
+
+/**
+ * Preserve sameJob's identity hierarchy without comparing every strong ATS record
+ * to every prior candidate. Only identities without a supported ATS key enter the
+ * weak fallback collection; their normalized URLs are still indexed first.
+ */
+export function deduplicateDiscoveryLeads(perSource: DiscoveryLead[][]): { queues: DiscoveryQueue[]; stats: DiscoveryDedupeStats } {
+  const seenAtsIdentities = new Set<string>();
+  const seenUrls = new Map<string, { hasWeakIdentity: boolean }>();
+  const weakIdentities: Partial<JobRecord>[] = [];
+  const stats: DiscoveryDedupeStats = {
+    candidateTraversals: 0,
+    atsIdentityLookups: 0,
+    urlIdentityLookups: 0,
+    fallbackSameJobComparisons: 0,
+    acceptedUnique: 0
+  };
+  const queues = perSource.map((leads, sourceIndex): DiscoveryQueue => {
+    const uniqueLeads: DiscoveryLead[] = [];
+    for (const lead of leads) {
+      stats.candidateTraversals++;
+      const identity = discoveryIdentity(lead);
+      const atsIdentity = supportedAtsIdentityKey(identity);
+      const urls = [...normalizedJobUrls(identity)];
+      let duplicate = false;
+
+      if (atsIdentity) {
+        stats.atsIdentityLookups++;
+        duplicate = seenAtsIdentities.has(atsIdentity);
+        if (!duplicate) {
+          for (const url of urls) {
+            stats.urlIdentityLookups++;
+            // sameJob allows a URL match between a strong and a weak identity, but
+            // two different supported ATS identities remain distinct requisitions.
+            if (seenUrls.get(url)?.hasWeakIdentity) { duplicate = true; break; }
+          }
+        }
+      } else {
+        for (const url of urls) {
+          stats.urlIdentityLookups++;
+          if (seenUrls.has(url)) { duplicate = true; break; }
+        }
+        if (!duplicate) {
+          for (const prior of weakIdentities) {
+            stats.fallbackSameJobComparisons++;
+            if (sameJob(prior, identity)) { duplicate = true; break; }
+          }
+        }
+      }
+      if (duplicate) continue;
+
+      if (atsIdentity) seenAtsIdentities.add(atsIdentity);
+      else weakIdentities.push(identity);
+      for (const url of urls) {
+        const prior = seenUrls.get(url);
+        seenUrls.set(url, { hasWeakIdentity: !atsIdentity || prior?.hasWeakIdentity === true });
+      }
+      stats.acceptedUnique++;
+      uniqueLeads.push(lead);
+    }
+    return { sourceIndex, leads: uniqueLeads };
+  });
+  return { queues, stats };
+}
+
 export async function scanDiscoverySources(
   sources: DiscoverySource[], profile: SearchProfile,
   scan: (source: DiscoverySource) => Promise<DiscoveryLead[]> = scanPublicBoard,
@@ -122,41 +210,19 @@ export async function scanDiscoverySources(
   const enabled = sources.filter(source => source.enabled).slice(0, 50);
   const settled = await Promise.allSettled(enabled.map(source => scan(source)));
   const sourceResults: BoardScanResult[] = [];
-  const queues: Array<{ sourceIndex: number; leads: DiscoveryLead[] }> = [];
-  const unique: Array<{ sourceIndex: number; lead: DiscoveryLead }> = [];
-
-  // This mirrors jobIdentity.sameJob's strong ATS identity, normalized URL, and
-  // conservative company/title/location fallback rules before verification work is
-  // allocated. It preserves the first enabled source's attribution for duplicates.
-  const identity = (lead: DiscoveryLead): Partial<JobRecord> => {
-    const detected = detectAtsProvider(lead.url);
-    return {
-      atsProvider: detected.provider,
-      atsBoard: detected.board,
-      atsJobId: detected.jobId,
-      canonicalUrl: lead.verification?.canonicalUrl || lead.url,
-      discoveryUrl: lead.url,
-      company: lead.company,
-      title: lead.title,
-      location: lead.location
-    };
-  };
+  const matchedBySource: DiscoveryLead[][] = [];
   settled.forEach((result, index) => {
     const source = enabled[index];
     if (result.status === 'rejected') {
       sourceResults.push({ sourceId: source.id, status: 'FAILED', fetched: 0, profileAccepted: 0, selected: 0 });
+      matchedBySource.push([]);
       return;
     }
     const matched = result.value.filter(lead => matchesSearchProfile(lead, profile));
     sourceResults.push({ sourceId: source.id, status: 'SUCCESS', fetched: result.value.length, profileAccepted: matched.length, selected: 0 });
-    const queue: DiscoveryLead[] = [];
-    for (const lead of matched) {
-      if (unique.some(entry => sameJob(identity(entry.lead), identity(lead)))) continue;
-      unique.push({ sourceIndex: index, lead });
-      queue.push(lead);
-    }
-    queues.push({ sourceIndex: index, leads: queue });
+    matchedBySource.push(matched);
   });
+  const { queues, stats: dedupeStats } = deduplicateDiscoveryLeads(matchedBySource);
 
   // Round-robin only after per-source normalization/filtering and global identity
   // dedupe. A prolific first source therefore cannot consume the whole cap.
@@ -175,7 +241,8 @@ export async function scanDiscoverySources(
   }
   return {
     jobs: await buildDiscoveredJobs(selected, verify), sourceResults,
-    discoveryRequestsUsed: enabled.length, queryBudgetUsed: enabled.length, queryBudgetUnit: 'public_board_scans' as const
+    discoveryRequestsUsed: enabled.length, queryBudgetUsed: enabled.length, queryBudgetUnit: 'public_board_scans' as const,
+    dedupeStats
   };
 }
 
