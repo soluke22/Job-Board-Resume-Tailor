@@ -3,6 +3,7 @@ import { artifactProvenanceSchema, artifactStateSchema, questionCategorySchema }
 import { z } from 'zod';
 import { claimSchema, resumeBasisSchema } from '../../src/types/provenance.js';
 import { metadataSchema, requirementSchema, extractionSchema } from '../../src/types/assessment.js';
+import { normalizeWatchlistCompany } from '../../src/utils/watchlist.js';
 
 // Runtime counterparts of the persisted UI contracts. Unknown optional metadata is
 // preserved for forwards compatibility; known fields never bypass shape validation.
@@ -107,7 +108,11 @@ const canonicalJobSchema = object({ id, atsProvider: text, atsBoard: text.option
   });
 export const jobSchema = z.preprocess(normalizeApplicationJob, canonicalJobSchema);
 const unique = <T extends z.ZodType<{ id: string }>>(schema: T) => list(schema).refine(records => new Set(records.map(r => r.id)).size === records.length, 'Duplicate record ids');
+const watchlistSchema = object({ id, companyName: z.string().trim().min(1).max(200), normalizedCompanyName: z.string().trim().min(1).max(200),
+  status: z.enum(['ACTIVE','PAUSED','RESEARCH']), priority: z.enum(['HIGH','MEDIUM','LOW']), lanes: z.array(z.enum(['frontend-product','ui-platform-design-systems','frontend-heavy-fullstack','production-support-frontend','forward-deployed-software'])).max(5),
+  locationPolicy: z.enum(['REMOTE_OK','LOCAL_HYBRID','ANY','UNKNOWN']), notes: text.optional(), careersUrl: z.string().url().max(2000).refine(value => { const protocol = new URL(value).protocol; return protocol === 'http:' || protocol === 'https:'; }, 'Careers URL must use http or https').optional(), atsSourceId: id.optional(), monitoringEnabled: flag, createdAt: text, updatedAt: text, ...review })
+  .superRefine((entry, context) => { if (entry.normalizedCompanyName !== normalizeWatchlistCompany(entry.companyName)) context.addIssue({ code:'custom', message:'Invalid normalized company name' }); if (entry.status === 'RESEARCH' && entry.atsSourceId) context.addIssue({ code:'custom', message:'Research entries cannot claim a configured source' }); if ((!entry.atsSourceId || entry.status === 'RESEARCH' || entry.status === 'PAUSED') && entry.monitoringEnabled) context.addIssue({ code:'custom', message:'Monitoring requires an active configured source' }); });
 export const workspaceInput = z.object({ profile: profileSchema.nullable().optional(), searchProfile: searchProfileSchema.nullable().optional(), masterResume: resumeSchema.nullable().optional(),
   evidence: unique(evidenceSchema).optional(), projects: unique(projectSchema).optional(), skills: unique(skillSchema).optional(), jobs: unique(jobSchema).optional(),
-  experiences: unique(experienceSchema).optional(), searchSessions: unique(object({ id })).optional(),
+  experiences: unique(experienceSchema).optional(), searchSessions: unique(object({ id })).optional(), companyWatchlist: unique(watchlistSchema).refine(records => new Set(records.map(r => r.normalizedCompanyName)).size === records.length, 'Duplicate company watchlist entry').optional(),
 }).strict();

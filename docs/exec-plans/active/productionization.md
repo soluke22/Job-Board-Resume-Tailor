@@ -1,5 +1,40 @@
 # Productionization execution plan
 
+## Company watchlist / target market (2026-10-02)
+
+Baseline: rewritten `dev` equals `origin/dev`; unrelated local QA material remains
+untracked and untouched. Scope: add a private, owner-scoped and revisioned target
+company collection that optionally links existing ATS sources without duplicating
+provider authority. The collection supports deterministic strategic status, priority,
+role lanes and a small location policy, and is isolated from search-profile
+assessment invalidation. Discovery must retain existing enabled sources, source order,
+deduplication and fair capped allocation; watchlist priority is metadata only.
+Public demo examples and tests remain wholly synthetic. No AI calls, source scraping,
+deployment, production/main change, or live private data are in scope.
+
+Acceptance: owner CRUD/reload/import-export/isolation and safe removal preserve
+unrelated workspace history; source-linked versus research states are clear; shared
+sources scan once and source failures are truthfully surfaced without client-claimed
+scan facts. Focused watchlist, discovery, persistence and privacy tests plus typecheck
+will be run before the implementation handoff.
+
+Result (validated 2026-10-03): implemented with a dedicated owner-scoped collection
+and registry-only source references. The view supports filters and editable company
+strategy fields; session scan results are transient and explicitly labelled. Public
+examples use enforced synthetic fixture markers. Independent boundary review found a
+mutation race/error-reporting issue and permissive non-HTTP URL validation; both were
+corrected. Parent review additionally prevented imported source metadata from
+authorizing its own watchlist link and added a true 0000-through-0003 data-preservation
+test before migration 0004. Focused final tests pass 15/15. Node 24 release composition
+passes 190/190 with typecheck, build, harness, strict required-build privacy zero and
+runtime checks. Migration generation reports no drift; both evidence validators,
+built startup smoke 1/1 and diff checks pass. Local rendered-browser acceptance was
+attempted but unavailable because neither the browser automation binary nor a localhost-
+capable browser surface was available; structural UI contracts remain covered. No
+main, remote, deployment or production change. Next exact step after this local
+checkpoint: independent checkpoint review, then separately authorized dev publication
+and Preview acceptance.
+
 ## Public-repository semantic privacy remediation (2026-10-02)
 
 Baseline: local `dev` and `origin/dev` at

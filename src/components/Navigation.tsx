@@ -14,7 +14,8 @@ import {
   ChevronRight,
   ClipboardCopy,
   Lock,
-  EyeOff
+  EyeOff,
+  Building2
 } from 'lucide-react';
 import { useApp, AppView } from '../context/AppContext';
 
@@ -36,6 +37,7 @@ export const Navigation: React.FC = () => {
   const navItems: { id: AppView; label: string; icon: React.FC<{ className?: string }>; badge?: number }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'discover', label: 'Discover', icon: Compass, badge: jobs.filter((j) => j.freshnessBand === 'NEW').length || undefined },
+    { id: 'watchlist', label: 'Watchlist', icon: Building2 },
     { id: 'pipeline', label: 'Pipeline', icon: Briefcase, badge: jobs.length },
     { id: 'resume-editor', label: 'Studio', icon: FileCheck2 },
     { id: 'proof-packs', label: 'Proof Packs', icon: ShieldCheck },

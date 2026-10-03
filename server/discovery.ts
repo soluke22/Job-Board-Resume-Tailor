@@ -250,6 +250,13 @@ export function configuredDiscoverySources(profile: SearchProfile, jobs: JobReco
   return discoverySourcesForWorkspace(profile, jobs);
 }
 
+/** Watchlist entries only select existing registry sources; they never supply provider or board authority. */
+export function sourcesForWatchlistMonitoring(profile: SearchProfile, jobs: JobRecord[], watchlist: Array<{atsSourceId?:string;status:string;monitoringEnabled:boolean}> = []) {
+  const sources=configuredDiscoverySources(profile,jobs);
+  const monitored=new Set(watchlist.filter(entry=>entry.status==='ACTIVE'&&entry.monitoringEnabled&&entry.atsSourceId).map(entry=>entry.atsSourceId));
+  return sources.map(source=>monitored.has(source.id)?{...source,enabled:true}:source);
+}
+
 function sourceLabel(provider: PublicBoardProvider | string, channel: DiscoveryLead['source']) {
   if (channel === 'manual-web-import') return 'Manual Web Import';
   return provider === 'greenhouse' ? 'Greenhouse' : provider === 'ashby' ? 'Ashby' : provider === 'lever' ? 'Lever' : 'Company Careers';

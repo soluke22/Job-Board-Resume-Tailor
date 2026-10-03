@@ -22,7 +22,8 @@ import {
   AuthSession,
   ApplicationStatus,
   InterviewProofPack,
-  RecruiterOutreach
+  RecruiterOutreach,
+  CompanyWatchlistEntry
 } from '../types';
 import { storageService } from '../services/storage';
 import { apiService, setBeforePrivateRequest, invalidatePrivateRequests, signOutPrivateWorkspace, privateSignInFailureNotice, clearPrivateSignInIntent } from '../services/api';
@@ -42,6 +43,7 @@ export type AppView =
   | 'skills'
   | 'analytics'
   | 'candidate-setup'
+  | 'watchlist'
   | 'settings';
 
 export type AcknowledgedWorkspaceMutation<T> = {
@@ -190,6 +192,7 @@ interface AppContextType {
   activeJobId: string | null;
   activeJob: JobRecord | null;
   masterResume: TailoredResume;
+  companyWatchlist: CompanyWatchlistEntry[];
   analytics: OutcomeAnalytics;
 
   // Status & Progress
@@ -288,6 +291,7 @@ interface AppContextType {
   exportWorkspaceJson: () => Promise<string>;
   clearWorkspace: () => void;
   resetPublicDemo: () => void;
+  saveCompanyWatchlist: (entries: CompanyWatchlistEntry[]) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -305,6 +309,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [skills, setSkillsState] = useState<SkillItem[]>(() => storageService.getSkills(workspaceMode));
   const [jobs, setJobsState] = useState<JobRecord[]>(() => storageService.getJobs(workspaceMode));
   const [masterResume, setMasterResumeState] = useState<TailoredResume>(() => storageService.getMasterResume(workspaceMode));
+  const [companyWatchlist, setCompanyWatchlistState] = useState<CompanyWatchlistEntry[]>(() => storageService.getCompanyWatchlist(workspaceMode));
   const [analytics, setAnalyticsState] = useState<OutcomeAnalytics>(() => storageService.getAnalytics(workspaceMode));
 
   const [activeJobId, setActiveJobId] = useState<string | null>(jobs[0]?.id || null);
@@ -336,6 +341,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const loadedJobs = storageService.getJobs(mode);
     setJobsState(loadedJobs);
     setMasterResumeState(storageService.getMasterResume(mode));
+    setCompanyWatchlistState(storageService.getCompanyWatchlist(mode));
     setAnalyticsState(storageService.getAnalytics(mode));
     setActiveJobId(loadedJobs[0]?.id || null);
   };
@@ -406,7 +412,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     setBeforePrivateRequest(persistCurrent);
     if (workspaceMode === 'PRIVATE_WORKSPACE' && ready.current) void persistCurrent().catch(() => {});
-  }, [profile, searchProfile, evidence, projects, skills, jobs, masterResume, workspaceMode]);
+  }, [profile, searchProfile, evidence, projects, skills, jobs, masterResume, companyWatchlist, workspaceMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -533,6 +539,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       restore: () => { storageService.saveSearchProfile(previousProfile, workspaceMode); storageService.saveJobs(previousJobs, workspaceMode); }
     });
     if (outcome.kind === 'superseded') throw new Error('Search preferences save was superseded by newer workspace changes. Reload required.');
+  };
+  const saveCompanyWatchlist = async (entries: CompanyWatchlistEntry[]): Promise<void> => {
+    if (workspaceMode !== 'PRIVATE_WORKSPACE') { storageService.saveCompanyWatchlist(entries, workspaceMode); setCompanyWatchlistState(entries); return; }
+    const previous=storageService.getCompanyWatchlist(workspaceMode); const snapshot=()=>JSON.stringify(storageService.getCompanyWatchlist(workspaceMode));
+    const outcome=await acknowledgeWorkspaceMutation({ stage:()=>{storageService.saveCompanyWatchlist(entries,workspaceMode);return snapshot();},persist:persistCurrent,isCurrent:value=>snapshot()===value,publish:()=>setCompanyWatchlistState(entries),restore:()=>storageService.saveCompanyWatchlist(previous,workspaceMode) });
+    if(outcome.kind==='superseded') throw new Error('Watchlist save was superseded by newer workspace changes. Reload required.');
   };
 
   const setEvidence = (newEvidence: EvidenceItem[]) => {
@@ -1091,6 +1103,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeJobId,
         activeJob,
         masterResume,
+        companyWatchlist,
         analytics,
         isAnalyzing,
         isGenerating,
@@ -1131,6 +1144,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsAuthModalOpen,
         saveProfile,
         saveSearchProfile,
+        saveCompanyWatchlist,
         saveMasterResume,
         addEvidenceItem,
         approveEvidenceItem,

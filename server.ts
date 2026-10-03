@@ -11,7 +11,7 @@ import { installPrivateFiles } from './server/privateFiles.js';
 import { createWorkspaceRouter } from './server/workspaceRoutes.js';
 import { redactAiPayload } from './server/privacy.js';
 import { verifyPostingAts } from './server/atsAdapters.js';
-import { buildManualImportedJob, configuredDiscoverySources, scanDiscoverySources, scanPublicBoard } from './server/discovery.js';
+import { buildManualImportedJob, scanDiscoverySources, scanPublicBoard, sourcesForWatchlistMonitoring } from './server/discovery.js';
 import { buildDiscoveryQueries, googleSearchUrl, parseDiscoverySource } from './src/utils/discovery.js';
 import { mergeDiscoveredJobs } from './src/utils/jobIdentity.js';
 import { safeFetchText } from './server/safeFetch.js';
@@ -243,12 +243,12 @@ app.post('/api/verify-ats', async (req: Request, res: Response): Promise<void> =
 // ==========================================
 // 12. Keyless public-board discovery and manual posting ingestion
 // ==========================================
-type DiscoveryWorkspace = { searchProfile: import('./src/types/index.js').SearchProfile | null; jobs: import('./src/types/index.js').JobRecord[] };
+type DiscoveryWorkspace = { searchProfile: import('./src/types/index.js').SearchProfile | null; jobs: import('./src/types/index.js').JobRecord[]; companyWatchlist?: Array<{atsSourceId?:string;status:string;monitoringEnabled:boolean}> };
 export function createDiscoveryHandler(
   reserve = reserveProviderCall,
   readWorkspace: (ownerId: string) => Promise<DiscoveryWorkspace> = async ownerId => {
     const workspace = await createWorkspaceRepository().read(ownerId);
-    return { searchProfile: workspace.searchProfile, jobs: workspace.jobs };
+    return { searchProfile: workspace.searchProfile, jobs: workspace.jobs, companyWatchlist: workspace.companyWatchlist };
   },
   scan: typeof scanPublicBoard = scanPublicBoard
 ): RequestHandler {
@@ -263,7 +263,7 @@ export function createDiscoveryHandler(
       let queries: string[];
       try { queries = buildDiscoveryQueries(searchProfile, 10); }
       catch (error) { res.status(400).json({error: (error as Error).message}); return; }
-      const sources = configuredDiscoverySources(searchProfile, existingJobs);
+      const sources = sourcesForWatchlistMonitoring(searchProfile, existingJobs, workspace.companyWatchlist);
       for (const source of sources.filter(source => source.enabled)) await reserveExternalProviderCall(req.res!.locals.ownerId, reserve);
       const outcome = await scanDiscoverySources(sources, searchProfile, scan);
       const candidates = outcome.jobs;

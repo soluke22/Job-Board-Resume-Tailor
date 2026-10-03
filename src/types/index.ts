@@ -67,6 +67,15 @@ import type { ApplicationStatus, StatusTransitionEvent, ApplicationSnapshot } fr
 export type { OutcomeAnalytics } from '../utils/outcomeAnalytics';
 
 export type WorkspaceMode = 'PUBLIC_DEMO' | 'PRIVATE_WORKSPACE';
+export type WatchlistStatus = 'ACTIVE' | 'PAUSED' | 'RESEARCH';
+export type WatchlistPriority = 'HIGH' | 'MEDIUM' | 'LOW';
+export type WatchlistLocationPolicy = 'REMOTE_OK' | 'LOCAL_HYBRID' | 'ANY' | 'UNKNOWN';
+export interface CompanyWatchlistEntry {
+  id: string; companyName: string; normalizedCompanyName: string;
+  status: WatchlistStatus; priority: WatchlistPriority; lanes: PrimaryRoleFamily[];
+  locationPolicy: WatchlistLocationPolicy; notes?: string; careersUrl?: string;
+  atsSourceId?: string; monitoringEnabled: boolean; createdAt: string; updatedAt: string;
+}
 
 export interface AuthSession {
   isAuthenticated: boolean;

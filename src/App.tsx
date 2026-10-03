@@ -7,6 +7,7 @@ import { PipelineView } from './views/PipelineView';
 import { ProofPackView } from './views/ProofPackView';
 import { OutreachView } from './views/OutreachView';
 import { AnalyticsView } from './views/AnalyticsView';
+import { WatchlistView } from './views/WatchlistView';
 import { JobsView } from './components/JobsView';
 import { JobAnalysisView } from './components/JobAnalysisView';
 import { ResumeEditorView } from './components/ResumeEditorView';
@@ -70,6 +71,7 @@ const AppContent: React.FC = () => {
         {currentView === 'proof-packs' && <ProofPackView />}
         {currentView === 'outreach' && <OutreachView />}
         {currentView === 'analytics' && <AnalyticsView />}
+        {currentView === 'watchlist' && <WatchlistView />}
         {currentView === 'master-resume' && <MasterResumeView />}
         {currentView === 'evidence-bank' && <EvidenceBankView />}
         {currentView === 'projects' && <ProjectsView />}

@@ -26,7 +26,7 @@ type EntityTable = typeof s.evidenceItems;
 // The adapter intentionally exposes only Drizzle's shared transaction surface, allowing
 // the same repository and migrations to run against real PostgreSQL in integration tests.
 type DatabaseProvider = () => Pick<ReturnType<typeof getDb>, 'transaction'>;
-const collections = { evidence: s.evidenceItems, projects: s.projects, skills: s.skillEvidence, experiences: s.experiences, searchSessions: s.searchSessions };
+const collections = { evidence: s.evidenceItems, projects: s.projects, skills: s.skillEvidence, experiences: s.experiences, searchSessions: s.searchSessions, companyWatchlist: s.companyWatchlists };
 const attachments = {
   fit: s.fitAssessments, tailoringPlan: s.tailoringPlans, tailoredResume: s.resumes,
   proofPack: s.proofRecords, outreachDrafts: s.outreachRecords, recruiterOutreach: s.outreachRecords,
@@ -142,10 +142,17 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
         return record;
       };
       const normalize = (data: Record<string, unknown>, evidence = false) => importing ? { ...reviewImported(data), ...(evidence ? { verificationStatus: 'requires-review' } : {}), requiresUserReview: true, importProvenance: provenance } : data;
+      // A watchlist can only reference a source already held by the owner-scoped
+      // registry. A reference never imports provider/board authority by itself.
+      const storedSearch = (await tx.select().from(s.searchProfiles).where(and(eq(s.searchProfiles.ownerId, ownerId), eq(s.searchProfiles.id, 'searchProfile'))))[0];
+      const storedSourceProfile = storedSearch ? decode(s.searchProfiles, storedSearch).data : null;
+      const sourceProfile = importing ? storedSourceProfile : (input.searchProfile ?? storedSourceProfile) as any;
+      const sourceIds = new Set(Array.isArray((sourceProfile as any)?.discoverySources) ? (sourceProfile as any).discoverySources.filter((source:any)=>!source.removed).map((source:any)=>source.id) : []);
       for (const [key, table] of Object.entries(collections)) {
         if (!(key in input)) continue;
         const entries = input[key] as Record<string, unknown>[];
         for (const entry of entries) {
+          if (key === 'companyWatchlist' && entry.atsSourceId && !sourceIds.has(entry.atsSourceId)) throw new WorkspaceValidationError('Watchlist source is not configured in this workspace');
           let record = normalize(entry, key === 'evidence');
           if (key === 'evidence' && !importing) {
             record = preserveEvidenceReview(entry as unknown as EvidenceItem, previousEvidence.find((e: EvidenceItem) => e.id === entry.id));

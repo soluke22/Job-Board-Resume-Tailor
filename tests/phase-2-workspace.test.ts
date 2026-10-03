@@ -93,19 +93,25 @@ test('additive upload recovery migration preserves existing workspace, metadata 
   try {
     for (const name of ['0000_friendly_matthew_murdock', '0001_cynical_khan']) await pg.exec(await readFile(`migrations/${name}.sql`, 'utf8'));
     await db.insert(s.user).values({ id: 'owner-a', name: 'Synthetic', email: 'owner-a@example.invalid' });
-    const repo = createWorkspaceRepository(() => db as any);
-    await repo.save('owner-a', { evidence: [syntheticEvidence()] }, 0);
+    await db.insert(s.workspaces).values({ ownerId: 'owner-a', revision: 1 });
+    await db.insert(s.evidenceItems).values({ ownerId: 'owner-a', id: 'evidence-a', data: syntheticEvidence('evidence-a') });
     await db.insert(s.privateFiles).values({ ownerId: 'owner-a', id: 'file', blobPath: 'private/owner-a/file', originalFilename: 'synthetic.txt', mimeType: 'text/plain', size: 9, purpose: 'evidence', sourceType: 'user-upload' });
     await db.insert(s.session).values({ id: 'synthetic-session', token: 'synthetic-session-token', userId: 'owner-a', expiresAt: new Date('2030-01-01') });
-    const before = await repo.read('owner-a');
+    const before = { workspace: await db.select().from(s.workspaces), evidence: await db.select().from(s.evidenceItems), files: await db.select().from(s.privateFiles), sessions: await db.select().from(s.session) };
     await pg.exec(await readFile('migrations/0002_broad_lifeguard.sql', 'utf8'));
-    assert.deepEqual(await repo.read('owner-a'), before);
-    assert.equal((await db.select().from(s.privateFiles)).length, 1); assert.equal((await db.select().from(s.session)).length, 1);
+    assert.deepEqual(await db.select().from(s.workspaces), before.workspace); assert.deepEqual(await db.select().from(s.evidenceItems), before.evidence);
+    assert.deepEqual(await db.select().from(s.privateFiles), before.files); assert.deepEqual(await db.select().from(s.session), before.sessions);
     assert.deepEqual(await db.select().from(s.privateFileUploads), []);
     await pg.exec(await readFile('migrations/0003_previous_kinsey_walden.sql', 'utf8'));
-    assert.deepEqual(await repo.read('owner-a'), before);
-    assert.equal((await db.select().from(s.privateFiles)).length, 1); assert.equal((await db.select().from(s.session)).length, 1);
+    assert.deepEqual(await db.select().from(s.workspaces), before.workspace); assert.deepEqual(await db.select().from(s.evidenceItems), before.evidence);
+    assert.deepEqual(await db.select().from(s.privateFiles), before.files); assert.deepEqual(await db.select().from(s.session), before.sessions);
     assert.deepEqual(await db.select().from(s.providerUsage), []);
+    await pg.exec(await readFile('migrations/0004_hot_nightcrawler.sql', 'utf8'));
+    assert.deepEqual(await db.select().from(s.workspaces), before.workspace); assert.deepEqual(await db.select().from(s.evidenceItems), before.evidence);
+    assert.deepEqual(await db.select().from(s.privateFiles), before.files); assert.deepEqual(await db.select().from(s.session), before.sessions);
+    assert.deepEqual(await db.select().from(s.companyWatchlists), []);
+    const restored = await createWorkspaceRepository(() => db as any).read('owner-a');
+    assert.equal(restored.revision, 1); assert.deepEqual(restored.evidence, [syntheticEvidence('evidence-a')]);
   } finally { await pg.close(); }
 });
 

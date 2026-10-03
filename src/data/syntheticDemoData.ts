@@ -7,7 +7,16 @@ import {
   JobRecord,
   TailoredResume,
   SearchProfile,
+  CompanyWatchlistEntry,
 } from '../types';
+import { isSyntheticDemoWatchlist } from '../utils/watchlist';
+
+export const DEMO_COMPANY_WATCHLIST: CompanyWatchlistEntry[] = [
+  { id:'demo-watch-orbit', companyName:'Synthetic Orbit Loom', normalizedCompanyName:'synthetic orbit loom', status:'ACTIVE', priority:'HIGH', lanes:['ui-platform-design-systems'], locationPolicy:'REMOTE_OK', careersUrl:'https://careers.synthetic-orbit.example.invalid', atsSourceId:'demo-source-orbit', monitoringEnabled:true, createdAt:'2026-01-01T00:00:00.000Z', updatedAt:'2026-01-01T00:00:00.000Z' },
+  { id:'demo-watch-cobalt', companyName:'Synthetic Cobalt Signal', normalizedCompanyName:'synthetic cobalt signal', status:'RESEARCH', priority:'MEDIUM', lanes:['frontend-product'], locationPolicy:'ANY', monitoringEnabled:false, createdAt:'2026-01-01T00:00:00.000Z', updatedAt:'2026-01-01T00:00:00.000Z' },
+  { id:'demo-watch-fern', companyName:'Synthetic Fern Harbor', normalizedCompanyName:'synthetic fern harbor', status:'PAUSED', priority:'LOW', lanes:['frontend-heavy-fullstack'], locationPolicy:'LOCAL_HYBRID', monitoringEnabled:false, createdAt:'2026-01-01T00:00:00.000Z', updatedAt:'2026-01-01T00:00:00.000Z' }
+];
+if (!isSyntheticDemoWatchlist(DEMO_COMPANY_WATCHLIST)) throw new Error('Invalid synthetic demo watchlist fixture');
 
 /**
  * 100% SYNTHETIC DEMO DATASET
@@ -104,7 +113,8 @@ export const DEMO_SEARCH_PROFILE: SearchProfile = {
   companyExclusions: ['Defense Logistics Corp', 'Legacy Banking Monoliths'],
   technologyStrengths: ['React', 'TypeScript', 'GraphQL', 'Tailwind CSS', 'Next.js', 'Jest'],
   technologyAdjacencies: ['Node.js', 'Express', 'PostgreSQL', 'Storybook', 'Vite'],
-  technologyGaps: ['Java Spring Boot', 'Kubernetes Cluster Administration', 'CUDA/C++']
+  technologyGaps: ['Java Spring Boot', 'Kubernetes Cluster Administration', 'CUDA/C++'],
+  discoverySources: [{ id:'demo-source-orbit', company:'Synthetic Orbit Loom', provider:'ashby', boardId:'synthetic-orbit', boardUrl:'https://jobs.ashbyhq.com/synthetic-orbit', enabled:true, origin:'configured' }]
 };
 
 export const DEMO_EVIDENCE_ITEMS: EvidenceItem[] = [
