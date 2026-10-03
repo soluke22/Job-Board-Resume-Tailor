@@ -9,7 +9,7 @@ import { evidenceReviewContent, preserveEvidenceReview } from '../src/utils/evid
 import type { EvidenceItem } from '../src/types/index.js';
 import { getDb } from './db/client.js';
 import * as s from './db/schema.js';
-import { workspaceInput } from './db/workspaceValidation.js';
+import { discoverySourceSchema, workspaceInput } from './db/workspaceValidation.js';
 import { assessmentMetadata, isCurrent, fingerprint } from './assessment.js';
 import { inspectResume, factualClaims } from './resumeProvenance.js';
 import { assertBoundedJson } from './inputBounds.js';
@@ -136,7 +136,11 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
         // Candidate bullets and nested records cannot inherit approved provenance.
         if ('provenanceStatus' in record || ('section' in record && 'underlyingEvidence' in record)) record.provenanceStatus = 'requires-review';
         const jdRequirement='kind' in record && 'excerpt' in record && 'start' in record && 'end' in record;
-        if (!jdRequirement && ('id' in record || 'versionId' in record || 'requiresUserReview' in record || 'importProvenance' in record)) {
+        // Strict structural/configuration records do not carry review provenance.
+        // Keep this predicate schema-driven so successful imports remain valid inputs
+        // for the next ordinary full-workspace save.
+        const strictStructuralRecord = discoverySourceSchema.safeParse(record).success;
+        if (!strictStructuralRecord && !jdRequirement && ('id' in record || 'versionId' in record || 'requiresUserReview' in record || 'importProvenance' in record)) {
           record.requiresUserReview = true; record.importProvenance = provenance;
         }
         return record;
@@ -148,6 +152,12 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
       const storedSourceProfile = storedSearch ? decode(s.searchProfiles, storedSearch).data : null;
       const sourceProfile = importing ? storedSourceProfile : (input.searchProfile ?? storedSourceProfile) as any;
       const sourceIds = new Set(Array.isArray((sourceProfile as any)?.discoverySources) ? (sourceProfile as any).discoverySources.filter((source:any)=>!source.removed).map((source:any)=>source.id) : []);
+      if (importing && input.companyWatchlist) {
+        const finalWatchlist = new Map<string, Record<string, any>>((await rows(tx, s.companyWatchlists, ownerId)).map(row => [row.id, row.data]));
+        for (const entry of input.companyWatchlist) finalWatchlist.set(entry.id, entry);
+        const identities = [...finalWatchlist.values()].map(entry => entry.normalizedCompanyName);
+        if (new Set(identities).size !== identities.length) throw new WorkspaceValidationError('Duplicate company watchlist entry');
+      }
       for (const [key, table] of Object.entries(collections)) {
         if (!(key in input)) continue;
         const entries = input[key] as Record<string, unknown>[];

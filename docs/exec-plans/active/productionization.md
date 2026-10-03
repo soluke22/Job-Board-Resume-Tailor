@@ -1,5 +1,31 @@
 # Productionization execution plan
 
+## Watchlist import persistence correction (2026-10-03)
+
+Baseline: local `dev` at the unpublished Company Watchlist checkpoint; remote refs
+unchanged and unrelated QA material preserved. Scope is limited to two independently
+demonstrated defects: imported review metadata entering strict nested source records,
+and normalized-company duplicates surviving the final import merge. Acceptance adds
+a reusable successful-import to client-equivalent snapshot to ordinary-save contract,
+preserves review metadata on eligible records, rejects ambiguous merged watchlist
+duplicates atomically, and retains forged-source denial. No migration, UI expansion,
+publication, deployment, main change, private runtime work, or model work is authorized.
+Pre-fix regressions reproduce both defects (10/12 watchlist tests pass; the two new
+contracts fail for the expected reasons). Correction exports the existing strict
+discovery-source schema as the structural import-review boundary, preserves review
+provenance on eligible records, and rejects duplicate normalized identities across
+the complete retained-plus-incoming watchlist before any upsert. Ambiguous different-ID
+collisions reject atomically; unique IDs and same-ID replacements keep normal import
+semantics. Client-equivalent import-to-save and collision rollback regressions pass.
+Node 24 focused validation passes 79/79 and full release composition passes 192/192
+with typecheck, build, harness, strict privacy zero and runtime checks. Normal privacy,
+startup smoke 1/1, both evidence validators, schema no-drift and diff checks pass.
+Fresh independent review is CLEAR, including additional full-workspace import/save and
+same-ID collision probes. Migration 0004 is unchanged. Removal confirmation remains a
+deferred LOW UX follow-up. No publication, deployment, main change or private runtime
+acceptance occurred. Next exact step after the local checkpoint is the previously
+planned independent checkpoint review, normal dev push and exact-SHA Preview acceptance.
+
 ## Company watchlist / target market (2026-10-02)
 
 Baseline: rewritten `dev` equals `origin/dev`; unrelated local QA material remains

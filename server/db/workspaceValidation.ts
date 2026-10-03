@@ -20,6 +20,8 @@ export const profileSchema = object({ name: text, title: text, email: text, phon
   coreIdentity: text, masterSummary: text, safeVerbs: strings, restrictedVerbs: strings,
   fullName: text.optional(), preferredName: text.optional(), workAuthorization: text.optional(),
   targetRoleFamilies: strings.optional(), targetSeniority: strings.optional(), locationPreferences: strings.optional(), dealbreakers: strings.optional(), ...review });
+export const discoverySourceSchema = z.object({ id, company: text, provider: z.enum(['ashby','greenhouse','lever']), boardId: text,
+  boardUrl: text, enabled: flag, origin: z.enum(['configured','learned']), validatedAt: text.optional(), removed: flag.optional() }).strict();
 export const searchProfileSchema = object({ preferredRoleFamilies: strings, preferredModifiers: strings, excludedRolePatterns: strings,
   targetSeniority: strings, allowedEmploymentTypes: strings, excludedEmploymentTypes: strings,
   remotePreference: z.enum(['remote_only', 'hybrid_flexible', 'any']), hybridLocations: strings, maximumOnsiteFrequency: text,
@@ -27,8 +29,7 @@ export const searchProfileSchema = object({ preferredRoleFamilies: strings, pref
   salaryPreference: object({ minTarget: number.optional(), minimumAcceptable: number.optional() }),
   hiringProcessPreferences: object({ dislikeAiInterviewers: flag.optional(), preferTakeHome: flag.optional(), dislikeLeetcode: flag.optional(), dislikeMultiRoundTakehome: flag.optional(), notes: text.optional() }),
   companyExclusions: strings, technologyStrengths: strings, technologyAdjacencies: strings, technologyGaps: strings,
-  discoverySources: list(z.object({ id, company: text, provider: z.enum(['ashby','greenhouse','lever']), boardId: text,
-    boardUrl: text, enabled: flag, origin: z.enum(['configured','learned']), validatedAt: text.optional(), removed: flag.optional() }).strict()).max(50).optional(), ...review });
+  discoverySources: list(discoverySourceSchema).max(50).optional(), ...review });
 const verification = z.enum(['verified', 'provisional', 'session-unreviewed', 'unverified', 'manual-edit-unvalidated', 'rejected', 'requires-review']);
 export const evidenceSchema = object({ id, sourceType: text, sourceLocation: text, verificationStatus: verification,
   employer: text.optional(), role: text.optional(), period: text.optional(), context: text, rawEvidence: text,
