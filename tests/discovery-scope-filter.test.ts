@@ -65,11 +65,20 @@ test('positive engineering families survive and unrelated professions fail deter
     assert.deepEqual(roleEligibility(lead(title), search, constraint()), { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' }, title);
 
   const forward = constraint({ roleFamilies: ['forward-deployed-software'] });
-  assert.equal(roleEligibility(lead('Forward Deployed Engineer'), profile({ preferredRoleFamilies: ['forward-deployed-software'] }), forward).eligible, true);
-  assert.equal(roleEligibility(lead('Forward Deployed Engineer'), search, constraint()).eligible, false, 'FDE needs configured family intent');
+  const forwardTitles = ['Forward Deployed Engineer', 'Forward Deployed Software Engineer', 'Software Engineer, Forward Deployed'];
+  for (const title of forwardTitles) {
+    assert.deepEqual(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['forward-deployed-software'] }), forward), { eligible: true, family: 'forward-deployed-software' }, `${title} survives when the FDE family is enabled`);
+    assert.deepEqual(roleEligibility(lead(title), search, constraint()), { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' }, `${title} cannot fall through when the FDE family is disabled`);
+  }
+  for (const title of ['Forward Deployed Sales Engineer', 'Forward Deployed Data Engineer', 'Forward Deployed Security Engineer', 'Forward Deployed Solutions Engineer'])
+    assert.deepEqual(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['forward-deployed-software'] }), forward), { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' }, `${title} is not a forward-deployed software occupation`);
   assert.equal(roleEligibility(lead('Product Engineer'), profile({ preferredRoleFamilies: ['frontend-product'] }), constraint({ roleFamilies: ['frontend-product'] })).eligible, true);
   for (const title of ['Software Engineer, Platform', 'Software Engineer, Developer Platform'])
     assert.equal(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['ui-platform-design-systems'] }), constraint({ roleFamilies: ['ui-platform-design-systems'] })).eligible, true, `${title} survives with the configured platform family`);
+  for (const title of ['Machine Learning Platform Engineer', 'Data Platform Engineer', 'Security Platform Engineer', 'Infrastructure Platform Engineer', 'Mobile Platform Engineer', 'Backend Platform Engineer'])
+    assert.deepEqual(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['ui-platform-design-systems'] }), constraint({ roleFamilies: ['ui-platform-design-systems'] })), { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' }, `${title} cannot be relabeled as the target platform family`);
+  for (const title of ['Sales Platform Engineer', 'Sales Engineer, Platform', 'Customer Success Platform Engineer', 'Revenue Operations Platform Engineer', 'Solutions Engineer, Developer Platform', 'Developer Advocate, Platform'])
+    assert.deepEqual(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['ui-platform-design-systems'] }), constraint({ roleFamilies: ['ui-platform-design-systems'] })), { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' }, `${title} cannot bypass profession safeguards through platform wording`);
   assert.equal(roleEligibility(lead('Software Engineer, Production'), profile({ preferredRoleFamilies: ['production-support-frontend'] }), constraint({ roleFamilies: ['production-support-frontend'] })).eligible, true);
   assert.equal(roleEligibility(lead('Frontend Engineer'), profile({ preferredRoleFamilies: ['frontend-product'] }), constraint({ roleFamilies: ['forward-deployed-software'] })).eligible, false, 'profile and company lane intent must overlap');
   assert.equal(roleEligibility(lead('Solutions Engineer'), search, constraint()).eligible, false, 'ambiguous customer-facing titles do not pass by title alone');
@@ -91,6 +100,8 @@ test('location eligibility rejects only clear incompatibility and preserves unkn
   assert.equal(locationEligibility(lead('Frontend Engineer', 'Remote - Canada and UK'), remote, constraint()).eligible, false, 'multiple clearly non-US alternatives remain incompatible');
   for (const location of ['Remote - EMEA', 'Remote - UK', 'Remote - Canada', 'Remote - APAC'])
     assert.deepEqual(locationEligibility(lead('Frontend Engineer', location), remote, constraint()), { eligible: false, reason: 'LOCATION_INCOMPATIBLE' }, location);
+  for (const location of ['Remote - Canada (US time zones)', 'Remote - Canada, US timezone', 'Canada Remote, US hours required', 'Canada Remote, EST (US)', 'Remote - UK with US overlap', 'Remote - EMEA; US working hours', 'Remote Canada, overlap with US', 'Remote EMEA, working hours overlap with US', 'Remote UK, timezone aligned to US'])
+    assert.deepEqual(locationEligibility(lead('Frontend Engineer', location), remote, constraint()), { eligible: false, reason: 'LOCATION_INCOMPATIBLE' }, `${location} uses US only as a working-hours qualifier`);
   assert.equal(locationEligibility(lead('Frontend Engineer', 'Berlin', { remoteStatus: 'onsite' }), remote, constraint()).eligible, false);
   assert.equal(locationEligibility(lead('Frontend Engineer', 'London, UK', { remoteStatus: 'unknown' }), remote, constraint()).eligible, false);
   const hybrid = profile({ remotePreference: 'hybrid_flexible', hybridLocations: ['Synthetic Metro'] });

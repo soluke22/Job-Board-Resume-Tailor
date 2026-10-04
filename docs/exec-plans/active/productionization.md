@@ -49,6 +49,17 @@ locations; ambiguous geography passes rather than fabricating incompatibility. N
 exact step: independent checkpoint review, then separately authorized `dev` publish
 and exact-SHA Preview second WATCHLIST scan before any ranking redesign.
 
+Publication review correction (2026-10-04): independent cumulative review reproduced
+three additional allocation-consuming bypass classes before push: disabled forward-
+deployed titles falling through generic software, non-target/business/customer-facing
+platform titles returning before their safeguards, and non-US locations using `US`
+only as a working-hours qualifier. The bounded correction routes profession safeguards
+before positive family matching, keeps forward-deployed matching occupation-specific,
+qualifies broad platform matches, and distinguishes US schedule context from geography
+in either order. Exact positive/negative regressions pass; consolidated independent
+re-review is CLEAR. Node 24 release composition remains 197/197, focused discovery/
+watchlist 32/32, built startup smoke 1/1, privacy/evidence/schema/diff gates pass.
+
 ## Watchlist import persistence correction (2026-10-03)
 
 Baseline: local `dev` at the unpublished Company Watchlist checkpoint; remote refs

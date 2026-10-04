@@ -155,18 +155,6 @@ export function roleEligibility(lead: DiscoveryLead, profile: SearchProfile, con
     return { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' as const };
 
   const accepts = (family: PrimaryRoleFamily) => families.has(family);
-  const matchedFamily =
-    (/\bforward deployed (?:software )?engineer\b/.test(title) && accepts('forward-deployed-software')) ? 'forward-deployed-software' :
-    (/\b(design systems?|ui platform)\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(design systems?|ui platform)\b/.test(title) && accepts('ui-platform-design-systems')) ? 'ui-platform-design-systems' :
-    (/\b(developer experience|developer productivity|devex)\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(developer experience|developer productivity|devex)\b/.test(title) && accepts('ui-platform-design-systems')) ? 'ui-platform-design-systems' :
-    (/\b(front ?end|ui|web)\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(front ?end|ui|web)\b/.test(title) && accepts('frontend-product')) ? 'frontend-product' :
-    (/\bproduct\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\bproduct\b/.test(title) && (accepts('frontend-product') || accepts('frontend-heavy-fullstack'))) ? (accepts('frontend-product') ? 'frontend-product' : 'frontend-heavy-fullstack') :
-    (/\bfull ?stack\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\bfull ?stack\b/.test(title) && accepts('frontend-heavy-fullstack')) ? 'frontend-heavy-fullstack' :
-    (/\bproduction\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\bproduction\b/.test(title) && accepts('production-support-frontend')) ? 'production-support-frontend' :
-    (/\bplatform\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(?:developer )?platform\b/.test(title) && (accepts('ui-platform-design-systems') || accepts('production-support-frontend'))) ? (accepts('ui-platform-design-systems') ? 'ui-platform-design-systems' : 'production-support-frontend') :
-    undefined;
-  if (matchedFamily) return { eligible: true, family: matchedFamily };
-
   const genericSoftware = /\bsoftware (?:development )?(?:engineer|developer)\b|\b(?:engineer|developer),? software\b/.test(title);
   if (businessBlocker.test(title) && !genericSoftware)
     return { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' as const };
@@ -183,7 +171,20 @@ export function roleEligibility(lead: DiscoveryLead, profile: SearchProfile, con
   }
 
   const explicitNonTargetDomain = /\b(data|analytics?|machine learning|ml|security|quality assurance|qa|test automation|infrastructure|devops|site reliability|sre|mobile|ios|android|embedded|firmware|backend|back end)\b/;
-  const explicitTargetDomain = /\b(front ?end|ui|web|product|full ?stack|design systems?|developer experience|developer productivity|devex|platform|production)\b/;
+  const forwardDeployed = /\bforward deployed (?:software )?(?:engineer|developer)\b|\bsoftware (?:engineer|developer)\b.*\bforward deployed\b/.test(title);
+  const matchedFamily =
+    (forwardDeployed && !explicitNonTargetDomain.test(title) && !businessBlocker.test(title) && accepts('forward-deployed-software')) ? 'forward-deployed-software' :
+    (/\b(design systems?|ui platform)\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(design systems?|ui platform)\b/.test(title) && accepts('ui-platform-design-systems')) ? 'ui-platform-design-systems' :
+    (/\b(developer experience|developer productivity|devex)\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(developer experience|developer productivity|devex)\b/.test(title) && accepts('ui-platform-design-systems')) ? 'ui-platform-design-systems' :
+    (/\b(front ?end|ui|web)\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(front ?end|ui|web)\b/.test(title) && accepts('frontend-product')) ? 'frontend-product' :
+    (/\bproduct\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\bproduct\b/.test(title) && (accepts('frontend-product') || accepts('frontend-heavy-fullstack'))) ? (accepts('frontend-product') ? 'frontend-product' : 'frontend-heavy-fullstack') :
+    (/\bfull ?stack\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\bfull ?stack\b/.test(title) && accepts('frontend-heavy-fullstack')) ? 'frontend-heavy-fullstack' :
+    (/\bproduction\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\bproduction\b/.test(title) && accepts('production-support-frontend')) ? 'production-support-frontend' :
+    (/\bplatform\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(?:developer )?platform\b/.test(title) && !explicitNonTargetDomain.test(title) && (accepts('ui-platform-design-systems') || accepts('production-support-frontend'))) ? (accepts('ui-platform-design-systems') ? 'ui-platform-design-systems' : 'production-support-frontend') :
+    undefined;
+  if (matchedFamily) return { eligible: true, family: matchedFamily };
+
+  const explicitTargetDomain = /\b(front ?end|ui|web|product|full ?stack|design systems?|developer experience|developer productivity|devex|platform|production|forward deployed)\b/;
   const genericEngineer = /^(?:(?:associate|junior|mid|senior|staff|principal|lead) )?engineer(?:\s+(?:i{1,4}|\d+))?$/.test(title);
   return (genericSoftware && !explicitNonTargetDomain.test(title) && !explicitTargetDomain.test(title)) || genericEngineer
     ? { eligible: true, family: accepts('frontend-heavy-fullstack') ? 'frontend-heavy-fullstack' as const : configuredFamilies(profile, constraint)[0] }
@@ -191,6 +192,7 @@ export function roleEligibility(lead: DiscoveryLead, profile: SearchProfile, con
 }
 
 const US_LOCATION = /\b(united states|u s a?|usa|us)\b/;
+const US_WORKING_CONTEXT = /\b(?:united states|u s a?|usa|us)\b(?:\W+\w+){0,2}\W+(?:time\s*zones?|(?:working\s+)?hours?|overlap|(?:eastern|central|mountain|pacific)\s+time)\b|\b(?:time\s*zones?|(?:working\s+)?hours?|overlap|(?:eastern|central|mountain|pacific)\s+time)\b(?:\W+\w+){0,4}\W+(?:united states|u s a?|usa|us)\b|\b(?:est|edt|cst|cdt|mst|mdt|pst|pdt)\s+(?:united states|u s a?|usa|us)\b/;
 const CLEAR_NON_US_LOCATION = /\b(emea|europe|european union|united kingdom|uk|canada|apac|asia pacific|australia|new zealand|india|germany|france|spain|italy|ireland|netherlands|poland|portugal|sweden|norway|denmark|switzerland|mexico|brazil|argentina)\b/;
 const REMOTE_WORD = /\b(remote|distributed|work from home)\b/;
 
@@ -207,10 +209,11 @@ export function locationEligibility(lead: DiscoveryLead, profile: SearchProfile,
   const explicitRemote = status === 'remote' || workplace === 'remote' || REMOTE_WORD.test(locationText);
   const explicitOnsite = status === 'onsite' || workplace === 'onsite';
   const explicitHybrid = status === 'hybrid' || workplace === 'hybrid';
-  const hasUsLocation = locationAlternatives.some(location => US_LOCATION.test(location));
+  const isUsGeography = (location: string) => US_LOCATION.test(location) && !US_WORKING_CONTEXT.test(location);
+  const hasUsLocation = locationAlternatives.some(isUsGeography);
   const hasNonUsLocation = locationAlternatives.some(location => CLEAR_NON_US_LOCATION.test(location));
   const hasUnknownAlternative = locationAlternatives.length > 1
-    && locationAlternatives.some(location => !US_LOCATION.test(location) && !CLEAR_NON_US_LOCATION.test(location));
+    && locationAlternatives.some(location => !isUsGeography(location) && !CLEAR_NON_US_LOCATION.test(location) && !US_WORKING_CONTEXT.test(location));
   const nonUsOnly = hasNonUsLocation && !hasUsLocation && !hasUnknownAlternative;
   const allowedLocal = (profile.hybridLocations || []).some(place => {
     const target = normalized(place);
