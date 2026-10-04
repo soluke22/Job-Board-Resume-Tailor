@@ -123,9 +123,9 @@ test('board discovery deduplicates before a deterministic fair global cap with t
   const repeat = await scanDiscoverySources([first, second, third], profile, scan, verify);
   assert.equal(outcome.jobs.length, 24);
   assert.deepEqual(outcome.sourceResults, [
-    {sourceId:first.id,status:'SUCCESS',fetched:30,profileAccepted:30,selected:20},
-    {sourceId:second.id,status:'SUCCESS',fetched:5,profileAccepted:5,selected:4},
-    {sourceId:third.id,status:'SUCCESS',fetched:0,profileAccepted:0,selected:0}
+    {sourceId:first.id,status:'SUCCESS',fetched:30,roleEligible:30,locationEligible:30,selected:20},
+    {sourceId:second.id,status:'SUCCESS',fetched:5,roleEligible:5,locationEligible:5,selected:4},
+    {sourceId:third.id,status:'SUCCESS',fetched:0,roleEligible:0,locationEligible:0,selected:0}
   ]);
   assert.deepEqual(outcome.sourceResults, repeat.sourceResults, 'same source order and rows yield the same allocation');
   assert.deepEqual(outcome.jobs.map(job => [job.atsProvider, job.atsBoard, job.atsJobId]), repeat.jobs.map(job => [job.atsProvider, job.atsBoard, job.atsJobId]));
@@ -134,8 +134,8 @@ test('board discovery deduplicates before a deterministic fair global cap with t
   assert.deepEqual(underCap.sourceResults.map(result => result.selected), [1,1]);
   const failed = await scanDiscoverySources([first, second], profile, async source => source === first ? leads('first', 1) : Promise.reject(new Error('synthetic')), verify);
   assert.deepEqual(failed.sourceResults, [
-    {sourceId:first.id,status:'SUCCESS',fetched:1,profileAccepted:1,selected:1},
-    {sourceId:second.id,status:'FAILED',fetched:0,profileAccepted:0,selected:0}
+    {sourceId:first.id,status:'SUCCESS',fetched:1,roleEligible:1,locationEligible:1,selected:1},
+    {sourceId:second.id,status:'FAILED',fetched:0,roleEligible:0,locationEligible:0,selected:0}
   ]);
 });
 test('supported maximum strong identities use bounded indexed dedupe before fair selection', async () => {

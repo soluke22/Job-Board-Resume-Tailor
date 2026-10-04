@@ -23,7 +23,9 @@ import {
   ApplicationStatus,
   InterviewProofPack,
   RecruiterOutreach,
-  CompanyWatchlistEntry
+  CompanyWatchlistEntry,
+  DiscoveryScope,
+  DiscoverySourceResult
 } from '../types';
 import { storageService } from '../services/storage';
 import { apiService, setBeforePrivateRequest, invalidatePrivateRequests, signOutPrivateWorkspace, privateSignInFailureNotice, clearPrivateSignInIntent } from '../services/api';
@@ -199,7 +201,7 @@ interface AppContextType {
   isAnalyzing: boolean;
   isGenerating: boolean;
   isDiscovering: boolean;
-  discoverySourceResults: Array<{sourceId:string;status:'SUCCESS'|'FAILED';fetched:number;profileAccepted:number;selected:number}>;
+  discoverySourceResults: DiscoverySourceResult[];
   error: string | null;
   clearError: () => void;
 
@@ -209,7 +211,7 @@ interface AppContextType {
   openResumeEditor: (id: string) => void;
 
   // Discovery & Job Pipeline
-  discoverJobs: (queryBudget?: number) => Promise<void>;
+  discoverJobs: (scope: DiscoveryScope) => Promise<void>;
   verifyAtsStatus: (jobId: string) => Promise<void>;
   addJob: (
     rawDescription: string,
@@ -323,7 +325,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
-  const [discoverySourceResults, setDiscoverySourceResults] = useState<Array<{sourceId:string;status:'SUCCESS'|'FAILED';fetched:number;profileAccepted:number;selected:number}>>([]);
+  const [discoverySourceResults, setDiscoverySourceResults] = useState<DiscoverySourceResult[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const clearError = () => setError(null);
@@ -603,12 +605,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Job Search & Discovery
-  const discoverJobs = async (): Promise<void> => {
+  const discoverJobs = async (scope: DiscoveryScope): Promise<void> => {
     setIsDiscovering(true);
     setError(null);
     setDiscoverySourceResults([]);
     try {
-      const res = await apiService.discoverJobs();
+      const res = await apiService.discoverJobs(scope);
       const newDiscovered = res.discoveredJobs || [];
       setDiscoverySourceResults(res.sourceResults || []);
 

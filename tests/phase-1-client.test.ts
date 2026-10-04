@@ -50,7 +50,7 @@ test('private API error codes preserve a valid session for provider failures and
         assert.equal(init?.credentials, 'same-origin'); assert.equal(init?.cache, 'no-store');
         return Response.json({ error: `Synthetic ${code.toLowerCase()} error`, code }, { status });
       };
-      await assert.rejects(apiService.discoverJobs(), new RegExp(`Synthetic ${code.toLowerCase()} error`));
+      await assert.rejects(apiService.discoverJobs('WATCHLIST'), new RegExp(`Synthetic ${code.toLowerCase()} error`));
       assert.equal(storageService.getAuthSession().isAuthenticated, !losesAccess, code);
       assert.equal(storageService.getEvidence('PRIVATE_WORKSPACE').length, losesAccess ? 0 : 1, code);
     }

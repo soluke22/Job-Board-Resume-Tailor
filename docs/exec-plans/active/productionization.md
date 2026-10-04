@@ -1,5 +1,54 @@
 # Productionization execution plan
 
+## Watchlist-scoped discovery eligibility (2026-10-04)
+
+Baseline: local `dev` and `origin/dev` are both
+`7323a3d3f0fbfab4c23ea695babd714fbae540ba`; the unrelated untracked QA release
+record remains untouched. Scope is limited to future discovery: make WATCHLIST and
+ALL_ENABLED source scopes explicit, require both active monitoring and an enabled
+registry source for WATCHLIST scans, and apply deterministic positive engineering-role
+and conservative location eligibility before fair allocation. Existing job records,
+assessment/ranking, company priority, source discovery, AI behavior, persistence,
+schema, deployment, `main`, and private runtime data are out of scope.
+
+Acceptance: synthetic regressions cover the ten source-eligibility cases, positive
+and negative role families including configured forward-deployed work, compatible,
+incompatible, and unknown locations, filter-before-round-robin behavior, the 24-job
+cap, priority neutrality, and truthful fetched/role/location/selected source results.
+The Company Watchlist primary action must run WATCHLIST scope while an explicit
+all-enabled action preserves registry-wide scanning. No filtered-zero board is called
+a provider failure; disabled sources cannot be resurrected; duplicate watchlist links
+produce one provider request. Complete Node 24 release validation and a bounded
+independent privacy/eligibility review precede a single local checkpoint commit.
+
+Result (validated 2026-10-04): implemented without persistence or schema changes.
+The authenticated discovery endpoint now requires explicit WATCHLIST or ALL_ENABLED
+scope. WATCHLIST intersects active monitored links with still-enabled canonical
+registry sources, combines duplicate link constraints, and never re-enables a source;
+ALL_ENABLED preserves the intentional registry-wide workflow. Provider rows retain
+structured team/location metadata and pass deterministic employment, positive
+family-aware role, and conservative location checks before canonical dedupe and fair
+round-robin allocation. Session diagnostics now distinguish fetched, role-eligible,
+location-eligible and selected counts, including successful filtered-zero boards.
+The Watchlist owns the primary scoped action; Discover retains the explicit all-source
+action. Existing workspace jobs and assessments are not rewritten.
+
+Synthetic focused discovery/watchlist coverage passes 32/32, including the ten source
+cases, role-family counterexamples, configured Product/DX/Platform/Production/FDE
+positives, ambiguous customer-facing rules, clear non-US-only versus mixed/unknown
+location alternatives, filter-before-fairness, cap/priority neutrality, provider
+failure and every source-result stage. Complete Node 24 release composition passes
+197/197 with typecheck, build, harness, strict required-build privacy zero, and runtime
+checks. Built startup smoke passes 1/1; normal privacy, both evidence validators,
+schema generation/no-drift and diff checks pass. Independent review found and drove
+corrections for broad generic-family admission, disabled-family assignment, mixed-
+region false rejection, configured platform false negatives, separator parsing,
+diagnostic coverage and disabled-source UI truth; final review is CLEAR. The known
+limitation is intentionally conservative lexical classification of novel titles and
+locations; ambiguous geography passes rather than fabricating incompatibility. Next
+exact step: independent checkpoint review, then separately authorized `dev` publish
+and exact-SHA Preview second WATCHLIST scan before any ranking redesign.
+
 ## Watchlist import persistence correction (2026-10-03)
 
 Baseline: local `dev` at the unpublished Company Watchlist checkpoint; remote refs

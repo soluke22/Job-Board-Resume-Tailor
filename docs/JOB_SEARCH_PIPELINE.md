@@ -17,11 +17,18 @@ history never enter query construction. The owner reviews browser results and im
 a useful posting URL or pasted JD through the manual flow.
 
 Automatic discovery is separate: the server loads the owner-scoped persisted
-SearchProfile and jobs, unions validated configured sources with exact board identities
-learned from verified jobs, and scans enabled public Ashby, Greenhouse and Lever
+SearchProfile, watchlist and jobs, and unions validated configured sources with exact
+board identities learned from verified jobs. WATCHLIST scope scans only sources linked
+by ACTIVE, monitoring-enabled watchlist entries that remain enabled in that registry;
+PAUSED, RESEARCH, unlinked, stale, removed-target and non-watchlist sources are excluded,
+and repeated links still produce one provider request. ALL_ENABLED scope preserves an
+intentional complete enabled-registry scan. Both scan public Ashby, Greenhouse and Lever
 endpoints. Board URLs/identifiers are normalized through a fixed provider allowlist
 before validation; arbitrary hosts cannot become scan endpoints. Provider results are
-filtered only for explicit deterministic mismatches before exact posting verification.
+positively classified by normalized title and available structured department/team
+metadata into configured engineering families, then conservatively filtered for clear
+location incompatibility before exact posting verification. Ambiguous locations pass;
+the filter does not invent commute feasibility or use an AI classifier.
 One unavailable board yields a failed source result while other boards can complete.
 Workday has no implemented universal public API and remains unsupported.
 
@@ -102,11 +109,15 @@ Classification is not fit. Removed discoveries are not returned as new active le
 unlisted/unknown/unsupported records retain visible uncertainty, not active claims.
 
 ### Request budget and failures
-discoveryRequestsUsed and queryBudgetUsed report enabled public-board scans with
+discoveryRequestsUsed and queryBudgetUsed report eligible enabled public-board scans with
 queryBudgetUnit public_board_scans. Each scan reserves one owner-scoped external
 budget unit; no AI budget is reserved. Google links use the owner's browser and do not
-consume a CareerOS provider call. Board feeds are bounded to 500 entries, profile
-filtering precedes a 24-lead exact-verification cap, and provider boundaries have an
+consume a CareerOS provider call. Board feeds are bounded to 500 entries. Employment,
+role-family and location filtering precede canonical identity dedupe, fair round-robin
+allocation and the 24-lead exact-verification cap; ineligible rows cannot consume a
+slot. Per-source results distinguish fetched, role-eligible, location-eligible and
+selected counts. A board filtered to zero remains a successful source result. Provider
+boundaries have an
 eight-second deadline. A failed board is reported without converting the operation
 into workspace-auth loss. Zero configured sources or zero matching postings is a
 successful empty result. There is no model or general-search fallback.

@@ -152,20 +152,20 @@ test('provider budget and discovery responses expose safe, actionable error code
   const profile = { preferredRoleFamilies: [], preferredModifiers: [], technologyStrengths: [], targetSeniority: [], remotePreference: 'any', discoverySources: [] };
   const readEmptyWorkspace = async () => ({ searchProfile: profile as any, jobs: [] });
   const missingApp = express(); missingApp.use(express.json()); missingApp.use((_req, res, next) => { res.locals.ownerId = 'synthetic-owner'; next(); }); missingApp.post('/api/discover-jobs', createDiscoveryHandler(async () => {}, readEmptyWorkspace));
-  const missing = await request(missingApp, '/api/discover-jobs');
+  const missing = await request(missingApp, '/api/discover-jobs', { scope: 'WATCHLIST' });
   assert.equal(missing.status, 200); assert.deepEqual((await missing.json()).sourceResults, []);
   let scanned = 0, additionalReservations = 0;
   const source = {id:'greenhouse:job-boards.greenhouse.io:synthetic',company:'Synthetic',provider:'greenhouse',boardId:'synthetic',boardUrl:'https://job-boards.greenhouse.io/synthetic',enabled:true,origin:'configured'};
   const readWorkspace = async () => ({ searchProfile: {...profile,discoverySources:[source]} as any, jobs: [] });
   const successApp = express(); successApp.use(express.json()); successApp.use((_req, res, next) => { res.locals.ownerId = 'synthetic-owner'; next(); }); successApp.post('/api/discover-jobs', createDiscoveryHandler(async () => { additionalReservations++; }, readWorkspace, async () => { scanned++; return []; }));
-  const success = await request(successApp, '/api/discover-jobs');
+  const success = await request(successApp, '/api/discover-jobs', { scope: 'ALL_ENABLED' });
   const successBody:any = await success.json();
-  assert.equal(success.status, 200); assert.equal(scanned, 1); assert.equal(additionalReservations, 1); assert.equal(successBody.queryBudgetUnit, 'public_board_scans'); assert.equal(successBody.googleSearches.length <= 10, true); assert.deepEqual(successBody.sourceResults, [{sourceId:source.id,status:'SUCCESS',fetched:0,profileAccepted:0,selected:0}]);
+  assert.equal(success.status, 200); assert.equal(scanned, 1); assert.equal(additionalReservations, 1); assert.equal(successBody.discoveryScope, 'ALL_ENABLED'); assert.equal(successBody.queryBudgetUnit, 'public_board_scans'); assert.equal(successBody.googleSearches.length <= 10, true); assert.deepEqual(successBody.sourceResults, [{sourceId:source.id,status:'SUCCESS',fetched:0,roleEligible:0,locationEligible:0,selected:0}]);
   const custom = await request(successApp, '/api/discover-jobs', { customQueries: ['private arbitrary text'] });
-  assert.equal(custom.status, 400); assert.deepEqual(await custom.json(), { error: 'Board discovery accepts no caller-supplied search context.' }); assert.equal(scanned, 1);
+  assert.equal(custom.status, 400); assert.deepEqual(await custom.json(), { error: 'Board discovery requires an explicit supported scope.' }); assert.equal(scanned, 1);
   const failedApp = express(); failedApp.use(express.json()); failedApp.use((_req, res, next) => { res.locals.ownerId = 'synthetic-owner'; next(); }); failedApp.post('/api/discover-jobs', createDiscoveryHandler(async () => {}, readWorkspace, async () => { throw new Error('private board failure'); }));
-  const failed = await request(failedApp, '/api/discover-jobs');
-  assert.equal(failed.status, 200); assert.deepEqual((await failed.json()).sourceResults, [{sourceId:source.id,status:'FAILED',fetched:0,profileAccepted:0,selected:0}]);
+  const failed = await request(failedApp, '/api/discover-jobs', { scope: 'ALL_ENABLED' });
+  assert.equal(failed.status, 200); assert.deepEqual((await failed.json()).sourceResults, [{sourceId:source.id,status:'FAILED',fetched:0,roleEligible:0,locationEligible:0,selected:0}]);
 });
 
 test('exact mutation Origin rejects missing, null, lookalike, scheme, port and multiple values while GET remains authorized', async () => {

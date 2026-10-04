@@ -6,7 +6,7 @@ import { normalizeWatchlistCompany, WATCHLIST_LANES, watchlistEntryWithSafeMonit
 type DetailDraft = { careersUrl: string; notes: string };
 
 export function WatchlistView() {
-  const { companyWatchlist, saveCompanyWatchlist, searchProfile, workspaceMode, discoverySourceResults } = useApp();
+  const { companyWatchlist, saveCompanyWatchlist, searchProfile, workspaceMode, discoverySourceResults, discoverJobs, isDiscovering } = useApp();
   const [draft, setDraft] = useState('');
   const [message, setMessage] = useState('');
   const [details, setDetails] = useState<Record<string, DetailDraft>>({});
@@ -88,7 +88,7 @@ export function WatchlistView() {
     <label>{label}<select aria-label={`Filter ${label}`} value={filters[key]} onChange={event => setFilters({ ...filters, [key]: event.target.value })}>{children}</select></label>;
 
   return <section className="max-w-6xl mx-auto p-6 space-y-5" aria-busy={saving}>
-    <div><h1 className="text-2xl font-bold">Company Watchlist</h1><p className="text-sm text-slate-500">Deliberate target companies are private workspace strategy. Sources remain separately configured ATS boards.</p></div>
+    <div className="flex items-start justify-between gap-4"><div><h1 className="text-2xl font-bold">Company Watchlist</h1><p className="text-sm text-slate-500">Deliberate target companies are private workspace strategy. Sources remain separately configured ATS boards.</p></div>{editable && <button type="button" disabled={isDiscovering} className="bg-emerald-700 text-white rounded px-4 py-2 disabled:opacity-50" onClick={() => void discoverJobs('WATCHLIST')}>{isDiscovering ? 'Scanning…' : 'Scan Active Watchlist'}</button>}</div>
     {editable
       ? <form className="flex gap-2" onSubmit={event => { event.preventDefault(); void add(); }}><input disabled={saving} aria-label="Company name" className="border rounded px-3 py-2 flex-1" value={draft} onChange={event => setDraft(event.target.value)} placeholder="Add a target company"/><button disabled={saving} className="bg-emerald-700 text-white rounded px-4">{saving ? 'Saving…' : 'Add company'}</button></form>
       : <p className="text-sm text-amber-700">Synthetic demo watchlist is read-only. Sign in to manage private target companies.</p>}
@@ -103,10 +103,10 @@ export function WatchlistView() {
     <div className="space-y-3">{filtered.map(entry => {
       const source = sources.find(item => item.id === entry.atsSourceId);
       const scan = discoverySourceResults.find(result => result.sourceId === entry.atsSourceId);
-      const monitorable = !!source && entry.status === 'ACTIVE';
+      const monitorable = source?.enabled === true && entry.status === 'ACTIVE';
       const detail = detailFor(entry);
       return <article key={entry.id} className="border rounded p-4 space-y-3">
-        <div className="flex justify-between gap-3"><div><h2 className="font-semibold">{entry.companyName}</h2><p className="text-sm text-slate-500">{source ? `Configured source: ${source.company} (${source.provider})` : 'Source not configured'}</p><p className="text-xs text-slate-500">{scan ? `This session: ${scan.status}; ${scan.selected} selected from ${scan.profileAccepted} matching.` : 'This session: not yet scanned.'}</p>{entry.careersUrl && <a className="text-sm text-emerald-700 underline" href={entry.careersUrl} target="_blank" rel="noreferrer">Open careers page</a>}</div>{editable && <button type="button" disabled={saving} className="text-rose-700 text-sm" onClick={() => void mutate(companyWatchlist.filter(item => item.id !== entry.id), 'Target removed privately.')}>Remove</button>}</div>
+        <div className="flex justify-between gap-3"><div><h2 className="font-semibold">{entry.companyName}</h2><p className="text-sm text-slate-500">{source ? `Configured source: ${source.company} (${source.provider})` : 'Source not configured'}</p><p className="text-xs text-slate-500">{scan ? `This session: ${scan.status}; ${scan.selected} selected, ${scan.locationEligible} location / ${scan.roleEligible} role eligible from ${scan.fetched} fetched.` : 'This session: not yet scanned.'}</p>{entry.careersUrl && <a className="text-sm text-emerald-700 underline" href={entry.careersUrl} target="_blank" rel="noreferrer">Open careers page</a>}</div>{editable && <button type="button" disabled={saving} className="text-rose-700 text-sm" onClick={() => void mutate(companyWatchlist.filter(item => item.id !== entry.id), 'Target removed privately.')}>Remove</button>}</div>
         {editable && <>
           <div className="grid md:grid-cols-4 gap-2 text-sm">
             <label>Priority<select disabled={saving} value={entry.priority} onChange={event => void update(entry, { priority: event.target.value as CompanyWatchlistEntry['priority'] })}><option>HIGH</option><option>MEDIUM</option><option>LOW</option></select></label>
@@ -116,7 +116,7 @@ export function WatchlistView() {
           </div>
           <div className="grid md:grid-cols-2 gap-2 text-sm"><label>Careers URL<input disabled={saving} className="border rounded px-2 py-1 w-full" value={detail.careersUrl} onChange={event => setDetails({ ...details, [entry.id]: { ...detail, careersUrl: event.target.value } })}/></label><label>Notes<textarea disabled={saving} className="border rounded px-2 py-1 w-full" value={detail.notes} onChange={event => setDetails({ ...details, [entry.id]: { ...detail, notes: event.target.value } })}/></label></div>
           <button type="button" disabled={saving} className="text-sm text-emerald-700" onClick={() => void saveDetails(entry)}>Save details</button>
-          <label className="text-sm"><input type="checkbox" disabled={saving || !monitorable} checked={entry.monitoringEnabled} onChange={event => void update(entry, { monitoringEnabled: event.target.checked })}/> Monitoring enabled {monitorable ? '' : '(requires ACTIVE status and configured source)'}</label>
+          <label className="text-sm"><input type="checkbox" disabled={saving || !monitorable} checked={entry.monitoringEnabled} onChange={event => void update(entry, { monitoringEnabled: event.target.checked })}/> Monitoring enabled {monitorable ? '' : '(requires ACTIVE status and an enabled configured source)'}</label>
           <fieldset disabled={saving}><legend className="text-sm">Career lanes</legend>{WATCHLIST_LANES.map(value => <label key={value} className="mr-3 text-xs"><input type="checkbox" checked={entry.lanes.includes(value)} onChange={event => void update(entry, { lanes: event.target.checked ? [...entry.lanes, value] : entry.lanes.filter(lane => lane !== value) })}/>{value}</label>)}</fieldset>
         </>}
       </article>;

@@ -53,15 +53,21 @@ Public demo rendering remains independent of auth/database configuration.
 
 ## Discovery, AI and ATS boundaries
 Discovery is deterministic and does not instantiate an AI client. Automatic
-discovery scans owner-enabled public Ashby, Greenhouse and Lever boards through
-fixed provider endpoints. The source registry combines validated owner configuration
+discovery has two explicit scopes: WATCHLIST intersects active, monitoring-enabled
+watchlist links with still-enabled registry sources, while ALL_ENABLED intentionally
+scans the complete enabled registry. A watchlist link cannot create or re-enable a
+source. Both scopes scan public Ashby, Greenhouse and Lever boards through fixed
+provider endpoints. The source registry combines validated owner configuration
 with exact board identities learned from already-verified jobs; unknown board IDs are
 never inferred from company names. Each board scan consumes the external provider
   budget only. No general-search API or credential is required. Each enabled source
-is normalized and profile-filtered, globally canonical-identity-deduplicated with
+is normalized, positively classified into configured engineering role families,
+conservatively location-filtered, and globally canonical-identity-deduplicated with
 deterministic first-source attribution, then selected in deterministic round-robin
 order before the global 24 verification cap. Source outcomes report only safe fetched,
-profile-accepted and selected counts, never payloads/errors or workspace-save counts.
+role-eligible, location-eligible and selected counts, never payloads/errors or
+workspace-save counts. Filtered-zero is a successful board outcome, not a provider
+failure. Company priority is strategy metadata and does not influence allocation.
 
 A bounded allowlisted SearchProfile query builder separately creates normal
 `google.com/search` links for owner-reviewed broader exploration. CareerOS does not

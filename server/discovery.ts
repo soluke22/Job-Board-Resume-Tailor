@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { JobRecord, SearchProfile } from '../src/types/index.js';
+import type { CompanyWatchlistEntry, DiscoveryScope, DiscoverySourceResult, JobRecord, PrimaryRoleFamily, SearchProfile, WatchlistLocationPolicy } from '../src/types/index.js';
 import type { DiscoverySource, PublicBoardProvider } from '../src/utils/discovery.js';
 import { discoverySourcesForWorkspace } from '../src/utils/discovery.js';
 import { detectAtsProvider, providerDate, verifyPostingAts, type JobVerificationResult } from './atsAdapters.js';
@@ -15,19 +15,12 @@ export interface DiscoveryLead {
   location?: string;
   remoteStatus?: 'remote' | 'hybrid' | 'onsite' | 'unknown';
   employmentType?: string;
+  department?: string;
+  team?: string;
+  secondaryLocations?: string[];
+  workplaceType?: string;
   source: 'public-board' | 'manual-web-import';
   verification?: JobVerificationResult;
-}
-
-export interface BoardScanResult {
-  sourceId: string;
-  status: 'SUCCESS' | 'FAILED';
-  /** Board rows returned before profile filtering. */
-  fetched: number;
-  /** Rows accepted by the deterministic owner profile. */
-  profileAccepted: number;
-  /** Unique rows selected for verification before the global cap/workspace merge. */
-  selected: number;
 }
 
 export interface DiscoveryDedupeStats {
@@ -39,6 +32,15 @@ export interface DiscoveryDedupeStats {
 }
 
 interface DiscoveryQueue { sourceIndex: number; leads: DiscoveryLead[] }
+
+export interface DiscoverySourceConstraint {
+  roleFamilies: PrimaryRoleFamily[];
+  locationPolicies: WatchlistLocationPolicy[];
+}
+export interface ScopedDiscoverySources {
+  sources: DiscoverySource[];
+  constraints: Map<string, DiscoverySourceConstraint>;
+}
 
 const text = (value: unknown, maximum: number) => typeof value === 'string' ? value.trim().slice(0, maximum) || undefined : undefined;
 const joined = (...parts: unknown[]) => parts.filter(part => typeof part === 'string' && part.trim()).join('\n\n') || undefined;
@@ -107,21 +109,136 @@ export async function scanPublicBoard(source: DiscoverySource, fetchImpl: typeof
       url, title, company: source.company,
       description: text(rawContent, 12_000),
       location: text(source.provider === 'greenhouse' ? job.location?.name : source.provider === 'lever' ? job.categories?.location : job.location, 500),
-      remoteStatus: remote, employmentType: text(source.provider === 'lever' ? job.categories?.commitment : job.employmentType, 200), source: 'public-board',
+      secondaryLocations: rawDetails.secondaryLocations, remoteStatus: remote, workplaceType: text(rawDetails.workplaceType, 100),
+      employmentType: text(source.provider === 'lever' ? job.categories?.commitment : job.employmentType, 200),
+      department: text(rawDetails.department, 500), team: text(rawDetails.team, 500), source: 'public-board',
       verification: { status: exactStatus, isListed: exactStatus === 'LISTED', lastVerifiedAt: new Date().toISOString(), canonicalUrl, applyUrl: rawDetails.applyUrl, rawDetails, verificationSource: endpoint }
     }];
   });
 }
 
 const lower = (value?: string) => value?.trim().toLowerCase() || '';
-export function matchesSearchProfile(lead: DiscoveryLead, profile: SearchProfile): boolean {
-  const title = lower(lead.title), company = lower(lead.company), employment = lower(lead.employmentType);
-  if ((profile.excludedRolePatterns || []).some(pattern => pattern.trim() && title.includes(lower(pattern)))) return false;
+const normalized = (value?: string) => lower(value).replace(/[^a-z0-9]+/g, ' ').trim();
+const ALL_ROLE_FAMILIES: PrimaryRoleFamily[] = [
+  'frontend-product', 'ui-platform-design-systems', 'frontend-heavy-fullstack',
+  'production-support-frontend', 'forward-deployed-software'
+];
+
+function configuredFamilies(profile: SearchProfile, constraint?: DiscoverySourceConstraint) {
+  const profileFamilies = profile.preferredRoleFamilies || [];
+  const sourceFamilies = constraint?.roleFamilies || [];
+  if (profileFamilies.length && sourceFamilies.length) {
+    const sourceSet = new Set(sourceFamilies);
+    return profileFamilies.filter(family => sourceSet.has(family));
+  }
+  return profileFamilies.length ? profileFamilies : sourceFamilies.length ? sourceFamilies : ALL_ROLE_FAMILIES;
+}
+
+/** Positive, deterministic target-family classification; no job-description inference. */
+export function roleEligibility(lead: DiscoveryLead, profile: SearchProfile, constraint?: DiscoverySourceConstraint) {
+  const title = normalized(lead.title);
+  const department = normalized(lead.department || (lead.verification?.rawDetails as any)?.department);
+  const team = normalized(lead.team || (lead.verification?.rawDetails as any)?.team);
+  const context = `${department} ${team}`.trim();
+  const families = new Set(configuredFamilies(profile, constraint));
+  if (!title) return { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' as const };
+  if (!families.size) return { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' as const };
+  if ((profile.excludedRolePatterns || []).some(pattern => {
+    const excluded = normalized(pattern);
+    return excluded && title.includes(excluded);
+  }))
+    return { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' as const };
+
+  const businessBlocker = /\b(account executive|sales|partnerships?|finance|accounting|recruit(?:er|ing)|human resources?|legal|policy|customer success|revenue operations?|marketing|communications?|business operations?|revenue analyst)\b/;
+  const researchLeadership = /\b(machine learning|ml|ai)\b.*\b(manager|director|head|lead)\b|\b(manager|director|head|lead)\b.*\b(machine learning|ml|ai research)\b/;
+  if (researchLeadership.test(title))
+    return { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' as const };
+
+  const accepts = (family: PrimaryRoleFamily) => families.has(family);
+  const matchedFamily =
+    (/\bforward deployed (?:software )?engineer\b/.test(title) && accepts('forward-deployed-software')) ? 'forward-deployed-software' :
+    (/\b(design systems?|ui platform)\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(design systems?|ui platform)\b/.test(title) && accepts('ui-platform-design-systems')) ? 'ui-platform-design-systems' :
+    (/\b(developer experience|developer productivity|devex)\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(developer experience|developer productivity|devex)\b/.test(title) && accepts('ui-platform-design-systems')) ? 'ui-platform-design-systems' :
+    (/\b(front ?end|ui|web)\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(front ?end|ui|web)\b/.test(title) && accepts('frontend-product')) ? 'frontend-product' :
+    (/\bproduct\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\bproduct\b/.test(title) && (accepts('frontend-product') || accepts('frontend-heavy-fullstack'))) ? (accepts('frontend-product') ? 'frontend-product' : 'frontend-heavy-fullstack') :
+    (/\bfull ?stack\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\bfull ?stack\b/.test(title) && accepts('frontend-heavy-fullstack')) ? 'frontend-heavy-fullstack' :
+    (/\bproduction\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\bproduction\b/.test(title) && accepts('production-support-frontend')) ? 'production-support-frontend' :
+    (/\bplatform\b.*\b(engineer|developer)\b|\b(engineer|developer)\b.*\b(?:developer )?platform\b/.test(title) && (accepts('ui-platform-design-systems') || accepts('production-support-frontend'))) ? (accepts('ui-platform-design-systems') ? 'ui-platform-design-systems' : 'production-support-frontend') :
+    undefined;
+  if (matchedFamily) return { eligible: true, family: matchedFamily };
+
+  const genericSoftware = /\bsoftware (?:development )?(?:engineer|developer)\b|\b(?:engineer|developer),? software\b/.test(title);
+  if (businessBlocker.test(title) && !genericSoftware)
+    return { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' as const };
+
+  const developerFacing = /\b(developer advocate|developer relations(?: engineer)?)\b/.test(title);
+  const customerFacing = /\b(solutions? engineer|solutions? architect|implementation engineer|customer engineer)\b/.test(title);
+  if (developerFacing || customerFacing) {
+    const technicalContext = /\b(engineering|software|developer experience|developer relations|product)\b/.test(context);
+    if (developerFacing && technicalContext && accepts('ui-platform-design-systems') && profile.preferredModifiers?.includes('DEVELOPER_TOOLING'))
+      return { eligible: true, family: 'ui-platform-design-systems' as const };
+    if (customerFacing && technicalContext && accepts('forward-deployed-software'))
+      return { eligible: true, family: 'forward-deployed-software' as const };
+    return { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' as const };
+  }
+
+  const explicitNonTargetDomain = /\b(data|analytics?|machine learning|ml|security|quality assurance|qa|test automation|infrastructure|devops|site reliability|sre|mobile|ios|android|embedded|firmware|backend|back end)\b/;
+  const explicitTargetDomain = /\b(front ?end|ui|web|product|full ?stack|design systems?|developer experience|developer productivity|devex|platform|production)\b/;
+  const genericEngineer = /^(?:(?:associate|junior|mid|senior|staff|principal|lead) )?engineer(?:\s+(?:i{1,4}|\d+))?$/.test(title);
+  return (genericSoftware && !explicitNonTargetDomain.test(title) && !explicitTargetDomain.test(title)) || genericEngineer
+    ? { eligible: true, family: accepts('frontend-heavy-fullstack') ? 'frontend-heavy-fullstack' as const : configuredFamilies(profile, constraint)[0] }
+    : { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' as const };
+}
+
+const US_LOCATION = /\b(united states|u s a?|usa|us)\b/;
+const CLEAR_NON_US_LOCATION = /\b(emea|europe|european union|united kingdom|uk|canada|apac|asia pacific|australia|new zealand|india|germany|france|spain|italy|ireland|netherlands|poland|portugal|sweden|norway|denmark|switzerland|mexico|brazil|argentina)\b/;
+const REMOTE_WORD = /\b(remote|distributed|work from home)\b/;
+
+/** Reject only clear incompatibilities; missing or ambiguous geography passes. */
+export function locationEligibility(lead: DiscoveryLead, profile: SearchProfile, constraint?: DiscoverySourceConstraint) {
+  const details = lead.verification?.rawDetails as any;
+  const rawLocations = [lead.location, ...(lead.secondaryLocations || details?.secondaryLocations || [])]
+    .filter((location): location is string => typeof location === 'string' && !!location.trim());
+  const locations = rawLocations.map(normalized).filter(Boolean);
+  const locationText = locations.join(' ');
+  const locationAlternatives = rawLocations.flatMap(location => location.split(/\s+(?:or|and)\s+|\s*[\/;]\s*/i).map(normalized).filter(Boolean));
+  const workplace = normalized(lead.workplaceType || details?.workplaceType);
+  const status = lead.remoteStatus || details?.remoteStatus || 'unknown';
+  const explicitRemote = status === 'remote' || workplace === 'remote' || REMOTE_WORD.test(locationText);
+  const explicitOnsite = status === 'onsite' || workplace === 'onsite';
+  const explicitHybrid = status === 'hybrid' || workplace === 'hybrid';
+  const hasUsLocation = locationAlternatives.some(location => US_LOCATION.test(location));
+  const hasNonUsLocation = locationAlternatives.some(location => CLEAR_NON_US_LOCATION.test(location));
+  const hasUnknownAlternative = locationAlternatives.length > 1
+    && locationAlternatives.some(location => !US_LOCATION.test(location) && !CLEAR_NON_US_LOCATION.test(location));
+  const nonUsOnly = hasNonUsLocation && !hasUsLocation && !hasUnknownAlternative;
+  const allowedLocal = (profile.hybridLocations || []).some(place => {
+    const target = normalized(place);
+    return target && (locationText.includes(target) || target.includes(locationText));
+  });
+
+  const policies = new Set(constraint?.locationPolicies || []);
+  if (nonUsOnly && (explicitRemote || profile.remotePreference === 'remote_only' || policies.has('REMOTE_OK')))
+    return { eligible: false, reason: 'LOCATION_INCOMPATIBLE' as const };
+  if (profile.remotePreference === 'remote_only' && (explicitOnsite || explicitHybrid))
+    return { eligible: false, reason: 'LOCATION_INCOMPATIBLE' as const };
+  if (profile.remotePreference === 'hybrid_flexible' && (explicitOnsite || explicitHybrid) && locations.length && !allowedLocal)
+    return { eligible: false, reason: 'LOCATION_INCOMPATIBLE' as const };
+
+  const policyIsPermissive = !policies.size || policies.has('ANY') || policies.has('UNKNOWN');
+  if (!policyIsPermissive && policies.has('REMOTE_OK') && (explicitOnsite || explicitHybrid))
+    return { eligible: false, reason: 'LOCATION_INCOMPATIBLE' as const };
+  if (!policyIsPermissive && policies.has('LOCAL_HYBRID') && (explicitOnsite || explicitHybrid) && locations.length && !allowedLocal)
+    return { eligible: false, reason: 'LOCATION_INCOMPATIBLE' as const };
+  return { eligible: true, reason: locations.length || status !== 'unknown' ? 'LOCATION_COMPATIBLE' as const : 'LOCATION_UNKNOWN_PASS' as const };
+}
+
+export function matchesSearchProfile(lead: DiscoveryLead, profile: SearchProfile, constraint?: DiscoverySourceConstraint): boolean {
+  const company = lower(lead.company), employment = lower(lead.employmentType);
   if ((profile.companyExclusions || []).some(excluded => excluded.trim() && company === lower(excluded))) return false;
   if (employment && (profile.excludedEmploymentTypes || []).some(excluded => employment.includes(lower(excluded)))) return false;
   if (employment && profile.allowedEmploymentTypes?.length && !profile.allowedEmploymentTypes.some(allowed => employment.includes(lower(allowed)))) return false;
-  if (profile.remotePreference === 'remote_only' && lead.remoteStatus === 'onsite') return false;
-  return true;
+  return roleEligibility(lead, profile, constraint).eligible && locationEligibility(lead, profile, constraint).eligible;
 }
 
 function discoveryIdentity(lead: DiscoveryLead): Partial<JobRecord> {
@@ -205,22 +322,31 @@ export function deduplicateDiscoveryLeads(perSource: DiscoveryLead[][]): { queue
 export async function scanDiscoverySources(
   sources: DiscoverySource[], profile: SearchProfile,
   scan: (source: DiscoverySource) => Promise<DiscoveryLead[]> = scanPublicBoard,
-  verify = verifyPostingAts
+  verify = verifyPostingAts,
+  constraints: ReadonlyMap<string, DiscoverySourceConstraint> = new Map()
 ) {
   const enabled = sources.filter(source => source.enabled).slice(0, 50);
   const settled = await Promise.allSettled(enabled.map(source => scan(source)));
-  const sourceResults: BoardScanResult[] = [];
+  const sourceResults: DiscoverySourceResult[] = [];
   const matchedBySource: DiscoveryLead[][] = [];
   settled.forEach((result, index) => {
     const source = enabled[index];
     if (result.status === 'rejected') {
-      sourceResults.push({ sourceId: source.id, status: 'FAILED', fetched: 0, profileAccepted: 0, selected: 0 });
+      sourceResults.push({ sourceId: source.id, status: 'FAILED', fetched: 0, roleEligible: 0, locationEligible: 0, selected: 0 });
       matchedBySource.push([]);
       return;
     }
-    const matched = result.value.filter(lead => matchesSearchProfile(lead, profile));
-    sourceResults.push({ sourceId: source.id, status: 'SUCCESS', fetched: result.value.length, profileAccepted: matched.length, selected: 0 });
-    matchedBySource.push(matched);
+    const constraint = constraints.get(source.id);
+    const profileEligible = result.value.filter(lead => {
+      const company = lower(lead.company), employment = lower(lead.employmentType);
+      if ((profile.companyExclusions || []).some(excluded => excluded.trim() && company === lower(excluded))) return false;
+      if (employment && (profile.excludedEmploymentTypes || []).some(excluded => employment.includes(lower(excluded)))) return false;
+      return !(employment && profile.allowedEmploymentTypes?.length && !profile.allowedEmploymentTypes.some(allowed => employment.includes(lower(allowed))));
+    });
+    const roleEligible = profileEligible.filter(lead => roleEligibility(lead, profile, constraint).eligible);
+    const locationEligible = roleEligible.filter(lead => locationEligibility(lead, profile, constraint).eligible);
+    sourceResults.push({ sourceId: source.id, status: 'SUCCESS', fetched: result.value.length, roleEligible: roleEligible.length, locationEligible: locationEligible.length, selected: 0 });
+    matchedBySource.push(locationEligible);
   });
   const { queues, stats: dedupeStats } = deduplicateDiscoveryLeads(matchedBySource);
 
@@ -250,11 +376,24 @@ export function configuredDiscoverySources(profile: SearchProfile, jobs: JobReco
   return discoverySourcesForWorkspace(profile, jobs);
 }
 
-/** Watchlist entries only select existing registry sources; they never supply provider or board authority. */
-export function sourcesForWatchlistMonitoring(profile: SearchProfile, jobs: JobRecord[], watchlist: Array<{atsSourceId?:string;status:string;monitoringEnabled:boolean}> = []) {
-  const sources=configuredDiscoverySources(profile,jobs);
-  const monitored=new Set(watchlist.filter(entry=>entry.status==='ACTIVE'&&entry.monitoringEnabled&&entry.atsSourceId).map(entry=>entry.atsSourceId));
-  return sources.map(source=>monitored.has(source.id)?{...source,enabled:true}:source);
+/** Watchlist entries constrain existing registry authority; they never create or re-enable it. */
+export function sourcesForDiscoveryScope(
+  profile: SearchProfile, jobs: JobRecord[], watchlist: CompanyWatchlistEntry[] = [], scope: DiscoveryScope
+): ScopedDiscoverySources {
+  const registry = configuredDiscoverySources(profile, jobs);
+  if (scope === 'ALL_ENABLED') return { sources: registry, constraints: new Map() };
+  const eligibleEntries = watchlist.filter(entry => entry.status === 'ACTIVE' && entry.monitoringEnabled && entry.atsSourceId);
+  const bySource = new Map<string, DiscoverySourceConstraint>();
+  for (const entry of eligibleEntries) {
+    const id = entry.atsSourceId!;
+    const current = bySource.get(id) || { roleFamilies: [], locationPolicies: [] };
+    for (const family of entry.lanes || []) if (!current.roleFamilies.includes(family)) current.roleFamilies.push(family);
+    if (!current.locationPolicies.includes(entry.locationPolicy)) current.locationPolicies.push(entry.locationPolicy);
+    bySource.set(id, current);
+  }
+  const sources = registry.filter(source => source.enabled && bySource.has(source.id));
+  const retained = new Set(sources.map(source => source.id));
+  return { sources, constraints: new Map([...bySource].filter(([id]) => retained.has(id))) };
 }
 
 function sourceLabel(provider: PublicBoardProvider | string, channel: DiscoveryLead['source']) {

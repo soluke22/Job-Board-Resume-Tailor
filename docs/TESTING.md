@@ -102,6 +102,14 @@ an owner retry. Live Neon and Private Blob acceptance remain pending configurati
 ## Phase 3 discovery/ATS coverage
 
 Focused: node --import tsx --test tests/phase-3-discovery.test.ts.
+
+Watchlist scope and deterministic pre-selection filters:
+`node --import tsx --test tests/discovery-scope-filter.test.ts tests/watchlist.test.ts tests/phase-3-discovery.test.ts`.
+Synthetic coverage proves active/paused/research/disabled/stale/non-watchlist source
+eligibility, one request per canonical source, positive engineering-family and
+borderline-title behavior, clear versus ambiguous location decisions, filter-before-
+round-robin ordering, the global cap, priority neutrality, and truthful
+fetched/role/location/selected diagnostics.
 Synthetic provider fixtures exercise Ashby listed/unlisted/feed absence/network,
 Greenhouse exact success/404/error/board-only, Lever public exact success/404,
 unsupported ATS and spoofed hostname detection. Dates preserve actual provider

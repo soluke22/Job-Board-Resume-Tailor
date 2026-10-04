@@ -191,7 +191,7 @@ export const DiscoverView: React.FC = () => {
             </button>
 
             <button
-              onClick={() => discoverJobs(3)}
+              onClick={() => discoverJobs('ALL_ENABLED')}
               disabled={isDiscovering}
               className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-900/30 flex items-center space-x-2 transition cursor-pointer disabled:opacity-50"
             >
@@ -203,7 +203,7 @@ export const DiscoverView: React.FC = () => {
               ) : (
                 <>
                   <Compass className="w-4 h-4" />
-                  <span>Discover New Roles</span>
+                  <span>Scan All Enabled Sources</span>
                 </>
               )}
             </button>
@@ -214,7 +214,7 @@ export const DiscoverView: React.FC = () => {
           <div className="mt-4 flex flex-wrap gap-2" aria-label="Latest discovery source outcomes">
             {discoverySourceResults.map(result => (
               <span key={result.sourceId} className={`rounded-lg border px-2.5 py-1 text-[11px] ${result.status === 'SUCCESS' ? 'border-emerald-800/70 bg-emerald-950/30 text-emerald-200' : 'border-amber-800/70 bg-amber-950/30 text-amber-200'}`}>
-                {result.sourceId}: {result.status === 'SUCCESS' ? `${result.selected} selected from ${result.profileAccepted} accepted (${result.fetched} fetched)` : 'scan failed'}
+                {result.sourceId}: {result.status === 'SUCCESS' ? `${result.selected} selected; ${result.locationEligible} location / ${result.roleEligible} role eligible (${result.fetched} fetched)` : 'scan failed'}
               </span>
             ))}
           </div>

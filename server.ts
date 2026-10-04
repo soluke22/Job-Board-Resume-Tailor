@@ -11,7 +11,7 @@ import { installPrivateFiles } from './server/privateFiles.js';
 import { createWorkspaceRouter } from './server/workspaceRoutes.js';
 import { redactAiPayload } from './server/privacy.js';
 import { verifyPostingAts } from './server/atsAdapters.js';
-import { buildManualImportedJob, scanDiscoverySources, scanPublicBoard, sourcesForWatchlistMonitoring } from './server/discovery.js';
+import { buildManualImportedJob, scanDiscoverySources, scanPublicBoard, sourcesForDiscoveryScope } from './server/discovery.js';
 import { buildDiscoveryQueries, googleSearchUrl, parseDiscoverySource } from './src/utils/discovery.js';
 import { mergeDiscoveredJobs } from './src/utils/jobIdentity.js';
 import { safeFetchText } from './server/safeFetch.js';
@@ -243,7 +243,7 @@ app.post('/api/verify-ats', async (req: Request, res: Response): Promise<void> =
 // ==========================================
 // 12. Keyless public-board discovery and manual posting ingestion
 // ==========================================
-type DiscoveryWorkspace = { searchProfile: import('./src/types/index.js').SearchProfile | null; jobs: import('./src/types/index.js').JobRecord[]; companyWatchlist?: Array<{atsSourceId?:string;status:string;monitoringEnabled:boolean}> };
+type DiscoveryWorkspace = { searchProfile: import('./src/types/index.js').SearchProfile | null; jobs: import('./src/types/index.js').JobRecord[]; companyWatchlist?: import('./src/types/index.js').CompanyWatchlistEntry[] };
 export function createDiscoveryHandler(
   reserve = reserveProviderCall,
   readWorkspace: (ownerId: string) => Promise<DiscoveryWorkspace> = async ownerId => {
@@ -254,7 +254,9 @@ export function createDiscoveryHandler(
 ): RequestHandler {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      if (Object.keys(req.body).length) { res.status(400).json({ error: 'Board discovery accepts no caller-supplied search context.' }); return; }
+      if (Object.keys(req.body).some(key => key !== 'scope') || !['WATCHLIST', 'ALL_ENABLED'].includes(req.body.scope)) {
+        res.status(400).json({ error: 'Board discovery requires an explicit supported scope.' }); return;
+      }
 
       const workspace = await readWorkspace(req.res!.locals.ownerId);
       const searchProfile = workspace.searchProfile;
@@ -263,15 +265,17 @@ export function createDiscoveryHandler(
       let queries: string[];
       try { queries = buildDiscoveryQueries(searchProfile, 10); }
       catch (error) { res.status(400).json({error: (error as Error).message}); return; }
-      const sources = sourcesForWatchlistMonitoring(searchProfile, existingJobs, workspace.companyWatchlist);
+      const scope = req.body.scope as import('./src/types/index.js').DiscoveryScope;
+      const { sources, constraints } = sourcesForDiscoveryScope(searchProfile, existingJobs, workspace.companyWatchlist, scope);
       for (const source of sources.filter(source => source.enabled)) await reserveExternalProviderCall(req.res!.locals.ownerId, reserve);
-      const outcome = await scanDiscoverySources(sources, searchProfile, scan);
+      const outcome = await scanDiscoverySources(sources, searchProfile, scan, undefined, constraints);
       const candidates = outcome.jobs;
       const merged = mergeDiscoveredJobs(Array.isArray(existingJobs) ? existingJobs : [], candidates);
       res.json({
         discoveredJobs: merged.newJobs.filter(j => j.verificationStatus !== 'NOT_LISTED'),
         refreshedJobs: merged.refreshedJobs,
         discoverySources: sources,
+        discoveryScope: scope,
         sourceResults: outcome.sourceResults,
         googleSearches: queries.map(query => ({ query, url: googleSearchUrl(query) })),
         discoveryRequestsUsed: outcome.discoveryRequestsUsed, queryBudgetUsed: outcome.queryBudgetUsed, queryBudgetUnit: outcome.queryBudgetUnit,

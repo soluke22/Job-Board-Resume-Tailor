@@ -70,6 +70,15 @@ export type WorkspaceMode = 'PUBLIC_DEMO' | 'PRIVATE_WORKSPACE';
 export type WatchlistStatus = 'ACTIVE' | 'PAUSED' | 'RESEARCH';
 export type WatchlistPriority = 'HIGH' | 'MEDIUM' | 'LOW';
 export type WatchlistLocationPolicy = 'REMOTE_OK' | 'LOCAL_HYBRID' | 'ANY' | 'UNKNOWN';
+export type DiscoveryScope = 'WATCHLIST' | 'ALL_ENABLED';
+export interface DiscoverySourceResult {
+  sourceId: string;
+  status: 'SUCCESS' | 'FAILED';
+  fetched: number;
+  roleEligible: number;
+  locationEligible: number;
+  selected: number;
+}
 export interface CompanyWatchlistEntry {
   id: string; companyName: string; normalizedCompanyName: string;
   status: WatchlistStatus; priority: WatchlistPriority; lanes: PrimaryRoleFamily[];
