@@ -1,5 +1,44 @@
 # Productionization execution plan
 
+## Assessment validation diagnostics (2026-10-05)
+
+Baseline: clean tracked `dev` and `origin/dev` at
+`9dbb607e3c1d5ca056158bdcb91392625a6836af`; preserve the unrelated untracked QA
+release record. Scope is limited to classifying strict structured-assessment
+failures across extraction provider/schema/contract, semantic
+provider/schema/contract, and persistence boundaries with finite privacy-safe
+reason codes. Do not log or return prompts, model output, job text, evidence,
+identity, IDs, secrets, or arbitrary validation messages. Preserve exact excerpts,
+centrality/kind rules, critical-context minimums, complete one-to-one semantic
+coverage, eligible evidence, support relationships, deterministic scoring, provider
+budgets, no retry, and no provider fallback.
+
+Acceptance: synthetic coverage distinguishes invalid JSON, schema-invalid output,
+every existing extraction and semantic post-schema invariant, workspace conflict,
+and provider/budget behavior without payload leakage. Complete the Node 24 release
+validation and an independent bounded privacy/truth review, publish one scoped dev
+checkpoint normally, wait for its exact Preview, then make exactly one live attempt
+against the already-persisted private acceptance target. Do not run discovery,
+assess any other job, create resume artifacts, migrate data, modify `main`, or touch
+Production. Success requires one persisted reload-stable assessment; failure stops
+after returning only its safe stage/reason code.
+
+Local result: diagnostics-only correction CLEAR. The two prior live attempts can be
+localized only to extraction (one AI reservation each); their exact failure class
+was irretrievably collapsed by the old generic 422. No contradictory extraction,
+semantic, evidence-eligibility, or scoring contract was reproduced, so none was
+weakened. Gemini empty, JSON and schema failures plus every post-schema contract now
+map to fixed finite stage/reason codes without retaining or returning model values or
+Zod issues. Provider/budget mappings, one reservation per actual provider call, no
+retry/fallback and revisioned atomic persistence remain unchanged. Node 24 focused
+assessment/provider/security/persistence tests pass 42/42; complete release
+composition passes 202/202 with typecheck, build, harness, strict build privacy zero
+and runtime checks. Normal privacy is zero; startup smoke 1/1; both evidence
+validators pass; Drizzle reports no schema changes; diff whitespace passes. The
+independent read-only boundary review found no demonstrated blocker/high or concrete
+lower-severity defect. Next: one scoped dev checkpoint/publication, exact-SHA Preview
+health plus private hydration/save, then exactly one persisted-target assessment.
+
 ## Watchlist-scoped discovery eligibility (2026-10-04)
 
 Baseline: local `dev` and `origin/dev` are both

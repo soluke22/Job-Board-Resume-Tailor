@@ -14,6 +14,14 @@ export class LlmProviderFailure extends Error {
   constructor(readonly code: LlmProviderFailureCode, message: string) { super(message); }
 }
 
+export type StructuredOutputFailureCode = 'EMPTY_RESPONSE' | 'INVALID_JSON' | 'SCHEMA_INVALID';
+/** Safe structural failure only. Never retain provider text or schema issues. */
+export class StructuredOutputFailure extends Error {
+  constructor(readonly code: StructuredOutputFailureCode) {
+    super('Structured model output failed validation.');
+  }
+}
+
 export interface LlmProviderDependencies {
   fetchImpl?: typeof fetch;
   reserveAiCall: (ownerId: string) => Promise<void>;
@@ -110,7 +118,14 @@ export function createStructuredModel(req: Request, dependencies: LlmProviderDep
   return async (schema, system, data) => {
     await dependencies.reserveAiCall(ownerId);
     const response = await client.models.generateContent({ model: 'gemini-3.8-flash', contents: JSON.stringify(data), config: { systemInstruction: system, responseMimeType: 'application/json', responseJsonSchema: jsonSchema(schema), thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM }, httpOptions: { timeout: 30_000 } } });
-    return schema.parse(JSON.parse(response.text || ''));
+    const text = response.text;
+    if (!text) throw new StructuredOutputFailure('EMPTY_RESPONSE');
+    let decoded: unknown;
+    try { decoded = JSON.parse(text); }
+    catch { throw new StructuredOutputFailure('INVALID_JSON'); }
+    const parsed = schema.safeParse(decoded);
+    if (!parsed.success) throw new StructuredOutputFailure('SCHEMA_INVALID');
+    return parsed.data;
   };
 }
 

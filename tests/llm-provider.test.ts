@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
-import { createStructuredModel, LlmProviderFailure, ollamaModel, selectedLlmProvider } from '../server/llmProvider';
+import { createStructuredModel, LlmProviderFailure, ollamaModel, selectedLlmProvider, StructuredOutputFailure } from '../server/llmProvider';
 import { safeProviderError } from '../server/providerErrors';
 import { ProviderBudgetExceeded, ProviderBudgetUnavailable } from '../server/providerBudget';
 
@@ -55,6 +55,40 @@ test('provider selection defaults to Gemini and local model default stays in con
   assert.equal(selectedLlmProvider({} as NodeJS.ProcessEnv), 'gemini');
   assert.equal(selectedLlmProvider({ LLM_PROVIDER: 'OLLAMA' } as NodeJS.ProcessEnv), 'ollama');
   assert.equal(ollamaModel({} as NodeJS.ProcessEnv), 'qwen3:14b');
+});
+
+test('Gemini structured output distinguishes empty text, invalid JSON, and schema-invalid JSON without retaining output', async () => {
+  const cases = [
+    { text: '', code: 'EMPTY_RESPONSE' },
+    { text: '{private-invalid-json', code: 'INVALID_JSON' },
+    { text: JSON.stringify({ answer: 5, private: 'schema value' }), code: 'SCHEMA_INVALID' },
+  ] as const;
+  for (const item of cases) {
+    let reserved = 0;
+    const model = createStructuredModel(req, {
+      environment: { GEMINI_API_KEY: 'synthetic-key' } as NodeJS.ProcessEnv,
+      reserveAiCall: async () => { reserved++; },
+      geminiClient: () => ({ models: { generateContent: async () => ({ text: item.text }) } }) as any,
+    });
+    await assert.rejects(model(schema, 'private system prompt', { private: 'payload' }), (error: unknown) => {
+      assert.ok(error instanceof StructuredOutputFailure); assert.equal(error.code, item.code);
+      assert.doesNotMatch(error.message, /private|schema value|invalid-json|payload/i);
+      return true;
+    });
+    assert.equal(reserved, 1);
+  }
+});
+
+test('Gemini provider failures remain provider failures after one reservation', async () => {
+  const failure = new Error('private upstream detail');
+  let reserved = 0;
+  const model = createStructuredModel(req, {
+    environment: { GEMINI_API_KEY: 'synthetic-key' } as NodeJS.ProcessEnv,
+    reserveAiCall: async () => { reserved++; },
+    geminiClient: () => ({ models: { generateContent: async () => { throw failure; } } }) as any,
+  });
+  await assert.rejects(model(schema, 'private', { private: 'payload' }), error => error === failure);
+  assert.equal(reserved, 1);
 });
 
 test('Ollama reader abort is classified as a timeout without response diagnostics', async () => {
