@@ -3,8 +3,8 @@
 ## Current State — committed dev implementation
 React 19/Vite renders through src/main.tsx and src/App.tsx. AppContext coordinates
 candidate setup, discovery, evidence, tailoring and application workflows.
-Express remains the application server, with Gemini limited to later intelligence
-workflows; server/local.ts serves Vite in
+Express remains the application server, with Vercel AI Gateway behind the
+provider-neutral structured-model boundary; server/local.ts serves Vite in
 development and dist/client in production. api/index.ts is the Vercel adapter.
 Build emits dist/client and dist/server.mjs; Next.js remains conditional.
 
@@ -75,13 +75,20 @@ request, scrape or ingest Google result pages. The owner imports a useful URL or
 through the manual flow, where exact ATS verification, canonical dedupe and
 UNASSESSED defaults apply before any AI workflow.
 
-The structured-model boundary defaults to Gemini from server-only `GEMINI_API_KEY`
-for analysis, evidence matches, plans, resumes, evaluations, proof packs and outreach
-through owner-protected API routes. A developer may explicitly choose local Ollama
-with `LLM_PROVIDER=ollama` and `OLLAMA_MODEL`; it is fixed to loopback
+The structured-model boundary defaults to Vercel AI Gateway for analysis, evidence
+matches, plans, resumes, evaluations, proof packs and outreach through owner-protected
+API routes. The uncertified legacy cover-letter route is fail-closed with HTTP 410
+pending a separate provenance review; it sends no request body to a model provider.
+`AI_GATEWAY_MODEL` centralizes the hosted model; Vercel
+OIDC supplies server-side Gateway authentication, with `AI_GATEWAY_API_KEY` reserved
+for server-only execution outside Vercel. The AI SDK receives each existing Zod
+schema through `Output.object`, with temperature zero, a 30-second timeout, zero SDK
+retries, one budget reservation per request and a second application Zod validation.
+A developer may explicitly choose local Ollama with `AI_PROVIDER=ollama` (legacy
+`LLM_PROVIDER=ollama` remains accepted) and `OLLAMA_MODEL`; it is fixed to loopback
 `127.0.0.1:11434/api/generate`, uses strict JSON Schema output, and never falls back
-to Gemini. Legacy cover letters remain Gemini-only and fail closed under that local
-mode. AI outputs remain
+to Gateway. Cover letters remain unavailable in local mode. No selected provider
+falls back to another provider. AI outputs remain
 untrusted; route authorization does not establish semantic candidate provenance.
 JSON parsing and redaction are not sufficient evidence validation.
 Discovery uses server/discovery.ts and exact public ATS adapters, preserving
@@ -102,7 +109,11 @@ eligibility, require READY resume ledgers for proofs, and persist fingerprinted
 downstream artifacts under workspace revisions. Existing JSON-backed proof/outreach/
 contact/application records need no migration. Repository reads recheck stale bases;
 ordinary saves/imports cannot forge approval. Profile/manual question routing bypasses
-Gemini; model context excludes private contact/history and unrelated evidence metadata.
+the hosted model; model context excludes private contact/history and unrelated evidence metadata.
+
+`server/geminiDiagnostics.ts`, its isolated test and `@google/genai` are
+`DEAD_COMPATIBILITY_CODE_PENDING_REMOVAL`; no deployed structured workflow imports
+or calls them, and `GEMINI_API_KEY` is not required for assessment.
 
 ## Acceptance versus target
 Phase 8 pins npm/package-lock and Node 24.x, with Vite static `dist/client` plus

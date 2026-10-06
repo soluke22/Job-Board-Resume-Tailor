@@ -1,10 +1,12 @@
 import type { Request } from 'express';
-import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import { generateText, gateway, Output } from 'ai';
 import { z } from 'zod';
 import type { StructuredModel } from './assessment.js';
+import { classifyAiGatewayError, type AiGatewayFailureCode } from './aiGatewayDiagnostics.js';
 
-export type LlmProviderName = 'gemini' | 'ollama';
+export type LlmProviderName = 'gateway' | 'ollama';
 export type LlmProviderFailureCode =
+  | AiGatewayFailureCode
   | 'OLLAMA_TIMEOUT'
   | 'OLLAMA_UNAVAILABLE'
   | 'OLLAMA_MODEL_NOT_FOUND'
@@ -25,7 +27,7 @@ export class StructuredOutputFailure extends Error {
 export interface LlmProviderDependencies {
   fetchImpl?: typeof fetch;
   reserveAiCall: (ownerId: string) => Promise<void>;
-  geminiClient?: (apiKey: string) => GoogleGenAI;
+  gatewayGenerate?: (options: Record<string, unknown>) => Promise<{ output: unknown }>;
   environment?: NodeJS.ProcessEnv;
 }
 
@@ -33,7 +35,17 @@ const OLLAMA_GENERATE_URL = 'http://127.0.0.1:11434/api/generate';
 const MAX_OLLAMA_RESPONSE_BYTES = 1024 * 1024;
 
 export function selectedLlmProvider(environment: NodeJS.ProcessEnv = process.env): LlmProviderName {
-  return environment.LLM_PROVIDER?.trim().toLowerCase() === 'ollama' ? 'ollama' : 'gemini';
+  const configured = (environment.AI_PROVIDER || environment.LLM_PROVIDER)?.trim().toLowerCase();
+  return configured === 'ollama' ? 'ollama' : 'gateway';
+}
+
+const DEFAULT_GATEWAY_MODEL = 'anthropic/claude-haiku-4.5';
+const GATEWAY_MODEL_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}\/[a-z0-9][a-z0-9._:-]{0,119}$/i;
+export function gatewayModel(environment: NodeJS.ProcessEnv = process.env): string {
+  const configured = environment.AI_GATEWAY_MODEL?.trim();
+  if (!configured) return DEFAULT_GATEWAY_MODEL;
+  if (!GATEWAY_MODEL_PATTERN.test(configured)) throw new LlmProviderFailure('AI_MODEL_NOT_FOUND', 'The configured AI Gateway model was not found.');
+  return configured;
 }
 
 export function ollamaModel(environment: NodeJS.ProcessEnv = process.env): string {
@@ -112,26 +124,26 @@ export function createStructuredModel(req: Request, dependencies: LlmProviderDep
     const model = ollamaModel(environment);
     return (schema, system, data) => ollamaStructured(schema, system, data, model, fetchImpl, () => dependencies.reserveAiCall(ownerId));
   }
-  const apiKey = environment.GEMINI_API_KEY;
-  if (!apiKey) return async () => { throw new Error('Gemini is not configured; no structured output produced.'); };
-  const client = (dependencies.geminiClient || (key => new GoogleGenAI({ apiKey: key, httpOptions: { headers: { 'User-Agent': 'aistudio-build' } } })))(apiKey);
+  const model = gatewayModel(environment);
+  const provider = model.split('/', 1)[0];
+  const run = dependencies.gatewayGenerate || (generateText as unknown as (options: Record<string, unknown>) => Promise<{ output: unknown }>);
   return async (schema, system, data) => {
     await dependencies.reserveAiCall(ownerId);
-    const response = await client.models.generateContent({ model: 'gemini-3.8-flash', contents: JSON.stringify(data), config: { systemInstruction: system, responseMimeType: 'application/json', responseJsonSchema: jsonSchema(schema), thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM }, httpOptions: { timeout: 30_000 } } });
-    const text = response.text;
-    if (!text) throw new StructuredOutputFailure('EMPTY_RESPONSE');
-    let decoded: unknown;
-    try { decoded = JSON.parse(text); }
-    catch { throw new StructuredOutputFailure('INVALID_JSON'); }
-    const parsed = schema.safeParse(decoded);
-    if (!parsed.success) throw new StructuredOutputFailure('SCHEMA_INVALID');
+    let output: unknown;
+    try {
+      const result = await run({
+        model: gateway(model), system, prompt: JSON.stringify(data),
+        output: Output.object({ schema }), temperature: 0, maxRetries: 0, timeout: 30_000,
+        providerOptions: { gateway: { only: [provider], has: ['structured-output'] } },
+      });
+      output = result.output;
+    } catch (error) {
+      if (error instanceof LlmProviderFailure) throw error;
+      const failure = classifyAiGatewayError(error);
+      throw new LlmProviderFailure(failure.code, failure.message);
+    }
+    const parsed = schema.safeParse(output);
+    if (!parsed.success) throw new LlmProviderFailure('AI_INVALID_OUTPUT', 'AI Gateway returned invalid structured output.');
     return parsed.data;
   };
-}
-
-/** Cover letters are legacy Gemini-only. Explicit local mode must never fall back. */
-export function legacyGeminiClient(environment: NodeJS.ProcessEnv = process.env): GoogleGenAI | null {
-  if (selectedLlmProvider(environment) === 'ollama') return null;
-  const apiKey = environment.GEMINI_API_KEY;
-  return apiKey ? new GoogleGenAI({ apiKey, httpOptions: { headers: { 'User-Agent': 'aistudio-build' } } }) : null;
 }

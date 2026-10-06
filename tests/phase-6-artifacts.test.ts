@@ -203,7 +203,7 @@ test('Phase 6 owner repository resolves sources, persists revisioned artifacts, 
 test('Phase 6 routes use the strict provider-neutral structured boundary and current UI has review/copy fences',async()=>{
   const server=await readFile('server.ts','utf8');const downstream=server.slice(server.indexOf('// Phase 6 certified'));
   const provider=await readFile('server/llmProvider.ts','utf8');
-  assert.match(downstream,/createArtifactHandler\(operation, structuredModel\)/);assert.match(provider,/responseJsonSchema: jsonSchema\(schema\)/);assert.match(provider,/timeout: 30_000/);assert.match(provider,/format: jsonSchema\(schema\)/);assert.doesNotMatch(provider,/extractCleanJson/);
+  assert.match(downstream,/createArtifactHandler\(operation, structuredModel\)/);assert.match(provider,/Output\.object\(\{ schema \}\)/);assert.match(provider,/maxRetries: 0/);assert.match(provider,/timeout: 30_000/);assert.match(provider,/schema\.safeParse\(output\)/);assert.match(provider,/format: jsonSchema\(schema\)/);assert.doesNotMatch(provider,/extractCleanJson/);
   const ui=await readFile('src/views/OutreachView.tsx','utf8');assert.match(ui,/canCopyArtifact\(ans\)/);assert.match(ui,/ArtifactStatus artifact=\{ans\}/);
   assert.equal(ARTIFACT_VERSION,'phase6-extractive-v1');assert.equal(fingerprint('text')===fingerprint('text'),true);
 });

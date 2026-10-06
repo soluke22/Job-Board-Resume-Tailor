@@ -23,7 +23,7 @@ function accessLost(response: Response, data?: SafeApiError) {
   const code = typeof data?.code === 'string' ? data.code : undefined;
   // Provider errors are never authentication verdicts for the private workspace,
   // even if an upstream service accidentally uses an auth-like HTTP status.
-  const providerFailure = code?.startsWith('GEMINI_') === true || code?.startsWith('OLLAMA_') === true || code?.startsWith('SEARCH_') === true;
+  const providerFailure = code?.startsWith('AI_') === true || code?.startsWith('GEMINI_') === true || code?.startsWith('OLLAMA_') === true || code?.startsWith('SEARCH_') === true;
   const authLoss = !providerFailure && (response.status === 401 ||
     (response.status === 403 && code === 'AUTH_FORBIDDEN') ||
     code === 'AUTH_UNAVAILABLE');

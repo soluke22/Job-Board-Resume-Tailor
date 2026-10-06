@@ -141,8 +141,8 @@ AVAILABLE canonical description is preferred. Explicit jdSource user-provided is
 allowed and labeled honestly; discovery snippets and generic URL fetches alone
 return INSUFFICIENT_JD. A user editing/pasting description explicitly supplies it.
 
-Shared strict Zod contracts live in src/types/assessment.ts. Gemini 3.8 Flash
-extracts exact short excerpts for job facts and hard/preferred/responsibility
+Shared strict Zod contracts live in src/types/assessment.ts. The configured model
+through Vercel AI Gateway extracts exact short excerpts for job facts and hard/preferred/responsibility
 requirements. Exact substring checks reject invented excerpts. Stable IDs hash
 kind and excerpt; source start/end offsets are retained. The model classifies
 the canonical five families/modifiers but never supplies final scores.
@@ -241,7 +241,7 @@ The UI displays a ten-point score and priority; no separate five-point fit exist
 Canonical refresh invalidates
 immediately; client evidence/profile edits conservatively mark scores stale.
 Current triage hides stale scores, without deleting history. Unchanged certified
-metadata reuses persisted assessment and invokes no Gemini; process-local cache
+metadata reuses persisted assessment and invokes no model provider; process-local cache
 and candidate title heuristics were removed. Ordinary saves cannot certify changed
 assessment or derived display fields; only the assessment service does so under
 the original workspace revision. In-flight conflicts return 409; client never
@@ -255,18 +255,17 @@ interview/provenance behavior is deferred to Phase 5 and is not certified here.
 
 ### Model boundary and live status
 Two bounded semantic requests maximum: extraction, then matching when relevant
-eligible evidence exists. Strict structured JSON schema, separate systemInstruction,
-MEDIUM thinking and 30-second SDK request timeout; no fake fallback or retry.
+eligible evidence exists. The Vercel AI SDK receives the existing Zod schema through
+`Output.object`, a separate system instruction, temperature zero and a 30-second
+request timeout; SDK retries are zero and there is no fallback.
 Scores/priorities are absent from model schemas, so injected output fields fail.
 Candidate contact/identity metadata is excluded, free-text evidence is redacted
 against the persisted profile, and evidence IDs remain unchanged.
-No GEMINI_API_KEY configured during acceptance: deterministic/mocked contracts
-verified, live semantic acceptance pending external configuration.
-SDK syntax reviewed against [official SDK config](https://googleapis.github.io/js-genai/release_docs/interfaces/types.GenerateContentConfig.html),
-[structured outputs](https://ai.google.dev/gemini-api/docs/structured-output),
-[model](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash) and
-[Zod JSON Schema](https://zod.dev/json-schema). Zod dialect metadata is removed;
-actual schema/service acceptance still needs the bounded synthetic live smoke.
+The application validates the SDK output again with the same strict Zod schema.
+SDK usage follows the [AI SDK generateText](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text)
+and [structured Output](https://ai-sdk.dev/docs/reference/ai-sdk-core/output)
+contracts plus [Zod JSON Schema](https://zod.dev/json-schema). Live Gateway semantics
+remain a bounded Preview acceptance gate rather than an inference from mocks.
 
 JD != evidence; classification != fit; fit != application priority;
 preference != blocker; adjacency != direct experience;
@@ -278,7 +277,7 @@ eligible owner evidence. SKIP/hard blockers are excluded; calibrated stretches
 remain eligible without an 8.0 score gate. Deterministic plans use requirement and
 evidence IDs for keep/omit decisions, project selection and supported skill labels.
 Master content supplies presentation/identity, never independent truth. Structured
-Gemini output may select/reorder complete approved evidence statements, with scope,
+Structured Gateway output may select/reorder complete approved evidence statements, with scope,
 IDs and exact text validated server-side before readiness. No free JD skill backfill.
 
 Manual edits invalidate exact-text approval; explicit checkpoints/revalidation and

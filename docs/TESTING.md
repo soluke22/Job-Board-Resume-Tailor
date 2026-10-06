@@ -21,7 +21,7 @@ The committed node:test suite runs through tsx; PGlite tests workspace contracts
 - node --import tsx --test tests/phase-4-assessment.test.ts: Phase 4 source,
   eligibility, provenance, retrieval, ID/adjacency validation, deterministic
   arithmetic/constraints, invalidation/cache, injection and real repository/handler
-  certification. Mocked semantic responses do not certify live Gemini behavior.
+  certification. Mocked semantic responses do not certify live Gateway behavior.
 - node --import tsx --test tests/auth-security.test.ts tests/phase-1-auth.test.ts tests/phase-1-client.test.ts: focused Phase 1 acceptance.
 - npm run typecheck: TypeScript (lint is an alias).
 - npm run build: Vite client and esbuild server; existing chunk warning is tracked.
@@ -122,7 +122,7 @@ fixtures cover Ashby, Greenhouse and Lever normalization, fixed endpoint allowli
 configured/learned source precedence, conservative filtering, successful empty scans,
 partial failure, canonical duplicate first-source attribution, deterministic round-robin
 fairness under/over the 24 cap, truthful safe source outcomes and per-board external
-budgeting without any Gemini client or key.
+budgeting without any model client or key.
 
 Shared server/client merge tests cover ATS IDs, canonical/tracking/Greenhouse alias
 URLs, distinct requisitions, within-batch aliases, all application statuses,
@@ -153,15 +153,19 @@ ATS: manual live exact provider, configured-board scan and browser Google-link
 acceptance remain separate.
 Evidence: unsupported/JD-derived/cross-owner claims, manual invalidation and export.
 Integration: full authenticated browser lifecycle and truthful end-to-end workflows.
-Use synthetic Gemini/ATS/provider fixtures by default. Never log secrets or raw
+Use synthetic AI/ATS/provider fixtures by default. Never log secrets or raw
 private workspace records. Build/static scanning cannot certify complete privacy.
 Results and reviewer findings belong in the active plan and phase acceptance matrices.
 
-Local provider coverage: `node --import tsx --test tests/llm-provider.test.ts` injects
-fetch and never contacts a daemon. It asserts the fixed loopback generate URL, exact
-non-streaming JSON-Schema request, model configuration, bounded structured parsing,
-safe timeout/connection/model/output classifications, one AI-budget reservation and
-no Gemini fallback. Do not use real candidate data to test a local daemon.
+Provider coverage: `node --import tsx --test tests/llm-provider.test.ts` injects both
+Gateway generation and local fetch, contacting neither service. It asserts Gateway
+default selection, AI SDK schema output, model/provider constraints, zero retries,
+safe finite errors, strict application validation, one reservation per request and
+no cross-provider fallback. The Ollama cases assert the fixed loopback URL, exact
+non-streaming JSON-Schema request and bounded parsing. Do not use real candidate data
+to test a local daemon. Assessment route fixtures prove safe extraction- and semantic-
+stage `AI_*` failures. Phase 9 security coverage proves the uncertified legacy cover-
+letter route remains HTTP 410 and does not forward client-supplied private fields.
 
 ## Phase 5 resume provenance coverage
 Phase 4.1 focused calibration: node --import tsx --test tests/phase-4-1-calibration.test.ts.
@@ -200,9 +204,9 @@ not the character heuristic. Native Ctrl+P is labeled draft. Cover letters displ
 uncertified draft independently. Confirm final export history records chosen text/IDs.
 
 Phase 5 deterministic provenance contract: verified locally.
-Live Gemini resume-generation acceptance: pending external configuration.
-GEMINI_API_KEY absent; only .env.example present. With a safe server key, run one
-bounded synthetic-only structured generation request. Do not send real private
+Live Gateway resume-generation acceptance is separate from the single assessment
+acceptance. With reviewed Preview-only configuration, run one bounded synthetic-only
+structured generation request when explicitly authorized. Do not send real private
 career data merely to test connectivity. Whole-statement certification intentionally
 withholds arbitrary paraphrases; add separately reviewed concise evidence to support
 alternate wording. Startup smoke: node --import tsx --test tests/phase-2-runtime.smoke.ts.
@@ -241,10 +245,10 @@ request: local work must survive and adoption must require reload. Legacy cover
 letters remain uncertified. READY never sends/submits or attests automatically.
 
 Phase 6 deterministic artifact contracts: verified with synthetic structured fixtures.
-Live Gemini proof/outreach/answer acceptance: pending external configuration.
-GEMINI_API_KEY absent; only .env.example. Strict JSON schema/Zod, MEDIUM thinking,
-30-second requests, no loose extraction or invented fallback. A configured server
-key permits synthetic-only smoke; authenticated/deployed browser acceptance remains
+Live Gateway proof/outreach/answer acceptance is pending separately authorized
+runtime testing. Strict AI SDK schema output plus application Zod validation,
+temperature zero, 30-second requests, zero retries and no fallback apply. Reviewed
+server-side Gateway configuration permits synthetic-only smoke; authenticated/deployed browser acceptance remains
 an external gate. Whole-statement certification withholds general paraphrases and
 STAR component assignment; manual artifact edits need fresh generation.
 

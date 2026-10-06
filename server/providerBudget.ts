@@ -4,7 +4,7 @@ import { providerUsage } from './db/schema.js';
 
 export class ProviderBudgetExceeded extends Error {}
 export class ProviderBudgetUnavailable extends Error {}
-// Count each Gemini invocation (including proof batches); uploads/fetches count
+// Count each external model invocation (including proof batches); uploads/fetches count
 // operations. No success refund: retries and failed provider calls can still cost.
 export function createProviderBudget(database: () => Pick<ReturnType<typeof getDb>, 'transaction'> = getDb) {
   return async (ownerId: string, category: 'ai' | 'external' | 'files', now = Date.now()) => {

@@ -1,5 +1,60 @@
 # Productionization execution plan
 
+## Vercel AI Gateway assessment provider (2026-10-05)
+
+Baseline: clean tracked `dev` and `origin/dev` at
+`c6132b02cf62ae83dfccf65d858b131c76c7832c`; preserve the unrelated untracked QA
+release record. Replace only the deployed/default structured-model boundary with
+Vercel AI Gateway through the current Vercel AI SDK. Retain explicit loopback-only
+Ollama development support and the provider-neutral `StructuredModel` contract.
+There is no automatic retry, fallback model, or cross-provider fallback. Keep every
+assessment extraction, evidence-eligibility, semantic completeness, support and
+deterministic scoring contract unchanged. Gateway credentials remain server-only;
+raw prompts, model output, provider bodies, job/evidence/candidate data and secrets
+must never enter logs or HTTP errors.
+
+Acceptance: Gateway is the default even in the presence of stale Gemini settings;
+the configured Gateway model supports structured output and is centralized in
+server environment/config. Each uncached model invocation reserves exactly once,
+uses strict SDK schema-constrained output plus application Zod validation, a 30s
+timeout and zero SDK retries. Synthetic tests cover provider selection, both model
+stages, malformed/schema-invalid output, safe error taxonomy, no fallback, cache
+reuse and unchanged deterministic scoring. Complete Node 24 release gates and an
+independent privacy/truth boundary review precede one scoped dev checkpoint. After
+an exact-SHA Preview is READY, verify Gateway-only Preview configuration and private
+workspace save/reload, then make exactly one live assessment attempt against the
+already-persisted acceptance target. Do not run discovery, assess another job,
+modify `main` or Production, migrate data, or generate a resume.
+
+Local result (validated 2026-10-06): CLEAR for publication. The default deployed
+structured boundary now uses Vercel AI SDK `generateText` with AI Gateway,
+`Output.object` and the centralized default model `anthropic/claude-haiku-4.5`.
+Every request uses temperature zero, a 30-second timeout, `maxRetries: 0`, one
+immediately preceding owner-scoped budget reservation, application Zod validation,
+and provider pinning with no fallback. Explicit loopback Ollama remains independent.
+Gateway failures map from structured metadata only into bounded `AI_*` codes; both
+extraction- and semantic-stage HTTP diagnostics retain their finite stage without
+provider bodies, prompts or private data. The uncertified legacy cover-letter route
+is HTTP 410 and cannot forward client fields to any model. Gemini is not reachable
+from deployed structured operations; its diagnostic compatibility module/dependency
+is marked `DEAD_COMPATIBILITY_CODE_PENDING_REMOVAL` for a separate checkpoint.
+
+Node 24.19.0 focused provider/assessment/security coverage passes 48/48. Complete
+release composition passes 213/213 with typecheck, build, harness, strict required-
+build privacy zero and runtime checks. Normal privacy is zero; built startup smoke
+passes 1/1; both synthetic evidence validators pass; Drizzle reports no schema
+changes; full and production dependency audits have no high/critical findings; and
+diff whitespace passes. Four moderate Drizzle/esbuild development-tool-chain findings
+remain because the offered fix is a breaking downgrade. Audit remediation also
+updated `proxy-addr`, `source-map-js`, and `drizzle-kit` within their existing ranges.
+Independent security review found and drove a fail-closed correction for a temporary
+legacy cover-letter privacy regression plus semantic-stage coverage, then returned
+CLEAR with no remaining blocker/high/medium findings. Next: create one scoped dev
+checkpoint, publish normally, wait for its exact-SHA Preview, configure only Preview
+for Gateway, verify private workspace save/reload, and assess exactly the persisted
+LaunchDarkly Full Stack Engineer job once. Discovery and all other jobs remain out of
+scope.
+
 ## Assessment validation diagnostics (2026-10-05)
 
 Baseline: clean tracked `dev` and `origin/dev` at

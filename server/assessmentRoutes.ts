@@ -23,7 +23,7 @@ export function createAssessmentHandler(modelForRequest:(req:Request)=>Structure
     } catch(error) {
       if(error instanceof WorkspaceConflict){res.status(409).json({error:'Workspace changed during assessment; reload and retry',code:'ASSESSMENT_WORKSPACE_CONFLICT',stage:'PERSISTENCE'});return;}
       if(error instanceof AssessmentProviderFailure){
-        const provider=safeProviderError(error.cause);if(provider){res.status(provider.status).json(provider.body);return;}
+        const provider=safeProviderError(error.cause);if(provider){res.status(provider.status).json({...provider.body,stage:error.stage});return;}
         res.status(503).json({error:'Assessment provider request failed.',code:error.code,stage:error.stage});return;
       }
       const provider=safeProviderError(error);if(provider){res.status(provider.status).json(provider.body);return;}

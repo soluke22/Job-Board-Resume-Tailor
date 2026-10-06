@@ -1,3 +1,5 @@
+// DEAD_COMPATIBILITY_CODE_PENDING_REMOVAL: retained only for the isolated legacy
+// Gemini diagnostic surface. Deployed structured assessment does not import it.
 export type GeminiFailureCode =
   | 'GEMINI_AUTH_INVALID'
   | 'GEMINI_PERMISSION_DENIED'

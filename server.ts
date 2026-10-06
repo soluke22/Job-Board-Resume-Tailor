@@ -1,5 +1,4 @@
 import { createArtifactHandler } from './server/artifactRoutes.js';
-import { z } from 'zod';
 import { createAssessmentHandler } from './server/assessmentRoutes.js';
 import { createResumeHandler } from './server/resumeRoutes.js';
 import express, { Request, Response, NextFunction, RequestHandler } from 'express';
@@ -9,14 +8,13 @@ import { assertBoundedJson } from './server/inputBounds.js';
 import { reserveProviderCall, ProviderBudgetExceeded, ProviderBudgetUnavailable, isBudgetedExternalPath } from './server/providerBudget.js';
 import { installPrivateFiles } from './server/privateFiles.js';
 import { createWorkspaceRouter } from './server/workspaceRoutes.js';
-import { redactAiPayload } from './server/privacy.js';
 import { verifyPostingAts } from './server/atsAdapters.js';
 import { buildManualImportedJob, scanDiscoverySources, scanPublicBoard, sourcesForDiscoveryScope } from './server/discovery.js';
 import { buildDiscoveryQueries, googleSearchUrl, parseDiscoverySource } from './src/utils/discovery.js';
 import { mergeDiscoveredJobs } from './src/utils/jobIdentity.js';
 import { safeFetchText } from './server/safeFetch.js';
 import { createWorkspaceRepository } from './server/workspaceRepository.js';
-import { createStructuredModel, legacyGeminiClient, selectedLlmProvider } from './server/llmProvider.js';
+import { createStructuredModel } from './server/llmProvider.js';
 
 
 dotenv.config();
@@ -69,8 +67,6 @@ export async function reserveExternalProviderCall(ownerId: string, reserve = res
     throw new ProviderBudgetUnavailable();
   }
 }
-const MODEL_NAME = 'gemini-3.8-flash';
-
 // ==========================================
 // 0. Fetch Job Posting from URL
 // ==========================================
@@ -145,80 +141,11 @@ app.post('/api/export-resume', createResumeHandler('export', resumeModel));
 // ==========================================
 // 6. Generate Tailored Cover Letter (Deterministic Header & Sign-Off)
 // ==========================================
-app.post('/api/generate-cover-letter', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { parsedJob, candidateProfile, tailoredResume } = req.body;
-
-    if (selectedLlmProvider() === 'ollama') {
-      res.status(503).json({ error: 'Cover letters are unavailable with the local structured-model provider.', code: 'OLLAMA_UNSUPPORTED_OPERATION' });
-      return;
-    }
-    const ai = legacyGeminiClient();
-    if (!ai) {
-      res.status(503).json({
-        error:
-          'Gemini API key is not configured. Studio fails closed to prevent unverified hallucinations.'
-      });
-      return;
-    }
-
-    const dateStr = new Date().toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    });
-
-    const prompt = `Write a compelling, truthful, and grounded cover letter applying for:
-Company: ${parsedJob.company}
-Role: ${parsedJob.roleTitle}
-
-CRITICAL RULES:
-1. STRICTLY NO EM DASHES (—) OR EN DASHES (–) ANYWHERE. Use commas or periods.
-2. Grounded strictly in supplied candidate evidence and projects.
-3. Do NOT invent metrics, revenue, or leadership roles. Preserve supplied candidate titles.
-4. Professional tone: conversational, confident, free of empty clichés.
-5. Exactly 3 to 4 well-structured paragraphs.
-6. Return ONLY the body paragraphs and evidence themes used.
-
-Return JSON:
-{
-  "paragraphs": string[],
-  "evidenceThemesUsed": string[]
-}`;
-
-    await reserveAiProviderCall(req.res!.locals.ownerId);
-    const response = await ai.models.generateContent(redactAiPayload({
-      model: MODEL_NAME,
-      contents: [{ text: prompt }],
-      config: {
-        responseMimeType: 'application/json', httpOptions: { timeout: 30000 }
-      }
-    }, candidateProfile));
-
-    const generated = z.object({ paragraphs: z.array(z.string().max(6000)).min(3).max(4), evidenceThemesUsed: z.array(z.string().max(500)).max(20) }).strict().parse(JSON.parse(response.text || ''));
-    const candidateName =
-      candidateProfile?.name ||
-      candidateProfile?.fullName ||
-      tailoredResume?.header?.name ||
-      '';
-
-    const coverLetter = {
-      id: `cl-${Date.now()}`,
-      jobId: parsedJob.roleTitle,
-      date: dateStr,
-      recipientName: `Hiring Team for ${parsedJob.roleTitle}`,
-      companyName: parsedJob.company,
-      roleTitle: parsedJob.roleTitle,
-      paragraphs: (generated.paragraphs || []).map((p: string) => p.replace(/[—–]/g, ', ')),
-      signOff: `Sincerely,\n${candidateName}`,
-      evidenceThemesUsed: generated.evidenceThemesUsed || []
-    };
-
-    res.json({ coverLetter });
-  } catch (error: any) {
-    console.error('Private operation failed');
-    res.status(500).json({ error: 'Failed to generate cover letter' });
-  }
+app.post('/api/generate-cover-letter', (_req: Request, res: Response): void => {
+  res.status(410).json({
+    error: 'Legacy cover letter generation is unavailable pending provenance review.',
+    code: 'LEGACY_OPERATION_UNAVAILABLE'
+  });
 });
 
 // ==========================================

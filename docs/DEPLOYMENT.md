@@ -55,10 +55,12 @@ export. Record actual Function bundle size from Vercel output before release.
 | BETTER_AUTH_URL | Private auth canonical origin | localhost HTTP outside production | Absent | Exact stable HTTPS origin | Exact canonical HTTPS origin |
 | GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET | Private Google OAuth | Local callback credentials | Absent | Staging registered callback | Production registered callback |
 | OWNER_EMAIL | Private verified owner | Authorized test owner | Absent | Authorized staging owner | Actual owner; never public |
-| GEMINI_API_KEY | Private AI only | Optional test key | Absent | Optional synthetic-only smoke key | Production server key |
-| LLM_PROVIDER / OLLAMA_MODEL | Developer-only local structured-model opt-in | `ollama` / local model if intentionally used | Absent | Absent | Absent |
+| AI_PROVIDER / AI_GATEWAY_MODEL | Hosted structured-model selection | `gateway` / configured model | Absent | `gateway` / reviewed model | `gateway` / reviewed model |
+| AI_GATEWAY_API_KEY | Server-only Gateway auth outside Vercel | Optional | Absent | Omit when Vercel OIDC works | Omit when Vercel OIDC works |
+| VERCEL_OIDC_TOKEN | Provider-managed Gateway and Blob credential | Do not copy | Platform-managed | Vercel manages/refreshes | Vercel manages/refreshes |
+| LLM_PROVIDER / OLLAMA_MODEL | Legacy selector / developer-only local model | `ollama` / local model if intentionally used | Absent | Absent | Absent |
+| GEMINI_API_KEY | Dead compatibility pending removal; not used by structured workflows | Absent | Absent | Not required | Not required |
 | BLOB_STORE_ID | Preferred deployed Blob OIDC config | Optional | Absent | Isolated PRIVATE staging store | PRIVATE production store |
-| VERCEL_OIDC_TOKEN | Provider-managed Blob credential | Do not copy | No private store access | Vercel manages/refreshes | Vercel manages/refreshes |
 | BLOB_READ_WRITE_TOKEN | Outside-Vercel/static fallback | Isolated test-store token | Absent | Omit with working OIDC | Omit with working OIDC |
 | NODE_ENV / VERCEL_ENV | Runtime/platform | Local shell mode | Provider Preview | Provider Preview | Provider Production |
 | PORT / DISABLE_HMR | Optional local shell/tooling | Local only | Not private config | Not private config | Not private config |
@@ -71,7 +73,7 @@ Ollama is not a deployed provider configuration: its unauthenticated local API m
 remain at the fixed default loopback binding (`127.0.0.1:11434`), never `0.0.0.0`.
 The application accepts no endpoint override and never falls back from explicit local
 mode to a cloud provider.
-Public navigation and `/api/health` must not contact Neon/Blob/Gemini/Google or public ATS endpoints.
+Public navigation and `/api/health` must not contact Neon/Blob/AI Gateway/Google or public ATS endpoints.
 
 ### Private resources, OAuth and migrations
 
@@ -147,7 +149,8 @@ production, each at its intended stage.
 
 ## Earlier persistence implementation detail (Phase 2, retained context)
 
-React/Vite + Express/Gemini is retained. server/local.ts serves development or
+React/Vite + Express is retained, with Vercel AI Gateway as the deployed/default
+structured-model boundary. server/local.ts serves development or
 dist/client; build emits ESM dist/server.mjs. api/index.ts is the Node Vercel
 adapter and vercel.json is committed. Better Auth/Google, Neon/Drizzle, migrations
 and Vercel Private Blob are committed integrations, not pending working-tree work.
@@ -225,9 +228,11 @@ and [abort semantics](https://vercel.com/docs/vercel-blob/examples#aborting-requ
 
 ## Configuration, migrations and live gates
 
-.env.example names server-only GEMINI_API_KEY, DATABASE_URL, BETTER_AUTH_SECRET,
-BETTER_AUTH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OWNER_EMAIL and
-BLOB_READ_WRITE_TOKEN. Never expose their values or use browser-prefixed secrets.
+.env.example names server-only AI provider/model configuration, optional outside-
+Vercel Gateway credentials, DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL,
+GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OWNER_EMAIL and BLOB_READ_WRITE_TOKEN.
+Never expose their values or use browser-prefixed secrets. Vercel OIDC is preferred
+for Gateway authentication and is provider-managed.
 Auth origin and registered Google callback must match the intended target.
 
 db:generate generates schema migrations; db:migrate applies to configured

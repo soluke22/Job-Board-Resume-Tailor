@@ -205,9 +205,21 @@ test('assessment handler maps structured provider and AI-budget failures without
       const response={locals:{ownerId:'owner-a'},set:()=>response,status:(value:number)=>{status=value;return response;},json:(value:any)=>{payload=value;return response;}};
       await handler({body:{jobId:'j'}} as any,response as any);return {status,payload};
     };
-    assert.deepEqual(await invoke(new LlmProviderFailure('OLLAMA_INVALID_OUTPUT','Local model returned invalid structured output.')), {status:502,payload:{error:'Local model returned invalid structured output.',code:'OLLAMA_INVALID_OUTPUT'}});
-    assert.deepEqual(await invoke(new ProviderBudgetExceeded('private budget detail')), {status:429,payload:{error:'AI operation budget exceeded; retry after the current window',code:'PROVIDER_BUDGET_EXCEEDED'}});
-    assert.deepEqual(await invoke(new ProviderBudgetUnavailable('private outage detail')), {status:503,payload:{error:'AI operation budget is temporarily unavailable; retry later',code:'PROVIDER_UNAVAILABLE'}});
+    assert.deepEqual(await invoke(new LlmProviderFailure('OLLAMA_INVALID_OUTPUT','Local model returned invalid structured output.')), {status:502,payload:{error:'Local model returned invalid structured output.',code:'OLLAMA_INVALID_OUTPUT',stage:'EXTRACTION_PROVIDER'}});
+    assert.deepEqual(await invoke(new LlmProviderFailure('AI_UNAVAILABLE','AI Gateway is temporarily unavailable; retry later.')), {status:503,payload:{error:'AI Gateway is temporarily unavailable; retry later.',code:'AI_UNAVAILABLE',stage:'EXTRACTION_PROVIDER'}});
+    assert.deepEqual(await invoke(new ProviderBudgetExceeded('private budget detail')), {status:429,payload:{error:'AI operation budget exceeded; retry after the current window',code:'PROVIDER_BUDGET_EXCEEDED',stage:'EXTRACTION_PROVIDER'}});
+    assert.deepEqual(await invoke(new ProviderBudgetUnavailable('private outage detail')), {status:503,payload:{error:'AI operation budget is temporarily unavailable; retry later',code:'PROVIDER_UNAVAILABLE',stage:'EXTRACTION_PROVIDER'}});
+    let semanticCalls=0;
+    const semanticHandler=createAssessmentHandler(()=>async()=>{
+      semanticCalls++;
+      if(semanticCalls===1)return extracted;
+      throw new LlmProviderFailure('AI_UNAVAILABLE','AI Gateway is temporarily unavailable; retry later.');
+    },repo);
+    let semanticStatus=200,semanticPayload:any;
+    const semanticResponse={locals:{ownerId:'owner-a'},set:()=>semanticResponse,status:(value:number)=>{semanticStatus=value;return semanticResponse;},json:(value:any)=>{semanticPayload=value;return semanticResponse;}};
+    await semanticHandler({body:{jobId:'j'}} as any,semanticResponse as any);
+    assert.deepEqual({status:semanticStatus,payload:semanticPayload},{status:503,payload:{error:'AI Gateway is temporarily unavailable; retry later.',code:'AI_UNAVAILABLE',stage:'SEMANTIC_PROVIDER'}});
+    assert.equal(semanticCalls,2);
   } finally {await pg.close();}
 });
 test('assessment handler exposes safe validation diagnostics and persistence conflict only',async()=>{
