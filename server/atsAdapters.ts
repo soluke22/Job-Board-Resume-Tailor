@@ -1,8 +1,10 @@
-import { AtsProvider, AtsVerificationStatus } from '../src/types/index.js';
+import { AtsProvider, AtsVerificationStatus, type CompensationDetails } from '../src/types/index.js';
+import { normalizeAtsCompensation } from './compensation.js';
+import { normalizeProviderEmploymentType, providerMetadataValues } from '../src/utils/employment.js';
 import { safeFetchText } from './safeFetch.js';
 export interface JobVerificationResult {
   status: AtsVerificationStatus; isListed: boolean; lastVerifiedAt: string;
-  canonicalUrl?: string; applyUrl?: string; compensation?: any; rawDetails?: any; notes?: string;
+  canonicalUrl?: string; applyUrl?: string; compensation?: CompensationDetails; rawDetails?: any; notes?: string;
   verificationSource?: string;
 }
 export interface AtsAdapter {
@@ -16,6 +18,14 @@ export function providerDate(value: unknown): string | undefined {
   if (typeof value !== 'string' && typeof value !== 'number') return undefined;
   const time = typeof value === 'number' ? value : Date.parse(value);
   return Number.isFinite(time) ? new Date(time).toISOString() : undefined;
+}
+
+export function providerWorkplaceStatus(value: unknown, metadata?: unknown, isRemote?: unknown): 'remote' | 'hybrid' | 'onsite' | 'unknown' {
+  const statuses = new Set([value, ...providerMetadataValues(metadata, ['workplace type', 'workplace', 'location type'])]
+    .map(entry => typeof entry === 'string' ? entry.toLowerCase().replace(/[\s-]+/g, '') : '')
+    .filter(entry => ['remote', 'hybrid', 'onsite'].includes(entry)));
+  if (isRemote === true) statuses.add('remote');
+  return statuses.size === 1 ? [...statuses][0] as 'remote' | 'hybrid' | 'onsite' : 'unknown';
 }
 function detect(url: string, hosts: string[], provider: string) {
   try {
@@ -65,26 +75,22 @@ function adapter(provider: 'ashby' | 'greenhouse' | 'lever', hosts: string[]): A
         } else if (String(j?.id) !== jobId || typeof (provider === 'lever' ? j.text : j.title) !== 'string') return result('UNKNOWN');
         const canonicalUrl = canonical(provider === 'ashby' ? j.jobUrl : provider === 'greenhouse' ? j.absolute_url : j.hostedUrl);
         const applyUrl = canonical(provider === 'greenhouse' ? j.absolute_url : j.applyUrl);
-        const compensation = provider === 'ashby' && j.compensation ? {raw: content(j.compensation.compensationTierSummary, j.compensation.scrapeableCompensationSalarySummary)}
-          : provider === 'lever' && j.salaryRange ? {
-            min: j.salaryRange.min, max: j.salaryRange.max, currency: j.salaryRange.currency,
-            interval: ['year','month','hour'].includes(j.salaryRange.interval) ? j.salaryRange.interval : undefined,
-            raw: j.salaryDescriptionPlain
-          } : undefined;
+        const compensation = normalizeAtsCompensation(provider, j);
         const rawDetails = {
           atsProvider: provider, atsBoard: board, atsJobId: jobId, title: provider === 'lever' ? j.text : j.title,
+          company: typeof j.companyName === 'string' ? j.companyName.trim() : typeof j.company === 'string' ? j.company.trim() : undefined,
           canonicalUrl, applyUrl,
           location: provider === 'greenhouse' ? j.location?.name : provider === 'lever' ? j.categories?.location : j.location,
           secondaryLocations: provider === 'ashby' ? j.secondaryLocations?.map((x: any) => typeof x === 'string' ? x : x.location) : undefined,
-          remoteStatus: provider === 'lever' && ['remote','hybrid','onsite'].includes(j.workplaceType) ? j.workplaceType : j.isRemote === true ? 'remote' : 'unknown',
-          workplaceType: j.workplaceType, employmentType: provider === 'lever' ? j.categories?.commitment : j.employmentType,
+          remoteStatus: providerWorkplaceStatus(j.workplaceType, j.metadata, j.isRemote),
+          workplaceType: j.workplaceType, employmentType: normalizeProviderEmploymentType(provider === 'lever' ? j.categories?.commitment : j.employmentType, j.metadata),
           department: provider === 'greenhouse' ? j.departments?.map((x: any) => x.name).join(', ') : j.department || j.categories?.department,
           team: j.team || j.categories?.team, compensation,
           publishedAt: providerDate(provider === 'greenhouse' ? j.first_published : provider === 'ashby' ? j.publishedAt : typeof j.createdAt === 'number' ? j.createdAt : undefined),
           updatedAt: provider === 'greenhouse' ? providerDate(j.updated_at) : undefined,
           rawContent: provider === 'ashby' ? content(j.descriptionPlain || j.descriptionHtml) : provider === 'greenhouse' ? content(j.content)
             : content(j.descriptionPlain || j.description, ...(j.lists || []).map((x: any) => content(x.text, x.content)), j.additionalPlain || j.additional),
-          providerMetadata: {compensation: j.compensation, salaryRange: j.salaryRange, categories: j.categories, offices: j.offices, metadata: j.metadata, payInputRanges: j.pay_input_ranges, address: j.address, secondaryLocations: j.secondaryLocations, createdAt: j.createdAt},
+          providerMetadata: {compensation: j.compensation, salaryRange: j.salaryRange, salaryDescription: j.salaryDescription, salaryDescriptionPlain: j.salaryDescriptionPlain, categories: j.categories, offices: j.offices, metadata: j.metadata, payInputRanges: j.pay_input_ranges, address: j.address, secondaryLocations: j.secondaryLocations, createdAt: j.createdAt, rawEmploymentType: provider === 'lever' ? j.categories?.commitment : j.employmentType},
           isCurrentlyListed: provider === 'ashby' ? j.isListed : true
         };
         return result(provider === 'ashby' && !j.isListed ? 'UNLISTED' : 'LISTED', {canonicalUrl, applyUrl, rawDetails, compensation, verificationSource: endpoint});

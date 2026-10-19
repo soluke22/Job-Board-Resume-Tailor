@@ -14,7 +14,9 @@ import {
   ChevronRight,
   ClipboardCopy,
   Lock,
-  EyeOff
+  EyeOff,
+  Building2,
+  CheckCircle2
 } from 'lucide-react';
 import { useApp, AppView } from '../context/AppContext';
 
@@ -35,7 +37,9 @@ export const Navigation: React.FC = () => {
 
   const navItems: { id: AppView; label: string; icon: React.FC<{ className?: string }>; badge?: number }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'shortlist', label: 'Shortlist', icon: CheckCircle2 },
     { id: 'discover', label: 'Discover', icon: Compass, badge: jobs.filter((j) => j.freshnessBand === 'NEW').length || undefined },
+    { id: 'watchlist', label: 'Watchlist', icon: Building2 },
     { id: 'pipeline', label: 'Pipeline', icon: Briefcase, badge: jobs.length },
     { id: 'resume-editor', label: 'Studio', icon: FileCheck2 },
     { id: 'proof-packs', label: 'Proof Packs', icon: ShieldCheck },
@@ -51,9 +55,9 @@ export const Navigation: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-slate-100 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex min-w-0 items-center justify-between gap-4 h-16">
           {/* Brand & Candidate Info */}
-          <div className="flex items-center space-x-3">
+          <div className="flex shrink-0 items-center space-x-3">
             <button
               onClick={() => setCurrentView('dashboard')}
               className="flex items-center space-x-2.5 text-left focus:outline-none group cursor-pointer"
@@ -99,7 +103,7 @@ export const Navigation: React.FC = () => {
           </div>
 
           {/* Quick Tools & Context */}
-          <div className="flex items-center space-x-2">
+          <div className="flex shrink-0 items-center space-x-2">
             <button
               onClick={() => setIsQuickGrabOpen(true)}
               className="hidden xl:flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
@@ -141,7 +145,7 @@ export const Navigation: React.FC = () => {
           </div>
 
           {/* Desktop Navigation Items */}
-          <nav className="hidden md:flex items-center space-x-1">
+          <nav aria-label="Main navigation" className="hidden min-w-0 flex-1 overflow-x-auto py-1 md:flex items-center space-x-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
@@ -149,7 +153,7 @@ export const Navigation: React.FC = () => {
                 <button
                   key={item.id}
                   onClick={() => setCurrentView(item.id)}
-                  className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center space-x-1.5 cursor-pointer ${
+                  className={`shrink-0 whitespace-nowrap px-2.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center space-x-1.5 cursor-pointer ${
                     isActive
                       ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -174,7 +178,7 @@ export const Navigation: React.FC = () => {
       </div>
 
       {/* Mobile Navigation Scrollable Strip */}
-      <div className="md:hidden border-t border-slate-800/80 bg-slate-900/95 overflow-x-auto py-2 px-3 flex space-x-1.5 scrollbar-none">
+      <nav aria-label="Main navigation" className="md:hidden border-t border-slate-800/80 bg-slate-900/95 overflow-x-auto py-2 px-3 flex space-x-1.5 scrollbar-none">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
@@ -191,7 +195,7 @@ export const Navigation: React.FC = () => {
             </button>
           );
         })}
-      </div>
+      </nav>
     </header>
   );
 };

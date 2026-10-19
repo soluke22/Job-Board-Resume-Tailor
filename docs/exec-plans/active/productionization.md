@@ -1,5 +1,968 @@
 # Productionization execution plan
 
+## Daily job shortlist UI checkpoint 1.9 (2026-10-17)
+
+Baseline: dev at cce0b1d364d5e1ec9913b1c579052219fafc4cbf, with 271 passing
+tests, 15 modified tracked files and seven untracked files. Preserve all previous
+work. Scope: one dedicated daily shortlist page in the existing React application,
+Dashboard/navigation entry points, pure selection/presentation helpers, synthetic
+tests and documentation. No backend normalization, eligibility/scoring, authentication,
+registry, persistence schema, deployment or scheduled-work changes.
+
+Use actual publication timestamps: up to ten deduplicated reviewable records in
+the last 24 hours, with separate explicit 1-to-14-day and unknown-date views; never
+fill the daily list with older/unknown jobs. Existing current assessments may order
+the list; stale/unassessed fits may not become scores or claimed eligibility.
+Display normalized compensation components and uncertainty without conversion or
+new salary policy. Reuse acknowledged logOutcome SHORTLISTED/ARCHIVED transitions
+for deliberate pursue/dismiss; never mark APPLIED, analyze, tailor or submit on load.
+Review/analysis navigation uses existing actions. Existing explicit discovery stays
+manual. Scan age reflects latestDiscoverySession.searchedAt, not current page load.
+
+Acceptance: deterministic pure selector boundaries/dedupe/limits, honest compensation
+and assessment/workplace states, accessible responsive dark/light presentation,
+loading/empty/error/stale states, action acknowledgement and workspace remount
+isolation. Use synthetic fixtures only. Node 24.19.0 shortlist/discovery/compensation,
+full tests, typecheck/build/harness/strict new-file privacy/runtime/release and diff
+checks. Inspect generated targets; build replacement limited to existing client/server
+outputs and Vite temporary config, preserving legacy dist files. No install, live ATS,
+external LLM, private account access, persistent migrations, commit/push/deployment.
+Create checkpoint-only before/after rollback evidence and record final results here.
+
+Implementation: added a dedicated `shortlist` route and dashboard/navigation entry.
+The selector uses existing `sameJob`, current assessments, saved verification state,
+and actual timestamps only; it has no discovery, analysis, or persistence side effect
+until a user explicitly chooses the existing acknowledged Pursue/Dismiss action.
+Workspace switches clear the in-memory latest discovery session, and discovery
+completion is epoch-guarded so a previous workspace cannot repopulate shortlist
+metadata after a mode change.
+
+Local result: PASS under Node 24.19.0. Fourteen new synthetic shortlist tests;
+shortlist/discovery/compensation focused run 92/92; shortlist/client/watchlist run
+39/39. Full npm test and final release composition each pass 285/285 with zero
+failures, cancellations or skips outside the sandbox. Typecheck, normal production
+build, harness, strict fresh-client privacy (zero findings), explicit scans of all
+three new files, runtime/config check and built startup smoke (1/1) pass. Existing
+large-client-chunk and dependency annotation warnings remain informational.
+
+The first sandbox full run was 264 passed / 21 failed: localhost EACCES and existing
+PGlite/native-process/synthetic-Git environment failures, plus the client source
+contract expecting error handling before the new epoch guard. That assertion now
+requires the stronger success/error/completion epoch fences and mode-reset wiring;
+no assertion or production eligibility rule was removed or weakened. It passes in
+the focused client run and complete outside-sandbox runs.
+
+Local browser evidence uses disposable synthetic fixtures and the actual React App,
+with application network calls blocked. Verified Dashboard/navigation entry, separate
+daily/older/unknown views, pursue/dismiss acknowledgement and rejection feedback,
+Demo decision persistence across reload, keyboard review/analysis navigation, manual
+discovery entry, and 390px mobile layout without horizontal page overflow. Actual
+AppProvider StrictMode fixture confirms that switching to Demo clears private scan
+metadata/spinner and that an old discovery completion cannot repopulate private jobs
+or change the reset timeframe. Dark-mode helper/hover contrast was corrected after
+visual review. Screenshots, synthetic harnesses, logs and checkpoint-only byte backups
+are outside the repository in the checkpoint-1.9 local artifact directory.
+The desktop navigation now scrolls inside its allocated width rather than widening
+the page. Browser geometry passes at 1280px, 1024px and 390px viewport widths; all
+release gates and the 1/1 built startup smoke pass again after that layout correction.
+
+No live ATS/LLM, real private account, persistent database, configuration, installation,
+Git history, commit or deployment operation was performed. Private authenticated
+browser/provider acceptance and separate light-mode visual acceptance remain external
+or manual gates; current fixtures do not certify deployed behavior. Historical Git
+privacy exposure remains an independent publication blocker. Stop at this checkpoint;
+Checkpoint 1.10 requires separate authorization.
+
+Preservation: dev/HEAD and all index entries are unchanged. Ten checkpoint files
+are intentional (seven existing files plus three additions); the other 184 original
+files, including all seven original untracked files, retain their initial SHA-256
+hashes. Final inventory is 19 modified tracked files and ten untracked files.
+Generated replacement stays within dist/client, dist/server.mjs and Vite temporary
+configuration output; all five legacy dist files are unchanged. A reverse-apply
+dry check passes for the checkpoint-only patch, which preserves earlier dirty work.
+
+## ATS compensation normalization checkpoint 1.8B (2026-10-16)
+
+Baseline: dev at cce0b1d364d5e1ec9913b1c579052219fafc4cbf, with 247 passing
+tests, 15 modified tracked files and five untracked files. Preserve this complete
+uncommitted baseline. Scope: one deterministic server normalizer shared by existing
+Greenhouse/Ashby/Lever discovery and exact adapters; additive optional compensation
+component/status contracts; synthetic tests and pipeline documentation. No live ATS
+requests, new provider, migration, private workspace operation or ranking algorithm.
+
+Inspection: discovery retains provider compensation fields but discards normalized
+compensation; exact verification handles Ashby summary text and Lever flat salary
+ranges only. Greenhouse pay_input_ranges are retained but unused. Existing JSON
+persistence accepts flat min/max/currency/year-hour-month/raw fields, which cannot
+represent multiple geographic bands or non-base components. Display uses raw text.
+Assessment compares annual USD flat maxima to configured preferences/minima; leave
+that policy and every scoring weight unchanged. A USD 100,000 target is a preference,
+not a new default hard minimum or an edit to any owner's saved configuration.
+
+Acceptance: shared provider handling of explicit amounts, currencies, periods,
+base/bonus/equity/total and applicability; structured precedence; conservative
+explicit labelled-text fallback; unavailable versus malformed/ambiguous disclosure;
+raw metadata retained; no currency/hourly conversion or geographic aggregation.
+Legacy flat fields expose only one unambiguous unscoped base range; old records
+remain valid. All requested synthetic format/provider/persistence/preference cases
+must pass. Preserve role/location/employment filters, cap/allocation/date/identity,
+registry/auth/ownership/provenance/lifecycle/provider policy. Validate with explicit
+Node 24.19.0 focused compensation/discovery tests, npm test, typecheck/build/harness,
+strict privacy/runtime/release in the established sanitized synthetic fixture
+environment. Build only authorized generated outputs; no commit/push/deployment.
+
+Local result: PASS. One shared normalizer now populates discovery and exact
+verification compensation consistently. Greenhouse cents/currency/title/blurb,
+Ashby components/tiers and Lever salaryRange/descriptions preserve their raw
+provider metadata. Additive optional JSON status/ranges retain amounts, explicit
+currency/year-hour-month period, base/bonus/equity/total, percentage units and
+applicability labels. Legacy flat comparison fields expose only one valid unscoped
+base range. Missing/ambiguous/malformed disclosures stay distinct; malformed pay
+does not change posting availability. Structured data wins over conflicting text,
+without borrowing missing fields. Explicit labelled canonical-text fallback is
+bounded and handles encoded markup; unrelated numeric prose is never salary data.
+
+Node 24.19.0 compensation tests pass 24/24; combined compensation/discovery tests
+pass 90/90 (existing discovery coverage 66/66). Standalone full suite and final
+release suites pass 271/271, zero failures/skips/cancellations. Typecheck, normal
+build, harness, strict required-build privacy (zero findings), runtime and release
+composition pass. Final compensation guards were retested in the full release
+suite. Client output is 722.75 kB; existing large-chunk/Zod annotation warnings
+remain nonfatal. Runtime verifies three client files totaling 792,199 bytes.
+
+Only compensation module/tests, adapter/discovery wiring, optional type/JSON
+validation and pipeline/plan docs changed. Cap/date semantics, role/location/
+employment eligibility and identity/allocation/registry/persistence pipeline
+sections compare unchanged. Assessment code and scoring/policy are unmodified;
+the 100,000 USD target was tested as a preference without reading/changing owner
+settings. Legacy and extended compensation round-trip in a fresh synthetic PGlite
+fixture; no persistent database migration or private workspace access occurred.
+No live ATS/LLM request, install, commit, push or deployment. Official public
+provider documentation was inspected; no live posting payload was fetched.
+
+Limits: structured fields may be absent; regional/tier labels do not establish which
+band applies to an applicant. Free-text grammar is deliberately bounded; unlabelled,
+unsupported weekly/daily periods, mixed components, ambiguous symbols/currency and
+unrecognized formats remain raw/uncertain rather than inferred or converted.
+No FX conversion, annualization, new salary rejection/ranking, or location inference.
+Final privacy coverage includes the new untracked module/test; preservation and a
+checkpoint-only reverse-patch dry run complete the handoff. Next exact step, only
+with separate endpoint-budget authorization: a bounded read-only live compensation
+regression using existing providers. Historical Git privacy remains an independent
+publication blocker; no history remediation. Stop after reporting this checkpoint.
+
+## Discovery live-defect correction checkpoint 1.8A-R1 (2026-10-16)
+
+Baseline: dev at cce0b1d364d5e1ec9913b1c579052219fafc4cbf, with the complete
+uncommitted 1.8A baseline (240 passing tests; 15 modified tracked files and five
+untracked files). Preserve all existing edits. Scope is limited to FDE business-domain
+precedence, explicit Canadian geography, and authoritative live-script employment
+summaries. No live network request, registry change, qualification scoring, migration,
+compensation work, private workspace operation, commit, push or deployment.
+
+Before correction, role filtering applies seniority/profile exclusions and explicit
+backend/pre-sales responsibilities first, then the business-title blocker (including
+Finance/Legal) before recognizing Forward Deployed Engineer. Location filtering
+recognizes country names but not Toronto/ON/CA and does not interpret named country
+or province metadata. The live script's main scan uses employmentEligibility, while
+its auxiliary eligible/reason summaries still call employmentTypeAllowed.
+
+Acceptance: short synthetic positive/negative FDE responsibility fixtures; ordinary
+finance/legal and primary pre-sales/backend exclusions; Toronto/province/country
+recognition without treating isolated CA or Ontario, California as Canada; explicit
+US alternatives retained; real script diagnostics exercised with synthetic fetch.
+Allocation/date/identity/dedupe/registry and persistence boundaries remain unchanged.
+Validate with explicit Node 24.19.0 focused/full tests, typecheck, normal build of
+authorized generated outputs, harness, strict privacy, runtime and release composition.
+Use sanitized configuration and only disposable synthetic localhost/PGlite/Git fixtures.
+Local result: PASS. FDE Finance/Legal/Compliance domains no longer trigger the
+ordinary business-occupation blocker. Production software responsibilities support
+SOFTWARE_DELIVERY; ambiguous duties return ROLE_SCOPE_UNKNOWN_PASS. Explicit
+business-only duties, primary pre-sales/backend work, seniority and configured role
+families remain enforced. Toronto/ON and named Canadian country/province metadata
+now exclude Canada-only geography; isolated CA/Ontario-CA remain uncertain and
+Ontario, California stays distinct. Explicit US-remote/local alternatives survive.
+Both auxiliary live-script employment checks now call production employmentEligibility.
+
+Seven new synthetic test groups cover the requested positive/negative scenarios,
+including accounting automation versus business-only accounting, country/province
+metadata, negated remote permission, explicit attendance contradictions and the
+actual script run with a mocked synthetic board feed. No real employer descriptions
+or candidate records were added. Node 24.19.0 focused tests pass 66/66; standalone
+full suite and final release suite pass 247/247 with zero failures/skips/cancellations.
+Typecheck, normal build, harness, strict required-build privacy (zero findings),
+runtime and release composition pass in the sanitized synthetic fixture environment.
+Client output remains 722.25 kB; existing chunk-size/Zod annotation warnings are
+nonfatal. No migration outside disposable fixtures or live network operation occurred.
+
+Cap/publication semantics, employment eligibility, identity/dedupe, scan/allocation
+and registry/persistence pipeline sections compare unchanged against this checkpoint's
+dirty baseline. Only discovery, the existing live script, precision tests and the
+pipeline/plan docs are in scope. Final source/artifact preservation and incremental
+rollback checks complete the handoff; no commit, push, deployment or next checkpoint.
+
+Limits: bounded responsibility/geography text patterns do not fully interpret JDs,
+all country formats, encoded HTML, commute/transit or actual candidate qualifications.
+No repeat live ATS audit was authorized or performed in R1. Next exact step: a
+separately authorized Checkpoint 1.8B may proceed as local work after this validated
+correction; no compensation behavior was implemented here. Historical Git privacy
+disposition remains an independent publication blocker, with no history remediation.
+
+## Discovery eligibility precision checkpoint 1.8A (2026-10-16)
+
+Baseline: `dev` at `cce0b1d364d5e1ec9913b1c579052219fafc4cbf`, with the
+verified Checkpoint 1.7 implementation (228/228 tests) and all 15 modified tracked
+files/five untracked files preserved. Scope: named structured employment/workplace
+metadata, explicit internship/student-only exclusions, primary backend/pre-sales
+responsibility exclusions, and mandatory distant attendance. Unknown employment
+and workplace remain unknown; ordinary junior roles, target engineering work and
+potentially local hybrid roles remain available for assessment.
+
+Acceptance: synthetic positive/negative and negation regressions; unchanged cap,
+fairness, unknown-date quota, date windows, ATS identity/dedupe/custom Greenhouse
+URLs, search-session persistence, ownership and provenance contracts. Explicit
+Node 24.19.0 focused/full tests, typecheck/build/harness/strict privacy/runtime and
+release composition must pass using the authorized synthetic fixture environment.
+No live ATS/model/workspace access, migration outside disposable tests, registry
+replacement, compensation work, source publication, commit or deployment. Results
+and exact next step will be recorded here; rollback must reverse only this
+checkpoint's incremental patch, preserving the existing uncommitted baseline.
+
+Local result: PASS. Named structured employment/workplace fields now normalize
+consistently in scans and exact adapters without dropping raw metadata. Explicit
+internships and student-only enrollment exclude before allocation; missing and
+conflicting employment remain unknown rather than guessed full-time. Primary
+backend/pre-sales duties precede keyword matches; production customer software,
+frontend-heavy full stack and ordinary junior roles survive. Mandatory distant
+attendance/relocation excludes only explicit evidence; negated/optional attendance
+and unknown workplace stay uncertain. Discover cards label unknown workplace.
+Exclusion functions retain explainable reasons and existing category counters.
+
+Final Node 24.19.0 focused coverage passes 59/59; full suite and repeated release
+suite pass 240/240 with zero failures/skips/cancellations. Typecheck, normal build,
+harness, strict required-build privacy (zero findings), runtime and release
+composition pass in the approved environment with private-service configuration
+removed and only synthetic localhost/PGlite/Git fixtures. Build warnings remain
+non-fatal: 722.25 kB client chunk and dependency annotation warnings. No live ATS,
+model, private workspace, production or registry operation occurred. No SQL
+migration, compensation change, commit, push or deployment. Final documentation
+privacy/harness/diff and incremental rollback checks follow this result entry.
+
+Limits: bounded lexical rules are not complete semantic JD interpretation;
+negated/ambiguous prose may remain uncertain, named metadata coverage is limited,
+and configured local geography does not establish transit/commute feasibility.
+Live selection precision and private profile configuration are not certified by
+synthetic tests. Next exact checkpoint, separately authorized: one bounded,
+read-only ATS eligibility regression without workspace persistence/model calls,
+before compensation normalization or registry expansion. Historical Git privacy
+disposition remains an independent publication blocker; no history remediation
+was performed here. Stop locally with the complete pre-existing dirty baseline.
+
+## ATS registry repair and live regression checkpoint 1.7 (2026-10-14)
+
+Baseline is the complete uncommitted Checkpoint 1 and 1.6 working tree on `dev`;
+preserve that diff and the unrelated untracked QA release record. Scope is limited
+to validating the existing 23-board owner registry, correcting only demonstrated
+board-registration or provider-normalization defects, and running one bounded,
+read-only 14-day scan with no workspace persistence. Do not add a provider, broaden
+the registry, call an LLM, assess a job, generate an artifact, migrate data, deploy,
+commit or push.
+
+Acceptance: official employer pages and public ATS responses establish whether the
+HubSpot, Dropbox, Coinbase and Pinterest registrations are valid, empty or
+unavailable; no replacement board is guessed. A Greenhouse row from the fixed
+configured board endpoint retains its provider/board/job identity when Greenhouse
+returns an employer-hosted `absolute_url`, while cross-board or cross-provider ATS
+URLs remain rejected. The scan reports source health, retrieved and date-coverage
+counts, deterministic filter exclusions, dedupe, eligibility, verification,
+new-versus-known and cap counts without persisting descriptions or jobs. Compare
+live results to Checkpoint 1.5 cautiously and isolate code effects with captured
+fixtures where possible. Run focused regressions and the Node 24 typecheck, build,
+privacy and release gates; update this section with actual results and the next
+exact checkpoint, then stop locally.
+
+Local result (validated 2026-10-14): no board identifier was changed. Official
+careers pages plus direct public feed checks confirm `dropbox` (32 current rows),
+`coinbase` (225) and `pinterest` (155) are valid, populated Greenhouse boards.
+`pinterestjobadvertisements` is a separate six-row board and is not a replacement.
+HubSpot's official careers experience still identifies `hubspotjobs`, while its
+public Greenhouse boards API returns 404; the registration is retained as canonical
+but currently unavailable rather than replaced with a guessed slug. The demonstrated
+defect was adapter normalization: employer-hosted Greenhouse `absolute_url` values
+caused all Dropbox/Coinbase/Pinterest rows to be discarded. The fixed board endpoint
+now supplies the provider/board/requisition identity while retaining the employer
+HTTPS application URL. Cross-board and cross-provider ATS links remain rejected,
+and dedupe now prefers that verified feed identity.
+
+One read-only 14-day run at `2026-10-14T20:00:00Z` scanned the unchanged 23-board
+registry with zero persistence and zero model calls: 22 boards succeeded, HubSpot
+failed HTTP, none was truly empty, and five successful boards had zero eligible
+rows. Feeds returned and the adapter retained 1,605 rows (Ashby 309, Greenhouse
+1,280, Lever 16); every retained row had a canonical publication timestamp. Of
+those, 318 were in-window, 1,277 older and 10 future. Employment filtering removed
+four explicit internships and one disallowed contract; role filtering removed
+1,485 and location filtering 34. Eighty-one passed employment/role/location before
+date filtering, no duplicates were removed, nine fresh jobs were selected and all
+nine were feed-verified/new to the 81-job workspace. There were zero cap exclusions.
+
+The run demonstrates Ashby `FullTime` is no longer mass-rejected, but selection
+quality is not yet acceptable: Greenhouse metadata/title gaps allowed a Coinbase
+internship, Pinterest internship, LaunchDarkly pre-sales role, Coinbase explicitly
+backend-primary role, and distant-market Discord/Pinterest roles through. Correct
+rejections include Staff/Principal/management, PostHog product management,
+Thumbtack AI/ML infrastructure and Grafana backend-heavy full stack. Senior roles
+and US-remote roles remain discoverable. Because live inventory and provider totals
+changed since Checkpoint 1.5, the 1,201-to-1,605 row and 9-to-9 selection comparison
+does not prove a code effect. Controlled same-row regressions do prove Ashby
+`FullTime` normalization and employer-hosted Greenhouse row retention; the cap stayed
+inactive in both live audits.
+
+Node 24.19.0 focused discovery coverage passes 24/24 and the complete release suite
+passes 228/228. Standalone typecheck, production build, privacy scan (zero findings),
+harness/strict privacy/runtime checks within release composition, built startup
+smoke 1/1, and diff whitespace pass. The existing 722.13 kB client chunk warning
+remains. Initial sandboxed build and startup smoke attempts hit Windows realpath and
+loopback restrictions; unchanged reruns outside those restrictions passed. No data
+write, migration, LLM/assessment, resume, deployment, commit or push occurred; the
+unrelated QA record remains untouched. Next exact checkpoint: normalize Greenhouse
+employment/workplace metadata and deterministic internship/early-career, explicit
+backend-primary, pre-sales and distant-onsite blockers before registry expansion or
+compensation gating. Allocation and the 24-job cap do not need investment yet.
+
+## Discovery precision checkpoint 1.6 (2026-10-14)
+
+Baseline is the uncommitted, locally validated Checkpoint 1 discovery-quality
+implementation on `dev`; preserve that complete diff and the unrelated untracked QA
+release record. Scope is limited to canonical provider employment normalization,
+deterministic title/role/seniority/location classification, safe provider/registry
+health diagnostics, and focused synthetic regressions based on the Checkpoint 1.5
+live findings. Raw provider metadata and publication-date provenance remain intact.
+No LLM call, broad source expansion, database migration, workspace/application
+mutation, Vercel action, deployment, push, commit, resume or cover-letter work is
+authorized.
+
+Acceptance: verified Ashby `FullTime` values normalize to the existing internal
+full-time contract before profile filtering; contract, part-time, temporary,
+internship and unknown values stay distinct and unknown never becomes full-time.
+Conservative precedence rejects management and Staff+ titles, infrastructure/cloud/
+compute/network/backend platform work, product-management false matches and clear
+non-US-only employment while retaining explicit frontend, UI, design-system, DX,
+frontend-platform, product-engineering, frontend-heavy full-stack and AI-product-UI
+roles. Senior remains eligible unless an existing explicit profile constraint says
+otherwise. Source diagnostics distinguish HTTP, invalid-response, empty-board,
+unsupported-provider and successful-filtered-zero outcomes without storing provider
+bodies or job descriptions. Canonical dates, dedupe, fair allocation, four-unknown
+quota and 24-job cap do not change. Run focused tests plus the complete Node 24
+validation suite and `git diff --check`; record actual results and stop locally.
+
+Local result (validated 2026-10-14): implemented on top of the preserved Checkpoint
+1 working tree with no migration, provider expansion, model call, workspace/job
+mutation, deployment, commit or push. Exact provider employment fields normalize
+before filtering while their raw values remain in provider metadata; unfamiliar
+values stay unknown. Role precedence now rejects management, Staff/Principal,
+non-engineering false matches, infrastructure/cloud/compute/network/backend lanes,
+backend-heavy full stack and clear non-US-only locations while retaining explicit
+frontend, UI, product, design-system, frontend-platform, DX, frontend-heavy and
+AI-product UI evidence. Senior remains eligible. Diagnostics now distinguish safe
+provider health outcomes, and legacy Checkpoint 1 session JSON hydrates with
+conservative defaults.
+
+Focused discovery/persistence coverage passes 46/46 and the complete Node 24.19.0
+suite passes 227/227. Typecheck, production build, harness integrity, standalone
+privacy scan (zero findings), composed release check (including strict required-build
+privacy and runtime check), and diff whitespace all pass. The existing >500 kB client
+chunk warning remains. Initial sandboxed build/release attempts hit Windows file/
+loopback restrictions, and one initial full-suite invocation inherited machine Node
+25 in npm child processes; unchanged reruns outside that restriction with Node 24
+first in PATH passed. No production/browser/live-ATS claim is inferred. Next exact
+checkpoint: correct or revalidate stale configured board identifiers, then rerun a
+bounded live discovery scan and compare health/filter counts before considering any
+new provider or cap change.
+
+## Discovery quality checkpoint 1 (2026-10-14)
+
+Baseline: tracked `dev` equals `origin/dev` at
+`cce0b1d364d5e1ec9913b1c579052219fafc4cbf`; preserve the unrelated untracked
+QA release record. Scope is limited to canonical-publication discovery windows,
+freshness-first but source-fair allocation under the existing 24-job cap,
+owner-scoped payload-free search-session diagnostics, and the corresponding
+Discover UI and synthetic coverage. Continue to scan only validated Ashby,
+Greenhouse, and Lever public boards. Unknown publication dates remain unknown;
+future and known-older dates cannot consume fresh-window slots. No LLM discovery,
+assessment/scoring changes, Workday scraping, resume/cover-letter work, application
+history changes, Vercel configuration, deployment, remote migration, `main`, or
+Production action is authorized.
+
+Acceptance: the discovery API and UI expose exact 1/2/7/14-day windows with 14
+days default. Canonical provider publication instants are compared against one
+server search instant using inclusive boundaries; `updatedAt` and `firstSeenAt`
+never substitute. Per-source known-date queues are newest-first and allocated
+fairly, with at most four unknown-date selections and 24 total. Existing profile,
+role, location, identity dedupe, history-safe refresh and provider-budget behavior
+remain intact. Each completed scan appends a bounded diagnostic record containing
+only window/timestamp/source identities/counts/statuses and new-versus-rediscovered
+totals, never descriptions, provider bodies, secrets, candidate data or errors.
+Focused boundary/timezone/future/unknown/allocation/dedupe/failure/persistence tests
+and the complete requested validation suite must pass before handoff. Stop after
+local implementation and validation; do not commit or deploy without approval.
+
+Local result (validated 2026-10-14): implemented without a schema migration or
+additional model call. The private discovery contract defaults to 14 days and
+accepts only 1/2/7/14; provider publication instants alone determine eligibility.
+Known fresh rows use newest-first fair rounds, unknown dates receive at most four
+slots, and known-old/future rows receive none under the unchanged 24-job cap.
+The existing owner-scoped search_sessions JSON entity now retains the latest 100
+strict, payload-free diagnostics without advancing the workspace revision, so the
+ordinary client job save remains conflict-free and stored jobs/history are unchanged.
+Discover exposes the selector and latest persisted summary after reload.
+
+Focused discovery/persistence regression coverage passes 43/43. The required
+Node 24.19.0 release composition passes 219/219 with typecheck, build, harness,
+strict required-build privacy zero, and runtime checks; standalone requested
+typecheck/build/harness/privacy commands also pass. An initial release attempt under
+the machine-default Node 25.9.0 correctly failed the two Node-major guards and runtime
+check, then passed unchanged under the repository-required Node 24 runtime. Diff
+whitespace passes. No Vercel action, production data operation, commit, migration,
+assessment/scoring change, Workday adapter, or LLM discovery path was introduced.
+Next checkpoint: evaluate source-registry coverage and provider-specific date
+availability using these diagnostics before expanding providers or changing the cap.
+
+## Vercel AI Gateway assessment provider (2026-10-05)
+
+Baseline: clean tracked `dev` and `origin/dev` at
+`c6132b02cf62ae83dfccf65d858b131c76c7832c`; preserve the unrelated untracked QA
+release record. Replace only the deployed/default structured-model boundary with
+Vercel AI Gateway through the current Vercel AI SDK. Retain explicit loopback-only
+Ollama development support and the provider-neutral `StructuredModel` contract.
+There is no automatic retry, fallback model, or cross-provider fallback. Keep every
+assessment extraction, evidence-eligibility, semantic completeness, support and
+deterministic scoring contract unchanged. Gateway credentials remain server-only;
+raw prompts, model output, provider bodies, job/evidence/candidate data and secrets
+must never enter logs or HTTP errors.
+
+Acceptance: Gateway is the default even in the presence of stale Gemini settings;
+the configured Gateway model supports structured output and is centralized in
+server environment/config. Each uncached model invocation reserves exactly once,
+uses strict SDK schema-constrained output plus application Zod validation, a 30s
+timeout and zero SDK retries. Synthetic tests cover provider selection, both model
+stages, malformed/schema-invalid output, safe error taxonomy, no fallback, cache
+reuse and unchanged deterministic scoring. Complete Node 24 release gates and an
+independent privacy/truth boundary review precede one scoped dev checkpoint. After
+an exact-SHA Preview is READY, verify Gateway-only Preview configuration and private
+workspace save/reload, then make exactly one live assessment attempt against the
+already-persisted acceptance target. Do not run discovery, assess another job,
+modify `main` or Production, migrate data, or generate a resume.
+
+Local result (validated 2026-10-06): CLEAR for publication. The default deployed
+structured boundary now uses Vercel AI SDK `generateText` with AI Gateway,
+`Output.object` and the centralized default model `anthropic/claude-haiku-4.5`.
+Every request uses temperature zero, a 30-second timeout, `maxRetries: 0`, one
+immediately preceding owner-scoped budget reservation, application Zod validation,
+and provider pinning with no fallback. Explicit loopback Ollama remains independent.
+Gateway failures map from structured metadata only into bounded `AI_*` codes; both
+extraction- and semantic-stage HTTP diagnostics retain their finite stage without
+provider bodies, prompts or private data. The uncertified legacy cover-letter route
+is HTTP 410 and cannot forward client fields to any model. Gemini is not reachable
+from deployed structured operations; its diagnostic compatibility module/dependency
+is marked `DEAD_COMPATIBILITY_CODE_PENDING_REMOVAL` for a separate checkpoint.
+
+Node 24.19.0 focused provider/assessment/security coverage passes 48/48. Complete
+release composition passes 213/213 with typecheck, build, harness, strict required-
+build privacy zero and runtime checks. Normal privacy is zero; built startup smoke
+passes 1/1; both synthetic evidence validators pass; Drizzle reports no schema
+changes; full and production dependency audits have no high/critical findings; and
+diff whitespace passes. Four moderate Drizzle/esbuild development-tool-chain findings
+remain because the offered fix is a breaking downgrade. Audit remediation also
+updated `proxy-addr`, `source-map-js`, and `drizzle-kit` within their existing ranges.
+Independent security review found and drove a fail-closed correction for a temporary
+legacy cover-letter privacy regression plus semantic-stage coverage, then returned
+CLEAR with no remaining blocker/high/medium findings. Next: create one scoped dev
+checkpoint, publish normally, wait for its exact-SHA Preview, configure only Preview
+for Gateway, verify private workspace save/reload, and assess exactly the persisted
+LaunchDarkly Full Stack Engineer job once. Discovery and all other jobs remain out of
+scope.
+
+## Assessment validation diagnostics (2026-10-05)
+
+Baseline: clean tracked `dev` and `origin/dev` at
+`9dbb607e3c1d5ca056158bdcb91392625a6836af`; preserve the unrelated untracked QA
+release record. Scope is limited to classifying strict structured-assessment
+failures across extraction provider/schema/contract, semantic
+provider/schema/contract, and persistence boundaries with finite privacy-safe
+reason codes. Do not log or return prompts, model output, job text, evidence,
+identity, IDs, secrets, or arbitrary validation messages. Preserve exact excerpts,
+centrality/kind rules, critical-context minimums, complete one-to-one semantic
+coverage, eligible evidence, support relationships, deterministic scoring, provider
+budgets, no retry, and no provider fallback.
+
+Acceptance: synthetic coverage distinguishes invalid JSON, schema-invalid output,
+every existing extraction and semantic post-schema invariant, workspace conflict,
+and provider/budget behavior without payload leakage. Complete the Node 24 release
+validation and an independent bounded privacy/truth review, publish one scoped dev
+checkpoint normally, wait for its exact Preview, then make exactly one live attempt
+against the already-persisted private acceptance target. Do not run discovery,
+assess any other job, create resume artifacts, migrate data, modify `main`, or touch
+Production. Success requires one persisted reload-stable assessment; failure stops
+after returning only its safe stage/reason code.
+
+Local result: diagnostics-only correction CLEAR. The two prior live attempts can be
+localized only to extraction (one AI reservation each); their exact failure class
+was irretrievably collapsed by the old generic 422. No contradictory extraction,
+semantic, evidence-eligibility, or scoring contract was reproduced, so none was
+weakened. Gemini empty, JSON and schema failures plus every post-schema contract now
+map to fixed finite stage/reason codes without retaining or returning model values or
+Zod issues. Provider/budget mappings, one reservation per actual provider call, no
+retry/fallback and revisioned atomic persistence remain unchanged. Node 24 focused
+assessment/provider/security/persistence tests pass 42/42; complete release
+composition passes 202/202 with typecheck, build, harness, strict build privacy zero
+and runtime checks. Normal privacy is zero; startup smoke 1/1; both evidence
+validators pass; Drizzle reports no schema changes; diff whitespace passes. The
+independent read-only boundary review found no demonstrated blocker/high or concrete
+lower-severity defect. Next: one scoped dev checkpoint/publication, exact-SHA Preview
+health plus private hydration/save, then exactly one persisted-target assessment.
+
+## Watchlist-scoped discovery eligibility (2026-10-04)
+
+Baseline: local `dev` and `origin/dev` are both
+`7323a3d3f0fbfab4c23ea695babd714fbae540ba`; the unrelated untracked QA release
+record remains untouched. Scope is limited to future discovery: make WATCHLIST and
+ALL_ENABLED source scopes explicit, require both active monitoring and an enabled
+registry source for WATCHLIST scans, and apply deterministic positive engineering-role
+and conservative location eligibility before fair allocation. Existing job records,
+assessment/ranking, company priority, source discovery, AI behavior, persistence,
+schema, deployment, `main`, and private runtime data are out of scope.
+
+Acceptance: synthetic regressions cover the ten source-eligibility cases, positive
+and negative role families including configured forward-deployed work, compatible,
+incompatible, and unknown locations, filter-before-round-robin behavior, the 24-job
+cap, priority neutrality, and truthful fetched/role/location/selected source results.
+The Company Watchlist primary action must run WATCHLIST scope while an explicit
+all-enabled action preserves registry-wide scanning. No filtered-zero board is called
+a provider failure; disabled sources cannot be resurrected; duplicate watchlist links
+produce one provider request. Complete Node 24 release validation and a bounded
+independent privacy/eligibility review precede a single local checkpoint commit.
+
+Result (validated 2026-10-04): implemented without persistence or schema changes.
+The authenticated discovery endpoint now requires explicit WATCHLIST or ALL_ENABLED
+scope. WATCHLIST intersects active monitored links with still-enabled canonical
+registry sources, combines duplicate link constraints, and never re-enables a source;
+ALL_ENABLED preserves the intentional registry-wide workflow. Provider rows retain
+structured team/location metadata and pass deterministic employment, positive
+family-aware role, and conservative location checks before canonical dedupe and fair
+round-robin allocation. Session diagnostics now distinguish fetched, role-eligible,
+location-eligible and selected counts, including successful filtered-zero boards.
+The Watchlist owns the primary scoped action; Discover retains the explicit all-source
+action. Existing workspace jobs and assessments are not rewritten.
+
+Synthetic focused discovery/watchlist coverage passes 32/32, including the ten source
+cases, role-family counterexamples, configured Product/DX/Platform/Production/FDE
+positives, ambiguous customer-facing rules, clear non-US-only versus mixed/unknown
+location alternatives, filter-before-fairness, cap/priority neutrality, provider
+failure and every source-result stage. Complete Node 24 release composition passes
+197/197 with typecheck, build, harness, strict required-build privacy zero, and runtime
+checks. Built startup smoke passes 1/1; normal privacy, both evidence validators,
+schema generation/no-drift and diff checks pass. Independent review found and drove
+corrections for broad generic-family admission, disabled-family assignment, mixed-
+region false rejection, configured platform false negatives, separator parsing,
+diagnostic coverage and disabled-source UI truth; final review is CLEAR. The known
+limitation is intentionally conservative lexical classification of novel titles and
+locations; ambiguous geography passes rather than fabricating incompatibility. Next
+exact step: independent checkpoint review, then separately authorized `dev` publish
+and exact-SHA Preview second WATCHLIST scan before any ranking redesign.
+
+Publication review correction (2026-10-04): independent cumulative review reproduced
+three additional allocation-consuming bypass classes before push: disabled forward-
+deployed titles falling through generic software, non-target/business/customer-facing
+platform titles returning before their safeguards, and non-US locations using `US`
+only as a working-hours qualifier. The bounded correction routes profession safeguards
+before positive family matching, keeps forward-deployed matching occupation-specific,
+qualifies broad platform matches, and distinguishes US schedule context from geography
+in either order. Exact positive/negative regressions pass; consolidated independent
+re-review is CLEAR. Node 24 release composition remains 197/197, focused discovery/
+watchlist 32/32, built startup smoke 1/1, privacy/evidence/schema/diff gates pass.
+
+## Watchlist import persistence correction (2026-10-03)
+
+Baseline: local `dev` at the unpublished Company Watchlist checkpoint; remote refs
+unchanged and unrelated QA material preserved. Scope is limited to two independently
+demonstrated defects: imported review metadata entering strict nested source records,
+and normalized-company duplicates surviving the final import merge. Acceptance adds
+a reusable successful-import to client-equivalent snapshot to ordinary-save contract,
+preserves review metadata on eligible records, rejects ambiguous merged watchlist
+duplicates atomically, and retains forged-source denial. No migration, UI expansion,
+publication, deployment, main change, private runtime work, or model work is authorized.
+Pre-fix regressions reproduce both defects (10/12 watchlist tests pass; the two new
+contracts fail for the expected reasons). Correction exports the existing strict
+discovery-source schema as the structural import-review boundary, preserves review
+provenance on eligible records, and rejects duplicate normalized identities across
+the complete retained-plus-incoming watchlist before any upsert. Ambiguous different-ID
+collisions reject atomically; unique IDs and same-ID replacements keep normal import
+semantics. Client-equivalent import-to-save and collision rollback regressions pass.
+Node 24 focused validation passes 79/79 and full release composition passes 192/192
+with typecheck, build, harness, strict privacy zero and runtime checks. Normal privacy,
+startup smoke 1/1, both evidence validators, schema no-drift and diff checks pass.
+Fresh independent review is CLEAR, including additional full-workspace import/save and
+same-ID collision probes. Migration 0004 is unchanged. Removal confirmation remains a
+deferred LOW UX follow-up. No publication, deployment, main change or private runtime
+acceptance occurred. Next exact step after the local checkpoint is the previously
+planned independent checkpoint review, normal dev push and exact-SHA Preview acceptance.
+
+## Company watchlist / target market (2026-10-02)
+
+Baseline: rewritten `dev` equals `origin/dev`; unrelated local QA material remains
+untracked and untouched. Scope: add a private, owner-scoped and revisioned target
+company collection that optionally links existing ATS sources without duplicating
+provider authority. The collection supports deterministic strategic status, priority,
+role lanes and a small location policy, and is isolated from search-profile
+assessment invalidation. Discovery must retain existing enabled sources, source order,
+deduplication and fair capped allocation; watchlist priority is metadata only.
+Public demo examples and tests remain wholly synthetic. No AI calls, source scraping,
+deployment, production/main change, or live private data are in scope.
+
+Acceptance: owner CRUD/reload/import-export/isolation and safe removal preserve
+unrelated workspace history; source-linked versus research states are clear; shared
+sources scan once and source failures are truthfully surfaced without client-claimed
+scan facts. Focused watchlist, discovery, persistence and privacy tests plus typecheck
+will be run before the implementation handoff.
+
+Result (validated 2026-10-03): implemented with a dedicated owner-scoped collection
+and registry-only source references. The view supports filters and editable company
+strategy fields; session scan results are transient and explicitly labelled. Public
+examples use enforced synthetic fixture markers. Independent boundary review found a
+mutation race/error-reporting issue and permissive non-HTTP URL validation; both were
+corrected. Parent review additionally prevented imported source metadata from
+authorizing its own watchlist link and added a true 0000-through-0003 data-preservation
+test before migration 0004. Focused final tests pass 15/15. Node 24 release composition
+passes 190/190 with typecheck, build, harness, strict required-build privacy zero and
+runtime checks. Migration generation reports no drift; both evidence validators,
+built startup smoke 1/1 and diff checks pass. Local rendered-browser acceptance was
+attempted but unavailable because neither the browser automation binary nor a localhost-
+capable browser surface was available; structural UI contracts remain covered. No
+main, remote, deployment or production change. Next exact step after this local
+checkpoint: independent checkpoint review, then separately authorized dev publication
+and Preview acceptance.
+
+## Public-repository semantic privacy remediation (2026-10-02)
+
+Baseline: local `dev` and `origin/dev` at
+`2d4091587a7c15c3c30c056a7d68911ffd6339f1`, with the unrelated untracked
+`QA/2026-09-22-production-release.md` preserved. The formal release audit found
+that public documentation and a discovery fixture contained owner-specific career
+or private-workspace material that mechanical credential/PII scanning could not
+classify semantically.
+
+Scope: remove the candidate-specific manual resume artifact, retain only a generic
+resume-editing boundary, redact owner-specific resume and DEV acceptance details
+from this public plan, replace the live ATS posting identity with a wholly synthetic
+provider-shaped fixture, generalize employer-specific schema/type nomenclature, and
+add structural privacy rules for manual-follow-up files and UUID-shaped ATS test
+identities. Preserve application behavior, deterministic discovery coverage, public
+synthetic demo data, main, production and remote refs.
+
+Acceptance: focused discovery/provider/privacy tests and the complete Node 24 release
+composition pass; current tracked source receives a fresh semantic review; one local
+checkpoint commit records only this remediation. History exposure is then mapped
+read-only across local/remote branches and tags, followed by a precise unexecuted
+rewrite plan. No push, history rewrite, ref deletion or force update is authorized.
+
+Result: current-tree remediation PASS. The candidate-specific manual artifact was
+removed, the retained editing guidance is generic, owner/workspace details in this
+plan were redacted, and the provider-shaped discovery fixture now uses an explicitly
+synthetic board and UUID. Candidate- and employer-specific legacy schema/type labels
+were replaced with generic candidate/employment/experience labels; loose
+persisted-object parsing continues to preserve unknown legacy metadata without
+requiring the private names in source.
+Structural regression coverage rejects owner-specific
+manual-follow-up files and non-synthetic UUID ATS fixtures without echoing matched
+values. Node 24 focused discovery/provider/privacy coverage passes 33/33; the full
+suite and release composition pass 180/180 with typecheck, build, harness, strict
+privacy (zero findings), runtime and diff checks passing. The remaining release
+blocker is historical reachability of the removed material; bounded independent
+security/privacy review found no remaining current-tree finding after its two
+structural-scanner bypass probes were corrected and regression-tested. Mapping and a precise
+unexecuted rewrite/coordination plan follow the local checkpoint.
+
+History mapping: pushed `origin/dev` retains the removed resume artifact, redacted
+plan sections, live ATS fixture and legacy candidate/employer-specific schema labels
+through its pre-cleanup tip. `origin/main` does not contain the resume, acceptance or
+live-fixture categories, but it does retain the legacy schema labels introduced in
+the initial application commit. No tags or other remote branches exist; a local-only
+backup branch also retains those schema objects. The smallest complete future purge
+therefore requires separately authorized, compatibility-preserving rewrites of both
+`refs/heads/dev` and `refs/heads/main`, plus local clone/backup cleanup. The local
+installation does not currently include `git-filter-repo`. Next exact step: obtain
+explicit authorization for an isolated-mirror rewrite and force-with-lease update of
+those two refs using pinned old remote SHAs; do not publish this checkpoint first.
+
+## Discovery dedupe availability correction (2026-10-01)
+
+Baseline: local `dev` at `e4961d9e548c67c0b96f611e60b57d12439b5cb7`,
+with the unrelated untracked `QA/2026-09-22-production-release.md` preserved.
+Independent publication review demonstrated a HIGH availability defect in the
+pre-cap cross-source dedupe: every accepted lead was retained in an array and every
+later lead used `unique.some(...sameJob...)`. The supported 50 sources x 500 rows
+could therefore perform 312,487,500 pairwise comparisons before selecting 24 jobs.
+
+Corrective design: preserve the existing `sameJob` identity hierarchy rather than
+replace it. Export its existing supported ATS key and normalized URL-set helpers;
+the discovery allocator indexes provider + board + posting ID and every normalized
+canonical/discovery URL. Strong records use only indexed lookups, retain the first
+deterministic source, and never enter the global fallback scan. Only records without
+a supported ATS identity enter a bounded weak-record collection; URL matches remain
+indexed, while `sameJob` is retained for the conservative company/title/location
+cases that cannot be represented by a strong key. Source/row traversal order,
+profile filtering, round-robin allocation, the final 24 cap, final/workspace merge,
+UNASSESSED defaults and `sourceResults` meanings remain unchanged.
+
+Supported-bound acceptance: deterministic fixtures cover 50 sources x 500 unique
+strong identities, mass cross-source duplicates, mixed strong/weak identities,
+small weak-only fallback and the existing prolific-source fairness case. Internal
+test-only-visible statistics record candidate traversal, ATS/URL index lookups and
+fallback `sameJob` comparisons; the maximum strong case must remain linear with zero
+fallback comparisons and no wall-clock assertion. Protected boundaries: no network,
+provider trust/status, canonical URL construction, company metadata, source registry,
+UI/API output, auth/private data, persistence, assessment/resume/evidence, Ollama,
+Gemini, production configuration, main, deployment or publication change.
+
+Result: PASS / independent review CLEAR. The supported 50 x 500 unique-strong case
+traverses 25,000 candidates with 25,000 ATS-key lookups, 25,000 normalized-URL
+lookups, zero fallback comparisons and 24 round-robin selections. The 25,000-row
+mass-duplicate case uses 25,000 ATS lookups, 500 URL lookups, zero fallback
+comparisons and retains 500 first-source records. Mixed and small weak-only fixtures
+preserve conservative fallback behavior; the prior fairness/source-result/
+UNASSESSED tests remain intact. Independent review also checked 575 ordered identity
+cases against the former sequential algorithm, including conflicting strong IDs and
+strong/weak aliases, with exact equivalence. Node 24.19.0 focused discovery 15/15,
+provider 9/9 and full/release suite 179/179 pass; typecheck, build, harness, strict
+privacy zero, runtime and diff checks pass. Known limitation: an artificial large
+weak-only input without supported ATS identities may retain quadratic conservative
+fallback; supported public-board rows are exact provider/board/job identities and use
+the indexed path. Next exact step after the local checkpoint: repeat the previously
+authorized independent review, then dev push and SHA-bound DEV Preview discovery
+acceptance. Do not push or deploy in this correction task.
+
+## Deterministic board fairness and local Ollama provider boundary (2026-10-01)
+
+Baseline: local `dev` at `27adb3b2e93030cec8e085bfc7303e9fc2a3096a`, ahead of
+freshly fetched `origin/dev` (`9564246f8ba453bd8daf8d96aa86dae9d66f0404`), with the
+unrelated untracked `QA/2026-09-22-production-release.md` preserved. Scope is limited
+to deterministic enabled-board result allocation and an explicit developer-only local
+Ollama structured-model provider. Expected files: `server/discovery.ts`, `server.ts`,
+`server/llmProvider.ts`, narrow provider diagnostics if needed, client discovery
+response/context/view files, focused discovery/security/provider tests, `.env.example`,
+and the architecture/testing/deployment documentation.
+
+Part A design: each source keeps its existing normalization and profile filtering;
+the results are then globally deduplicated by the current canonical posting identity
+(supported provider + board + job id, normalized URL, conservative fallback), retaining
+deterministic first-source attribution. Deterministic round-robin draws from those
+per-source queues before the global 24 cap. Existing final build and workspace merge
+deduplication remains defense in depth. Per-source results expose only `sourceId`, safe
+`SUCCESS`/`FAILED` status, and numeric `fetched`, `profileAccepted`, and `selected`
+outcomes; they never expose an upstream response, body, error, or count presented as
+saved after workspace merging. The private UI distinguishes a successful zero from a
+failed source.
+
+Part B design: a provider-neutral structured-model boundary centralizes the three
+structured assessment/resume/artifact adapters. Gemini remains the default. Only
+explicit `LLM_PROVIDER=ollama` selects Ollama; the model comes from `OLLAMA_MODEL`
+(defaulted in the provider configuration boundary to `qwen3:14b`), not business logic.
+Ollama uses the fixed loopback `http://127.0.0.1:11434/api/generate`, JSON Schema
+format, `stream:false`, temperature zero, bounded 30-second no-redirect transport,
+bounded parsing, and schema validation. Failures are safely classified without prompt,
+model-output, body, or raw diagnostic logging, and never fall back to Gemini. The
+existing owner-scoped AI budget reserves once per invocation for either provider.
+Legacy non-structured cover letters remain Gemini-only and fail safely as unsupported
+when Ollama is explicitly selected.
+
+Acceptance: deterministic tests demonstrate fairness, duplicate attribution, zero and
+failure sources, under/over-cap behavior, UNASSESSED persistence, existing merge
+dedupe, and truthful source outcomes. Provider tests use injected fetch with no daemon
+and cover exact request/schema, success, malformed/schema-invalid output, timeout,
+connection and model-not-found failures, no fallback, and non-sensitive diagnostics.
+Run focused tests plus Node 24 typecheck, build, harness, privacy, and release checks
+as feasible. Protected boundaries: no auth/owner/session weakening, no arbitrary-host
+or request-controlled URL, no cloud fallback, no production/configuration/deployment
+switch, no private workspace or canonical-resume data, and no resume/provenance rewrite.
+
+Result: PASS. Discovery now normalizes and filters each enabled source, applies the
+existing canonical identity semantics before work allocation, preserves first-source
+duplicate attribution, and round-robins selected jobs through the 24 cap. Source
+results are safe `fetched`/`profileAccepted`/`selected` counts with `SUCCESS`/`FAILED`,
+flowed through the private API/context into a concise Discover view status. Existing
+final workspace merge remains in place, and all created records remain UNASSESSED.
+
+Structured assessment, resume and artifact routes now use one provider boundary.
+Gemini remains default; explicit Ollama uses only the fixed loopback generate endpoint
+with configured model/default, schema output, non-streaming temperature-zero requests,
+30-second no-redirect transport, bounded parsing and no fallback. Legacy cover letters
+return a safe unsupported response in explicit Ollama mode rather than invoking Gemini.
+The established AI budget reserves once per actual provider request. Documentation
+limits Ollama to developer-local loopback operation and provides no deployed switch.
+
+Security correction gate CLEAR: discovery outcomes clear on every workspace transition,
+private-view clearance/logout/public-demo reset, new scan and failed scan, and render
+only in authenticated private mode. The shared mapper returns only approved provider or
+budget status/code/message pairs; reader aborts classify as `OLLAMA_TIMEOUT`.
+Deterministic handler-boundary coverage proves the mapper without private detail.
+
+Bundled Node 24.19.0 `npm run release:check` PASS: full suite 175/175, typecheck,
+build, harness, strict privacy scan and runtime check all pass. `git diff --check`
+passes. Existing Rollup annotation and >500 kB client-chunk warnings are non-failing.
+Next exact step: conduct scoped checkpoint commit/review only; do not push, deploy, or
+change configuration. No Ollama daemon/model download, live provider call, or
+canonical-resume edit occurred.
+
+## Private master-resume audit boundary (2026-10-01)
+
+An owner-specific resume/evidence review was performed outside the application
+runtime. Its candidate material, evidence judgments and editing instructions are
+private and must not be recorded in public source. The public architectural finding
+is limited to this: the repository has no canonical editable resume document or PDF
+generator; owner-scoped `masterResume` data lives in private persistence, browser
+print is the current PDF path, and evidence authority still requires explicit owner
+review through the established provenance workflow.
+
+The former candidate-specific manual change set was an invalid public artifact and
+has been removed. Generic repository policy now lives in
+`docs/manual-follow-up/resume-editing-boundary.md`. Mechanical privacy validation at
+the time did not establish semantic safety; subsequent release review requires both
+scanner results and human semantic inspection of documentation and fixtures.
+
+## DEV keyless-discovery release hardening (2026-09-25)
+
+Baseline: `dev` and `origin/dev` at `a6f92e15a5f34780706537779bb5f39258202490`; preserve the unrelated untracked `QA/2026-09-22-production-release.md`. Scope: correct only verified company metadata for URL-only ATS ingestion, add focused regressions, configure 3–6 verified public boards through the owner-facing DEV flow, then run one board scan, duplicate import, and reload acceptance. Company must come from exact provider fields or exact canonical ATS page metadata, never board slug or JD prose; an existing nonblank owner label survives. Unknown remains blank. Validate with Node 24 focused/full tests, typecheck, build, privacy/runtime/release/diff checks and one bounded read-only security review. No auth, Google, production, main, Vercel configuration, or manual Neon change. Record results and the next exact step here before a scoped dev checkpoint.
+
+Result: company ingestion passed under SHA-bound private DEV acceptance. The bounded
+manual ATS fallback reads only exact verified canonical metadata through
+`safeFetchText`; optional provider company fields and existing owner labels are
+preserved, missing company remains blank, imports stay UNASSESSED, and canonical
+identity dedupe preserves one record across scan/import/reload. Specific source
+labels, posting identities, job counts and owner activity are intentionally excluded
+from this public plan.
+
+Board acceptance was partial because the former global first-source slice allowed a
+prolific source to consume the verification/save cap before other processed sources
+could contribute qualifying candidates. The UI also omitted per-source outcomes, so
+provider success versus empty/failure could not be claimed. This technical defect
+motivated the later deterministic round-robin/source-result correction. Private DEV
+runtime details remain outside the repository.
+
+## Keyless ATS-board discovery correction (2026-09-24)
+
+Baseline: clean tracked `dev` and freshly fetched `origin/dev` at
+`01b1bd72baa2c134161be09bb6012aa6220afa61`; `origin/main` remains
+`3309546643dd73b1c720c709fc1b45adc3a1ef41`. The known untracked
+`QA/2026-09-22-production-release.md` is unrelated and must remain untouched.
+
+Scope: preserve the deterministic SearchProfile query builder, exact ATS
+verification, unknown-fact truthfulness, unassessed job defaults, history-safe
+dedupe, revision/deletion fences, owner/session behavior and external-only budget.
+Remove Brave and every general-web search credential/operation. Automatic discovery
+will scan only enabled owner-configured or safely learned public Greenhouse, Ashby
+and Lever boards through fixed provider endpoints. Discover will also expose at most
+ten normal `google.com/search` links for owner-reviewed broader exploration; it will
+not scrape or ingest Google results. The existing manual flow will accept a URL,
+optional pasted JD and optional owner labels, reuse exact ATS verification where
+supported, deduplicate, and persist the result as UNASSESSED. Workday remains
+UNSUPPORTED; generic company pages remain bounded UNKNOWN unless exact evidence
+supports another status. No assessment, tailoring, evidence, lifecycle, BUG-003,
+BUG-004, main, production, production configuration or production database work.
+
+Acceptance: with no Brave/Gemini/search key, boot and focused tests cover bounded
+private-data-free Google queries, standard encoded Google URLs, configured and
+learned source registries, provider/identifier allowlisting, owner add/enable/remove,
+Greenhouse/Ashby/Lever board normalization, conservative profile filtering, partial
+board failure, successful zero results, canonical dedupe, unknown date/remote facts,
+URL-only/manual-JD import, UNASSESSED defaults, no AI/search-provider calls, external
+budget classification and private-session preservation. Run Node 24 focused tests,
+full suite, typecheck, build, privacy, runtime, release and diff checks, followed by
+one bounded read-only security review. After a passing reviewed milestone, create a
+scoped dev checkpoint and push dev; deploy DEV only if local gates pass and current
+authenticated Preview configuration permits the requested browser acceptance.
+
+## Keyless ATS-board discovery correction result (2026-09-24)
+
+Implementation PASS. Removed the Brave dependency and replaced server-side
+general search with at most ten deterministic, private-data-free Google links.
+Automatic discovery uses enabled, owner-configured or learned Greenhouse,
+Ashby and Lever public boards only; Workday remains unsupported. Board records
+are learned from exact LISTED/UNLISTED ATS identities, filtered conservatively,
+normalized with unknown facts preserved, deduplicated and created UNASSESSED.
+Manual URL/JD imports use bounded public fetching and exact ATS verification
+where available. Added source management, provider validation, external-only
+budgets, and source-removal tombstones (including suppression of learned
+duplicates). Owner/session, evidence and downstream AI boundaries were
+reviewed; discovery does not call Gemini or any general-web API.
+
+Node 24.19.0 validation PASS: focused discovery 9/9, full suite 162/162,
+typecheck, build, harness, privacy scan (0 findings), runtime check, integrated
+release check and `git diff --check`. The build retains the existing >500 kB
+client chunk warning; release/runtime scripts identify actual Vercel routing
+and Function limits as external gates. The first bounded read-only route/privacy/SSRF
+review found two Medium provenance defects; both were fixed and verified by the
+reviewer. Board feed rows now require exact provider, board and job identity
+alignment before receiving listing authority. Pasted JDs are marked unavailable
+as canonical, their canonical content source is cleared, and explicit
+user-provided provenance takes precedence over stale canonical flags. The
+correction release check passes again (162/162 tests). The pushed Preview for
+`ec473be8919d4597d6eca2d0c2297bcaf630b760` reached Ready; the Google link opened
+a normal Google results tab. Private workspace/source scan/import/Pipeline/reload
+acceptance is waiting for the owner to sign into the visible Preview manually.
+Next exact step: commit and push this reviewed security correction, then use
+the resulting Preview after manual owner sign-in and when an actual configured
+public board is available.
+
+## Gemini discovery provider-boundary diagnosis (2026-09-24)
+
+Scope: classify only the server-side Gemini failure boundary and add a private,
+owner-authenticated diagnostic probe that is unavailable in Vercel Production.
+The probe sends static minimal or Google Search-only content, returns no model
+content, and reuses the normal server-only Gemini client and AI budget boundary.
+Add deterministic tests for the installed SDK's documented error structure and
+request shape. No Gemini key/configuration, Neon, provider-budget SQL, BUG-003,
+BUG-004, commit, push, merge, or production deployment/change is authorized.
+Acceptance: safe structured error codes/log metadata never expose secrets,
+payloads, candidates, stacks, headers, session data, or raw provider responses;
+the deployed Preview-only diagnostic can distinguish minimal versus Search calls
+after separate publication authorization; normal discovery behavior remains
+private/owner guarded.
+
+Result: local implementation and deterministic validation PASS. Installed
+`@google/genai` 2.22.0 declarations and generated source confirm the current
+`gemini-3.8-flash`, `contents`, `config.tools: [{ googleSearch: {} }]`, and
+nested `config.httpOptions` request shape; no speculative request correction
+was made. Provider-call failures now return a safe structured Gemini category
+while discovery parsing, grounding processing, and ATS work retain their
+separate generic failure boundary. The diagnostic accepts exactly `{mode}` and
+sends only `Return the word OK.`; it is owner-guarded by route order and omitted
+when `VERCEL_ENV=production`. Its same-route GET page is likewise Preview-only,
+owner-authenticated and static; it renders only safe probe status/code fields so
+authenticated browser validation does not weaken the HttpOnly session boundary.
+Consolidated review correction: all upstream
+Gemini auth/permission/request/model/payment failures use safe gateway status
+502 (never browser-auth 401/403), and the client independently refuses any
+`GEMINI_*` code as a workspace-auth verdict. An exact, bounded JSON parse of
+the installed SDK's ApiError message recognizes only allowlisted
+`error.details[].reason` API-key codes; only that approved reason can reach
+the diagnostic log. Nested Node/undici cause codes are likewise allowlisted as
+timeout or transport, and static probe logs distinguish minimal from Search.
+The read-only security review's P2 correction makes `VERCEL_ENV=production` an
+unconditional veto even if `NODE_ENV` conflicts, with missing/conflicting
+environment regression coverage. Node 24.19.0 focused 30/30 and full 162/162,
+typecheck, build, strict privacy/runtime/release and whitespace checks pass.
+Dev Preview deployment `a8bd9e201822f0d8befab2fe3333367cc3ca0761`
+reached Ready. The authenticated minimal/no-tool probe returned application HTTP
+503 with `GEMINI_UNAVAILABLE`; its safe runtime log recorded provider status 503
+at `phase=probe-minimal`. Per the ordered stop rule, the Search probe and normal
+discovery were not run. Exact failure layer is Google service/provider HTTP 503,
+not the CareerOS request shape, Search tool, or discovery response processing;
+no source correction is indicated by this result. Next exact step: retry only
+the minimal probe after the provider service state changes, then continue the
+ordered sequence only if it succeeds. Two scoped dev commits were pushed solely
+to create the Preview diagnostic deployment. No key/configuration, Neon,
+provider-budget SQL, main, or production action occurred.
+
 ## P0 API error contract and provider-budget diagnostics (2026-09-23)
 
 Scope: BUG-001 and BUG-002 only. Add a stable, safe API error contract so non-auth provider/application failures preserve an authenticated private workspace while explicit authentication failures continue to fail closed; classify provider-budget exhaustion separately from unexpected persistence unavailability and add regression coverage/diagnostics. Preserve existing budget transaction semantics, rate limits, origin/session/owner protections, and provenance boundaries. No migration, commit, push, deployment, configuration, or live-resource action is authorized. Acceptance: focused Node 24 regressions cover client A–E plus server discovery/auth/budget classifications; parent performs final diff, security, and full validation.
@@ -1017,3 +1980,45 @@ migration/rotation/history rewrite. Stop after checkpoint publication.
 
 ## Phase 10 authorized scope (2026-09-13)
 Clean freshly fetched dev/origin/dev 24a5737537d92c7c51b5df2939a3352bcaead082; main 18bde7f451e4e5f39e303f82a0507a30233cd35e; 0 main-side /26 dev-side commits. Verify release delta, dependencies, migrations, deterministic gates and clean-source reproduction; create dev -> main PR and inspect readiness. Acceptance: phase-10-acceptance.md. No merge/main mutation, Phase 11, deployment or remote migration. External gates remain deferred.
+
+## Checkpoint 1.12A local scope (2026-10-19)
+
+Preserve the dirty dev worktree and accepted 1.11A/B. One implementation owner:
+explainable approved-evidence planning; separate advisory resume-quality versus
+unchanged provenance READY; bounded deterministic extraction-omission warnings.
+Acceptance: red/green public-interface synthetic regressions, focused/full tests,
+typecheck, isolated build/release/privacy checks and independent read-only review.
+No external calls, private database writes, evidence promotion, Git mutations or
+deployment. Owner-private evidence review is procedural only; no private content
+belongs in this plan. Actual model-generated resume/PDF acceptance remains later.
+
+Local result: three original defects reproduced red before their implementation;
+12 new contract regressions plus existing suites pass. Final Node 24.19.0 suite:
+312/312, no skips, including existing browser/PDF safeguards. Typecheck, isolated
+production build, harness, strict complete-source/build privacy triage, runtime,
+startup smoke and whitespace checks pass. Independent specification and engineering
+reviews pass after one consolidated correction cycle (exact-statement coverage,
+partial support, preference clauses, payload minimization and runtime plan fields).
+New disclosures render at 1280/1024/390 in light/dark with no document overflow or
+page errors. Build warnings about chunk size/dependency annotations remain.
+READY/export, scoring and whole-statement certification remain unchanged; advisory
+quality always awaits human review, and extraction warnings are explicitly bounded.
+Next exact step: owner-private statement/scope/period review, then separately
+authorized inference and actual tailored-PDF acceptance. No real evidence approval
+or generated real resume is claimed. No commit or external operation authorized.
+
+Exact checkpoint file scope (earlier dirty changes retained):
+- server/resumeProvenance.ts
+- server/resumeRoutes.ts
+- server/assessment.ts
+- server/assessmentRoutes.ts
+- server/requirementCompleteness.ts (new)
+- server/workspaceRepository.ts
+- server/db/workspaceValidation.ts
+- src/types/index.ts
+- src/types/assessment.ts
+- src/components/JobAnalysisView.tsx
+- src/components/EvaluationPanel.tsx
+- tests/resume-quality-contracts.test.ts (new)
+- tests/phase-5-resume.test.ts
+- docs/exec-plans/active/productionization.md

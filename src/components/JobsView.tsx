@@ -33,8 +33,10 @@ export const JobsView: React.FC = () => {
     const matchesVerdict =
       verdictFilter === 'All' || currentFit(job)?.verdict === verdictFilter;
 
-    const matchesFamily =
-      familyFilter === 'All' || job.parsed?.classifiedFamily === familyFilter;
+    // Keep the historical frontend alias readable without changing stored classifications.
+    const family = job.parsed?.classifiedFamily === 'frontend-product-engineer'
+      ? 'frontend-product' : job.parsed?.classifiedFamily;
+    const matchesFamily = familyFilter === 'All' || family === familyFilter;
 
     return matchesSearch && matchesVerdict && matchesFamily;
   });
@@ -101,7 +103,7 @@ export const JobsView: React.FC = () => {
           </span>
           {[
             { id: 'All', label: 'All Families' },
-            { id: 'frontend-product-engineer', label: 'Frontend Product' },
+            { id: 'frontend-product', label: 'Frontend Product' },
             { id: 'ui-platform-design-systems', label: 'UI Platform & Systems' },
             { id: 'internal-tools-fullstack-frontend', label: 'Internal Tools' },
             { id: 'production-support-frontend', label: 'Production Support' }

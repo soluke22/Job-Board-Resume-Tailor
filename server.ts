@@ -1,21 +1,21 @@
 import { createArtifactHandler } from './server/artifactRoutes.js';
-import { z } from 'zod';
-import { AssessmentError } from './server/assessment.js';
 import { createAssessmentHandler } from './server/assessmentRoutes.js';
 import { createResumeHandler } from './server/resumeRoutes.js';
 import express, { Request, Response, NextFunction, RequestHandler } from 'express';
 import dotenv from 'dotenv';
-import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { installAuth, requireWorkspaceOwner, privateNoStore } from './server/auth.js';
 import { assertBoundedJson } from './server/inputBounds.js';
-import { reserveProviderCall, ProviderBudgetExceeded, isBudgetedExternalPath } from './server/providerBudget.js';
+import { reserveProviderCall, ProviderBudgetExceeded, ProviderBudgetUnavailable, isBudgetedExternalPath } from './server/providerBudget.js';
 import { installPrivateFiles } from './server/privateFiles.js';
 import { createWorkspaceRouter } from './server/workspaceRoutes.js';
-import { redactAiPayload } from './server/privacy.js';
 import { verifyPostingAts } from './server/atsAdapters.js';
-import { executeDiscoveryRequest, validateDiscoveryInput } from './server/discovery.js';
+import { buildManualImportedJob, scanDiscoverySources, scanPublicBoard, sourcesForDiscoveryScope } from './server/discovery.js';
+import { buildDiscoveryQueries, googleSearchUrl, parseDiscoverySource } from './src/utils/discovery.js';
 import { mergeDiscoveredJobs } from './src/utils/jobIdentity.js';
 import { safeFetchText } from './server/safeFetch.js';
+import { createWorkspaceRepository } from './server/workspaceRepository.js';
+import { createStructuredModel } from './server/llmProvider.js';
+import { randomUUID } from 'node:crypto';
 
 
 dotenv.config();
@@ -52,8 +52,6 @@ export function createProviderBudgetMiddleware(reserve = reserveProviderCall): R
 }
 app.use('/api', createProviderBudgetMiddleware());
 
-// Lazy initialization of GoogleGenAI
-export class ProviderBudgetUnavailable extends Error {}
 export async function reserveAiProviderCall(ownerId: string, reserve = reserveProviderCall): Promise<void> {
   try {
     await reserve(ownerId, 'ai');
@@ -62,30 +60,14 @@ export async function reserveAiProviderCall(ownerId: string, reserve = reservePr
     throw new ProviderBudgetUnavailable();
   }
 }
-function getGeminiClient(req: Request, alreadyMinimized = false): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return null;
+export async function reserveExternalProviderCall(ownerId: string, reserve = reserveProviderCall): Promise<void> {
+  try {
+    await reserve(ownerId, 'external');
+  } catch (error) {
+    if (error instanceof ProviderBudgetExceeded) throw error;
+    throw new ProviderBudgetUnavailable();
   }
-  const client = new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build'
-      }
-    }
-  });
-  const generate = client.models.generateContent.bind(client.models);
-  client.models.generateContent = async (params: any) => {
-    await reserveAiProviderCall(req.res!.locals.ownerId);
-    const bounded = { ...params, config: { ...params.config, httpOptions: { ...params.config?.httpOptions, timeout: 30000 } } };
-    return generate(alreadyMinimized ? bounded : redactAiPayload(bounded, req.body?.candidateProfile));
-  };
-  return client;
 }
-
-const MODEL_NAME = 'gemini-3.8-flash';
-
 // ==========================================
 // 0. Fetch Job Posting from URL
 // ==========================================
@@ -133,13 +115,8 @@ app.post('/api/fetch-job-url', async (req: Request, res: Response): Promise<void
 // ==========================================
 // 1. Analyze Job & Classify Role Family & Multi-Factor Fit
 // ==========================================
-function geminiJsonSchema(schema: z.ZodType) { const { ['$schema']: dialect, ...json } = z.toJSONSchema(schema); return json; }
-const assessmentHandler = createAssessmentHandler((req) => async (schema, system, data) => {
-  const ai = getGeminiClient(req, true);
-  if (!ai) throw new AssessmentError('Gemini is not configured; no assessment produced');
-  const response = await ai.models.generateContent({model:MODEL_NAME,contents:JSON.stringify(data),config:{systemInstruction:system,responseMimeType:'application/json',responseJsonSchema:geminiJsonSchema(schema),thinkingConfig:{thinkingLevel:ThinkingLevel.MEDIUM},httpOptions:{timeout:30000}}});
-  return schema.parse(JSON.parse(response.text || ''));
-});
+const structuredModel = (req: Request) => createStructuredModel(req, { reserveAiCall: reserveAiProviderCall });
+const assessmentHandler = createAssessmentHandler(structuredModel);
 app.post('/api/analyze-job', assessmentHandler);
 // Compatibility route uses the same persisted deterministic assessment, never a second scoring path.
 app.post('/api/match-evidence', assessmentHandler);
@@ -155,12 +132,7 @@ app.post('/api/gap-interview', (_req, res) => {
 // ==========================================
 // 4. Tailoring Plan
 // ==========================================
-const resumeModel = (req: Request) => async (schema: z.ZodType, system: string, data: unknown) => {
-  const ai = getGeminiClient(req, true);
-  if (!ai) throw new Error('Gemini is not configured');
-  const response = await ai.models.generateContent({model:MODEL_NAME,contents:JSON.stringify(data),config:{systemInstruction:system,responseMimeType:'application/json',responseJsonSchema:geminiJsonSchema(schema),thinkingConfig:{thinkingLevel:ThinkingLevel.MEDIUM},httpOptions:{timeout:30000}}});
-  return schema.parse(JSON.parse(response.text || ''));
-};
+const resumeModel = structuredModel;
 app.post('/api/generate-plan', createResumeHandler('plan', resumeModel));
 app.post('/api/generate-resume', createResumeHandler('generate', resumeModel));
 app.post('/api/evaluate-resume', createResumeHandler('evaluate', resumeModel));
@@ -170,75 +142,11 @@ app.post('/api/export-resume', createResumeHandler('export', resumeModel));
 // ==========================================
 // 6. Generate Tailored Cover Letter (Deterministic Header & Sign-Off)
 // ==========================================
-app.post('/api/generate-cover-letter', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { parsedJob, candidateProfile, tailoredResume } = req.body;
-
-    const ai = getGeminiClient(req);
-    if (!ai) {
-      res.status(503).json({
-        error:
-          'Gemini API key is not configured. Studio fails closed to prevent unverified hallucinations.'
-      });
-      return;
-    }
-
-    const dateStr = new Date().toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    });
-
-    const prompt = `Write a compelling, truthful, and grounded cover letter applying for:
-Company: ${parsedJob.company}
-Role: ${parsedJob.roleTitle}
-
-CRITICAL RULES:
-1. STRICTLY NO EM DASHES (—) OR EN DASHES (–) ANYWHERE. Use commas or periods.
-2. Grounded strictly in supplied candidate evidence and projects.
-3. Do NOT invent metrics, revenue, or leadership roles. Preserve supplied candidate titles.
-4. Professional tone: conversational, confident, free of empty clichés.
-5. Exactly 3 to 4 well-structured paragraphs.
-6. Return ONLY the body paragraphs and evidence themes used.
-
-Return JSON:
-{
-  "paragraphs": string[],
-  "evidenceThemesUsed": string[]
-}`;
-
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ text: prompt }],
-      config: {
-        responseMimeType: 'application/json', httpOptions: { timeout: 30000 }
-      }
-    });
-
-    const generated = z.object({ paragraphs: z.array(z.string().max(6000)).min(3).max(4), evidenceThemesUsed: z.array(z.string().max(500)).max(20) }).strict().parse(JSON.parse(response.text || ''));
-    const candidateName =
-      candidateProfile?.name ||
-      candidateProfile?.fullName ||
-      tailoredResume?.header?.name ||
-      '';
-
-    const coverLetter = {
-      id: `cl-${Date.now()}`,
-      jobId: parsedJob.roleTitle,
-      date: dateStr,
-      recipientName: `Hiring Team for ${parsedJob.roleTitle}`,
-      companyName: parsedJob.company,
-      roleTitle: parsedJob.roleTitle,
-      paragraphs: (generated.paragraphs || []).map((p: string) => p.replace(/[—–]/g, ', ')),
-      signOff: `Sincerely,\n${candidateName}`,
-      evidenceThemesUsed: generated.evidenceThemesUsed || []
-    };
-
-    res.json({ coverLetter });
-  } catch (error: any) {
-    console.error('Private operation failed');
-    res.status(500).json({ error: 'Failed to generate cover letter' });
-  }
+app.post('/api/generate-cover-letter', (_req: Request, res: Response): void => {
+  res.status(410).json({
+    error: 'Legacy cover letter generation is unavailable pending provenance review.',
+    code: 'LEGACY_OPERATION_UNAVAILABLE'
+  });
 });
 
 // ==========================================
@@ -261,40 +169,62 @@ app.post('/api/verify-ats', async (req: Request, res: Response): Promise<void> =
 });
 
 // ==========================================
-// 12. Search-Grounded Job Discovery Engine
+// 12. Keyless public-board discovery and manual posting ingestion
 // ==========================================
-export function createDiscoveryHandler(client = getGeminiClient): RequestHandler {
+type DiscoveryWorkspace = { searchProfile: import('./src/types/index.js').SearchProfile | null; jobs: import('./src/types/index.js').JobRecord[]; companyWatchlist?: import('./src/types/index.js').CompanyWatchlistEntry[] };
+const defaultDiscoveryRepository = createWorkspaceRepository();
+const defaultReadDiscoveryWorkspace = async (ownerId: string): Promise<DiscoveryWorkspace> => {
+  const workspace = await defaultDiscoveryRepository.read(ownerId);
+  return { searchProfile: workspace.searchProfile, jobs: workspace.jobs, companyWatchlist: workspace.companyWatchlist };
+};
+const defaultRecordDiscoverySession = (ownerId: string, session: import('./src/types/index.js').SearchSessionDiagnostic) => defaultDiscoveryRepository.appendSearchSession(ownerId, session);
+export function createDiscoveryHandler(
+  reserve = reserveProviderCall,
+  readWorkspace: (ownerId: string) => Promise<DiscoveryWorkspace> = defaultReadDiscoveryWorkspace,
+  scan: typeof scanPublicBoard = scanPublicBoard,
+  recordSession: (ownerId:string, session:import('./src/types/index.js').SearchSessionDiagnostic)=>Promise<unknown> = readWorkspace === defaultReadDiscoveryWorkspace ? defaultRecordDiscoverySession : async()=>undefined
+): RequestHandler {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const {
-        searchProfile,
-        customQueries,
-        evidenceItems,
-        existingJobs,
-        queryBudget = 4
-      } = req.body;
-
-      const ai = client(req);
-      if (!ai) {
-        res.status(503).json({
-          error: 'AI generation is not configured. Discovery remains unavailable until it is configured.',
-          code: 'AI_NOT_CONFIGURED'
-        });
-        return;
+      const requestedWindow = req.body.windowDays ?? 14;
+      if (Object.keys(req.body).some(key => !['scope','windowDays'].includes(key)) || !['WATCHLIST', 'ALL_ENABLED'].includes(req.body.scope) || ![1,2,7,14].includes(requestedWindow)) {
+        res.status(400).json({ error: 'Board discovery requires an explicit supported scope.' }); return;
       }
 
-      try { validateDiscoveryInput(searchProfile, queryBudget, customQueries); }
+      const workspace = await readWorkspace(req.res!.locals.ownerId);
+      const searchProfile = workspace.searchProfile;
+      const existingJobs = workspace.jobs;
+      if (!searchProfile) { res.status(400).json({ error: 'Configure valid search preferences first.' }); return; }
+      let queries: string[];
+      try { queries = buildDiscoveryQueries(searchProfile, 10); }
       catch (error) { res.status(400).json({error: (error as Error).message}); return; }
-      // Budget counts requests, not Google's unobservable internal query execution.
-      const outcome = await executeDiscoveryRequest(prompt => ai.models.generateContent({
-        model: MODEL_NAME, contents: [{text: prompt}], config: {tools: [{googleSearch: {}}]}
-      }), searchProfile, queryBudget, customQueries);
+      const scope = req.body.scope as import('./src/types/index.js').DiscoveryScope;
+      const windowDays = requestedWindow as import('./src/types/index.js').DiscoveryWindowDays;
+      const { sources, constraints } = sourcesForDiscoveryScope(searchProfile, existingJobs, workspace.companyWatchlist, scope);
+      for (const source of sources.filter(source => source.enabled)) await reserveExternalProviderCall(req.res!.locals.ownerId, reserve);
+      const outcome = await scanDiscoverySources(sources, searchProfile, scan, undefined, constraints, {windowDays});
       const candidates = outcome.jobs;
       const merged = mergeDiscoveredJobs(Array.isArray(existingJobs) ? existingJobs : [], candidates);
+      const sourceById = new Map(sources.map(source=>[source.id,source]));
+      const returnedNewJobs = merged.newJobs.filter(j => j.verificationStatus !== 'NOT_LISTED');
+      const searchSession: import('./src/types/index.js').SearchSessionDiagnostic = {
+        id:`search-${randomUUID()}`,requestedWindowDays:windowDays,searchedAt:outcome.diagnostics.searchedAt,scope,
+        sources:outcome.sourceResults.map(result=>{const source=sourceById.get(result.sourceId)!;return {sourceId:result.sourceId,provider:source.provider,boardId:source.boardId,status:result.status,health:result.health,fetched:result.fetched,selected:result.selected};}),
+        filters:outcome.diagnostics.filterCounts,
+        totals:{candidatesEncountered:outcome.diagnostics.candidatesEncountered,duplicatesRemoved:outcome.diagnostics.duplicatesRemoved,selectedForVerification:outcome.diagnostics.selectedForVerification,successfullyVerified:outcome.diagnostics.successfullyVerified,newlyDiscovered:returnedNewJobs.length,rediscovered:merged.refreshedJobs.length},
+        providerErrors:outcome.sourceResults.filter(result=>result.status==='FAILED').map(result=>{const source=sourceById.get(result.sourceId)!;return {sourceId:result.sourceId,provider:source.provider,boardId:source.boardId,reason:result.health as Exclude<import('./src/types/index.js').DiscoverySourceHealth,'SUCCESS'|'EMPTY_BOARD'|'ZERO_ELIGIBLE'>};}),
+        unsupportedProviders:outcome.sourceResults.filter(result=>result.health==='UNSUPPORTED_PROVIDER').map(result=>result.sourceId),
+      };
+      await recordSession(req.res!.locals.ownerId,searchSession);
       res.json({
-        discoveredJobs: merged.newJobs.filter(j => j.verificationStatus !== 'NOT_LISTED'),
+        discoveredJobs: returnedNewJobs,
         refreshedJobs: merged.refreshedJobs,
+        discoverySources: sources,
+        discoveryScope: scope,
+        sourceResults: outcome.sourceResults,
+        googleSearches: queries.map(query => ({ query, url: googleSearchUrl(query) })),
         discoveryRequestsUsed: outcome.discoveryRequestsUsed, queryBudgetUsed: outcome.queryBudgetUsed, queryBudgetUnit: outcome.queryBudgetUnit,
+        searchSession,
         freshnessStats: {
           newCount: merged.newJobs.filter(j => j.freshnessBand === 'NEW').length,
           recentCount: merged.newJobs.filter(j => j.freshnessBand === 'RECENT').length,
@@ -303,12 +233,12 @@ export function createDiscoveryHandler(client = getGeminiClient): RequestHandler
       });
     } catch (error) {
       if (error instanceof ProviderBudgetExceeded) {
-        res.status(429).json({ error: 'AI operation budget exceeded; retry after the current window', code: 'PROVIDER_BUDGET_EXCEEDED' });
+        res.status(429).json({ error: 'External operation budget exceeded; retry after the current window', code: 'PROVIDER_BUDGET_EXCEEDED' });
         return;
       }
       if (error instanceof ProviderBudgetUnavailable) {
-        console.warn('provider_budget_unavailable category=ai');
-        res.status(503).json({ error: 'AI operation budget is temporarily unavailable; retry later', code: 'PROVIDER_UNAVAILABLE' });
+        console.warn('provider_budget_unavailable category=external');
+        res.status(503).json({ error: 'External operation budget is temporarily unavailable; retry later', code: 'PROVIDER_UNAVAILABLE' });
         return;
       }
       console.error('Private operation failed');
@@ -318,14 +248,34 @@ export function createDiscoveryHandler(client = getGeminiClient): RequestHandler
 }
 app.post('/api/discover-jobs', createDiscoveryHandler());
 
+app.post('/api/discovery-sources/validate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (Object.keys(req.body).some(key => !['input', 'company'].includes(key))) { res.status(400).json({ error: 'Only a board URL/identifier and company label are accepted.' }); return; }
+    const source = parseDiscoverySource(req.body.input, req.body.company);
+    await scanPublicBoard(source);
+    res.json({ source: { ...source, validatedAt: new Date().toISOString() } });
+  } catch {
+    res.status(400).json({ error: 'The supported public board could not be validated.' });
+  }
+});
+
+app.post('/api/import-job', async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (Object.keys(req.body).some(key => !['url', 'description', 'company', 'title'].includes(key)) || typeof req.body.url !== 'string') {
+      res.status(400).json({ error: 'A posting URL and optional pasted job fields are accepted.' }); return;
+    }
+    const workspace = await createWorkspaceRepository().read(req.res!.locals.ownerId);
+    const imported = await buildManualImportedJob(req.body);
+    const merged = mergeDiscoveredJobs(workspace.jobs, [imported]);
+    res.json({ discoveredJobs: merged.newJobs, refreshedJobs: merged.refreshedJobs });
+  } catch {
+    res.status(400).json({ error: 'The posting URL could not be imported safely.' });
+  }
+});
+
 // Phase 6 certified downstream artifacts use the Phase 4/5 strict adapter.
 for (const [path, operation] of [['generate-proof-pack','proof'],['generate-outreach','outreach'],['generate-answers','answers'],['generate-referral','referral']] as const) {
-  app.post(`/api/${path}`, createArtifactHandler(operation, (req) => async (schema, system, data) => {
-    const ai=getGeminiClient(req,true);
-    if(!ai)throw new AssessmentError('Gemini is not configured; no artifact produced');
-    const response=await ai.models.generateContent({model:MODEL_NAME,contents:JSON.stringify(data),config:{systemInstruction:system,responseMimeType:'application/json',responseJsonSchema:geminiJsonSchema(schema),thinkingConfig:{thinkingLevel:ThinkingLevel.MEDIUM},httpOptions:{timeout:30000}}});
-    return schema.parse(JSON.parse(response.text || ''));
-  }));
+  app.post(`/api/${path}`, createArtifactHandler(operation, structuredModel));
 }
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Unknown API route' }));

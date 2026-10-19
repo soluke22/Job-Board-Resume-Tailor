@@ -33,6 +33,8 @@ test('search and master save plans acknowledge both changed document and depende
   const search = planSearchProfilePersistence({ preferredRoleFamilies: [] } as any, {} as any, [assessed]);
   assert.equal(search.jobs[0].assessmentStatus, 'STALE');
   assert.equal(search.jobs[0].proofPack.provenance.validationStatus, 'STALE');
+  const sourceOnly = planSearchProfilePersistence({ preferredRoleFamilies: [], discoverySources: [{ id:'x' }] } as any, { preferredRoleFamilies: [] } as any, [assessed]);
+  assert.equal(sourceOnly.jobs[0].assessmentStatus, 'ASSESSED', 'discovery source management is not assessment input');
   const master = planMasterResumePersistence({ id: 'next' } as any, {} as any, [assessed]);
   assert.equal(master.masterResume.id, 'next');
   assert.equal(master.jobs[0].proofPack.provenance.validationStatus, 'STALE');

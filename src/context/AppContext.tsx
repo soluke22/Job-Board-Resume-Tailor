@@ -5,6 +5,7 @@ import { invalidateEditedResume } from '../utils/resumeReadiness';
 import { evidenceReviewContent, preserveEvidenceReview, unreviewedEvidence } from '../utils/evidenceReview';
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { mergeDiscoveredJobs } from '../utils/jobIdentity';
+import { assessmentSearchProfile } from '../utils/discovery';
 import {
   CandidateProfile,
   EvidenceItem,
@@ -21,13 +22,19 @@ import {
   AuthSession,
   ApplicationStatus,
   InterviewProofPack,
-  RecruiterOutreach
+  RecruiterOutreach,
+  CompanyWatchlistEntry,
+  DiscoveryScope,
+  DiscoverySourceResult,
+  DiscoveryWindowDays,
+  SearchSessionDiagnostic
 } from '../types';
 import { storageService } from '../services/storage';
 import { apiService, setBeforePrivateRequest, invalidatePrivateRequests, signOutPrivateWorkspace, privateSignInFailureNotice, clearPrivateSignInIntent } from '../services/api';
 
 export type AppView =
   | 'dashboard'
+  | 'shortlist'
   | 'discover'
   | 'pipeline'
   | 'jobs'
@@ -41,6 +48,7 @@ export type AppView =
   | 'skills'
   | 'analytics'
   | 'candidate-setup'
+  | 'watchlist'
   | 'settings';
 
 export type AcknowledgedWorkspaceMutation<T> = {
@@ -156,7 +164,7 @@ export function planEvidenceAddition(currentEvidence: EvidenceItem[], item: Evid
 }
 
 export function planSearchProfilePersistence(nextProfile: SearchProfile, currentProfile: SearchProfile, currentJobs: JobRecord[]) {
-  return { searchProfile: nextProfile, jobs: JSON.stringify(nextProfile) === JSON.stringify(currentProfile) ? currentJobs : currentJobs.map(job => invalidateJobArtifacts(job.fit ? { ...job, assessmentStatus: 'STALE' } : job, 'Assessment source changed; reassess and regenerate before use')) };
+  return { searchProfile: nextProfile, jobs: JSON.stringify(assessmentSearchProfile(nextProfile)) === JSON.stringify(assessmentSearchProfile(currentProfile)) ? currentJobs : currentJobs.map(job => invalidateJobArtifacts(job.fit ? { ...job, assessmentStatus: 'STALE' } : job, 'Assessment source changed; reassess and regenerate before use')) };
 }
 
 export function planMasterResumePersistence(nextResume: TailoredResume, currentResume: TailoredResume, currentJobs: JobRecord[]) {
@@ -189,12 +197,15 @@ interface AppContextType {
   activeJobId: string | null;
   activeJob: JobRecord | null;
   masterResume: TailoredResume;
+  companyWatchlist: CompanyWatchlistEntry[];
   analytics: OutcomeAnalytics;
 
   // Status & Progress
   isAnalyzing: boolean;
   isGenerating: boolean;
   isDiscovering: boolean;
+  discoverySourceResults: DiscoverySourceResult[];
+  latestDiscoverySession: SearchSessionDiagnostic | null;
   error: string | null;
   clearError: () => void;
 
@@ -204,7 +215,7 @@ interface AppContextType {
   openResumeEditor: (id: string) => void;
 
   // Discovery & Job Pipeline
-  discoverJobs: (queryBudget?: number) => Promise<void>;
+  discoverJobs: (scope: DiscoveryScope, windowDays?: DiscoveryWindowDays) => Promise<void>;
   verifyAtsStatus: (jobId: string) => Promise<void>;
   addJob: (
     rawDescription: string,
@@ -286,6 +297,7 @@ interface AppContextType {
   exportWorkspaceJson: () => Promise<string>;
   clearWorkspace: () => void;
   resetPublicDemo: () => void;
+  saveCompanyWatchlist: (entries: CompanyWatchlistEntry[]) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -303,6 +315,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [skills, setSkillsState] = useState<SkillItem[]>(() => storageService.getSkills(workspaceMode));
   const [jobs, setJobsState] = useState<JobRecord[]>(() => storageService.getJobs(workspaceMode));
   const [masterResume, setMasterResumeState] = useState<TailoredResume>(() => storageService.getMasterResume(workspaceMode));
+  const [companyWatchlist, setCompanyWatchlistState] = useState<CompanyWatchlistEntry[]>(() => storageService.getCompanyWatchlist(workspaceMode));
   const [analytics, setAnalyticsState] = useState<OutcomeAnalytics>(() => storageService.getAnalytics(workspaceMode));
 
   const [activeJobId, setActiveJobId] = useState<string | null>(jobs[0]?.id || null);
@@ -316,6 +329,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
+  const [discoverySourceResults, setDiscoverySourceResults] = useState<DiscoverySourceResult[]>([]);
+  const [latestDiscoverySession, setLatestDiscoverySession] = useState<SearchSessionDiagnostic | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const clearError = () => setError(null);
@@ -324,6 +339,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Synchronize state when workspaceMode changes
   const reloadDataForMode = (mode: WorkspaceMode) => {
+    setDiscoverySourceResults([]);
     setProfileState(storageService.getProfile(mode));
     setSearchProfileState(storageService.getSearchProfile(mode));
     setEvidenceState(storageService.getEvidence(mode));
@@ -332,6 +348,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const loadedJobs = storageService.getJobs(mode);
     setJobsState(loadedJobs);
     setMasterResumeState(storageService.getMasterResume(mode));
+    setCompanyWatchlistState(storageService.getCompanyWatchlist(mode));
     setAnalyticsState(storageService.getAnalytics(mode));
     setActiveJobId(loadedJobs[0]?.id || null);
   };
@@ -341,7 +358,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsAuthModalOpen(true);
       return;
     }
-    if (newMode !== storageService.getWorkspaceMode()) { epoch.current++; invalidatePrivateRequests(); setWorkspaceEpoch(v => v + 1); }
+    if (newMode !== storageService.getWorkspaceMode()) {
+      epoch.current++;
+      invalidatePrivateRequests();
+      setLatestDiscoverySession(null);
+      setIsDiscovering(false);
+      setWorkspaceEpoch(v => v + 1);
+    }
     setWorkspaceModeState(newMode);
     storageService.setWorkspaceMode(newMode);
     reloadDataForMode(newMode);
@@ -371,10 +394,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthModalOpen(false); setIsQuickGrabOpen(false); setIsAtsGuardsOpen(false);
     setWorkspaceEpoch(v => v + 1);
     setSyncStatus('');
+    setLatestDiscoverySession(null);
     setIsAnalyzing(false); setIsGenerating(false); setIsDiscovering(false);
   };
   const adopt = (result: any) => {
     storageService.hydratePrivateWorkspace(result.data);
+    const sessions = Array.isArray(result.data?.searchSessions) ? result.data.searchSessions : [];
+    setLatestDiscoverySession(sessions.reduce((latest: SearchSessionDiagnostic | null, session: SearchSessionDiagnostic) => {
+      const timestamp = Date.parse(session?.searchedAt);
+      if (!Number.isFinite(timestamp)) return latest;
+      return !latest || timestamp > Date.parse(latest.searchedAt) ? session : latest;
+    }, null));
     revision.current = result.revision;
     saved.current = scheduled.current = JSON.stringify(storageService.privateSnapshot());
     reloadDataForMode('PRIVATE_WORKSPACE');
@@ -402,7 +432,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     setBeforePrivateRequest(persistCurrent);
     if (workspaceMode === 'PRIVATE_WORKSPACE' && ready.current) void persistCurrent().catch(() => {});
-  }, [profile, searchProfile, evidence, projects, skills, jobs, masterResume, workspaceMode]);
+  }, [profile, searchProfile, evidence, projects, skills, jobs, masterResume, companyWatchlist, workspaceMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -512,7 +542,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSearchProfile = (newSearchProfile: SearchProfile) => {
-    if (JSON.stringify(newSearchProfile) !== JSON.stringify(searchProfile)) setJobs(jobs.map(j=>invalidateJobArtifacts(j.fit?{...j,assessmentStatus:'STALE'}:j,'Assessment source changed; reassess and regenerate before use')));
+    if (JSON.stringify(assessmentSearchProfile(newSearchProfile)) !== JSON.stringify(assessmentSearchProfile(searchProfile))) setJobs(jobs.map(j=>invalidateJobArtifacts(j.fit?{...j,assessmentStatus:'STALE'}:j,'Assessment source changed; reassess and regenerate before use')));
     setSearchProfileState(newSearchProfile);
     storageService.saveSearchProfile(newSearchProfile, workspaceMode);
   };
@@ -529,6 +559,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       restore: () => { storageService.saveSearchProfile(previousProfile, workspaceMode); storageService.saveJobs(previousJobs, workspaceMode); }
     });
     if (outcome.kind === 'superseded') throw new Error('Search preferences save was superseded by newer workspace changes. Reload required.');
+  };
+  const saveCompanyWatchlist = async (entries: CompanyWatchlistEntry[]): Promise<void> => {
+    if (workspaceMode !== 'PRIVATE_WORKSPACE') { storageService.saveCompanyWatchlist(entries, workspaceMode); setCompanyWatchlistState(entries); return; }
+    const previous=storageService.getCompanyWatchlist(workspaceMode); const snapshot=()=>JSON.stringify(storageService.getCompanyWatchlist(workspaceMode));
+    const outcome=await acknowledgeWorkspaceMutation({ stage:()=>{storageService.saveCompanyWatchlist(entries,workspaceMode);return snapshot();},persist:persistCurrent,isCurrent:value=>snapshot()===value,publish:()=>setCompanyWatchlistState(entries),restore:()=>storageService.saveCompanyWatchlist(previous,workspaceMode) });
+    if(outcome.kind==='superseded') throw new Error('Watchlist save was superseded by newer workspace changes. Reload required.');
   };
 
   const setEvidence = (newEvidence: EvidenceItem[]) => {
@@ -587,12 +623,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Job Search & Discovery
-  const discoverJobs = async (queryBudget = 3): Promise<void> => {
+  const discoverJobs = async (scope: DiscoveryScope, windowDays: DiscoveryWindowDays = 14): Promise<void> => {
+    const startedEpoch = epoch.current;
     setIsDiscovering(true);
     setError(null);
+    setDiscoverySourceResults([]);
     try {
-      const res = await apiService.discoverJobs(searchProfile, undefined, queryBudget, jobs);
+      const res = await apiService.discoverJobs(scope, windowDays);
+      if (startedEpoch !== epoch.current) return;
       const newDiscovered = res.discoveredJobs || [];
+      setDiscoverySourceResults(res.sourceResults || []);
+      setLatestDiscoverySession(res.searchSession || null);
 
       // Read the latest cache after the await: an in-flight search must not undo
       // application edits or resurrect a history record deleted meanwhile.
@@ -602,10 +643,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setJobs(merged.jobs);
       if (merged.newJobs[0]) setActiveJobId(merged.newJobs[0].id);
     } catch (err: any) {
+      if (startedEpoch !== epoch.current) return;
+      setDiscoverySourceResults([]);
       console.error('Job discovery failed:');
       setError(err.message || 'Job discovery encountered an error');
     } finally {
-      setIsDiscovering(false);
+      if (startedEpoch === epoch.current) setIsDiscovering(false);
     }
   };
 
@@ -643,6 +686,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     userProvided = true
   ): Promise<JobRecord> => {
     const effectiveUrl = sourceUrl || '';
+    if (effectiveUrl && workspaceMode === 'PRIVATE_WORKSPACE') {
+      const response = await apiService.importJob({ url: effectiveUrl, description: rawDescription || undefined, company, title });
+      const incoming = [...(response.refreshedJobs || []), ...(response.discoveredJobs || [])] as JobRecord[];
+      if (!incoming.length) throw new Error('The posting matched no importable job.');
+      const currentJobs = storageService.getJobs(workspaceMode);
+      const merged = mergeDiscoveredJobs(currentJobs, incoming);
+      setJobs(merged.jobs);
+      const imported = merged.jobs.find(job => incoming.some(candidate => candidate.id === job.id)) || incoming[0];
+      setActiveJobId(imported.id);
+      return imported;
+    }
     const newJob: JobRecord = {
       id: `job-${crypto.randomUUID()}`,
       atsProvider: 'company-careers',
@@ -662,11 +716,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       verificationStatus: 'UNKNOWN',
       isCurrentlyListed: false,
       freshnessBand: 'UNKNOWN',
-      sourceChannel: 'Direct User Input',
+      sourceChannel: effectiveUrl ? 'Manual Web Import' : 'Direct User Input',
       applicationPriority: 'UNASSESSED',
       assessmentStatus: 'UNASSESSED',
       priorityReason: 'User imported target role; not assessed',
-      applicationStatus: 'SHORTLISTED',
+      applicationStatus: 'DISCOVERED',
       status: 'Imported',
       primaryRoleFamily: undefined,
       roleModifiers: [],
@@ -681,7 +735,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const currentJobs = storageService.getJobs(workspaceMode);
-    const updated = planJobCreation(currentJobs, newJob);
+    const updated = mergeDiscoveredJobs(currentJobs, [newJob]).jobs;
     if (workspaceMode === 'PRIVATE_WORKSPACE') {
       const snapshot = () => JSON.stringify(storageService.getJobs(workspaceMode));
       const outcome = await acknowledgeWorkspaceMutation({
@@ -1073,10 +1127,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeJobId,
         activeJob,
         masterResume,
+        companyWatchlist,
         analytics,
         isAnalyzing,
         isGenerating,
         isDiscovering,
+        discoverySourceResults,
+        latestDiscoverySession,
         error,
         clearError,
         setActiveJobId,
@@ -1112,6 +1169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsAuthModalOpen,
         saveProfile,
         saveSearchProfile,
+        saveCompanyWatchlist,
         saveMasterResume,
         addEvidenceItem,
         approveEvidenceItem,

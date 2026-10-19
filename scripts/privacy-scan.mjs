@@ -1,9 +1,10 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, normalize, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
 const strict = process.argv.includes('--strict');
 const rootArg = process.argv.indexOf('--root');
-const roots = rootArg >= 0 ? [process.argv[rootArg + 1]] : [...execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean), 'dist/client'];
+const scanRoot = rootArg >= 0 ? process.argv[rootArg + 1] : '.';
+const roots = rootArg >= 0 ? [scanRoot] : [...execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean), 'dist/client'];
 if(roots.some(root => !root)) throw Error('--root requires a path');
 const findings = [];
 let built = false;
@@ -25,6 +26,16 @@ async function walk(path) {
  if (/(?:^|[\\/])\.env(?:\.|$)/.test(path) && !path.endsWith('.env.example')) findings.push({path, rule:'tracked environment file'});
  if(!/\.(?:tsx?|jsx?|mjs|cjs|json|html|css|md|map|pem|key|ya?ml|toml|example)$/.test(path) && !/(?:^|[\\/])\.env/.test(path)) return;
  const value = await readFile(path,'utf8');
+ const normalizedPath = normalize(relative(scanRoot,path)).replaceAll('\\','/');
+ if(normalizedPath.startsWith('docs/manual-follow-up/')) {
+  if(normalizedPath !== 'docs/manual-follow-up/resume-editing-boundary.md') findings.push({path,rule:'owner-specific manual follow-up file'});
+ }
+ if(/(?:^|\/)tests\//.test(normalizedPath)) {
+  const exactAtsUuid = /https:\/\/(?:jobs\.ashbyhq\.com|jobs(?:\.eu)?\.lever\.co)\/([^/\s"'`]+)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi;
+  for(const match of value.matchAll(exactAtsUuid)) {
+   if(!/^(?:synthetic|fixture|demo|test)(?:[-_][a-z0-9-]+)*$/i.test(match[1])) findings.push({path,rule:'non-synthetic ATS fixture identity'});
+  }
+ }
  for(const [label,pattern] of rules) {
   // Test credentials are explicitly synthetic. Strong key/URL/key-file rules
   // still apply to tests; generic literal triage applies to runtime source/build.

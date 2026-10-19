@@ -2,11 +2,13 @@ import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navigation } from './components/Navigation';
 import { DashboardView } from './components/DashboardView';
+import { DailyShortlistView } from './components/DailyShortlistView';
 import { DiscoverView } from './views/DiscoverView';
 import { PipelineView } from './views/PipelineView';
 import { ProofPackView } from './views/ProofPackView';
 import { OutreachView } from './views/OutreachView';
 import { AnalyticsView } from './views/AnalyticsView';
+import { WatchlistView } from './views/WatchlistView';
 import { JobsView } from './components/JobsView';
 import { JobAnalysisView } from './components/JobAnalysisView';
 import { ResumeEditorView } from './components/ResumeEditorView';
@@ -62,6 +64,7 @@ const AppContent: React.FC = () => {
       {workspaceMode === 'PRIVATE_WORKSPACE' && <div role="status" className="px-6 py-2 text-xs text-slate-500">{syncStatus}</div>}
       <main key={`main-workspace-${workspaceMode}-${workspaceEpoch}`} className="flex-1 pb-16">
         {currentView === 'dashboard' && <DashboardView />}
+        {currentView === 'shortlist' && <DailyShortlistView />}
         {currentView === 'discover' && <DiscoverView />}
         {currentView === 'pipeline' && <PipelineView />}
         {currentView === 'jobs' && <JobsView />}
@@ -70,6 +73,7 @@ const AppContent: React.FC = () => {
         {currentView === 'proof-packs' && <ProofPackView />}
         {currentView === 'outreach' && <OutreachView />}
         {currentView === 'analytics' && <AnalyticsView />}
+        {currentView === 'watchlist' && <WatchlistView />}
         {currentView === 'master-resume' && <MasterResumeView />}
         {currentView === 'evidence-bank' && <EvidenceBankView />}
         {currentView === 'projects' && <ProjectsView />}
@@ -95,7 +99,7 @@ const AppContent: React.FC = () => {
           <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
           <span className="font-medium">
             {isDiscovering
-              ? 'Discovering active ATS postings with search grounding...'
+              ? 'Finding web leads and verifying exact ATS postings...'
               : isAnalyzing
               ? 'Analyzing job requirements against candidate evidence...'
               : 'Synthesizing tailored artifacts & defensible proof packs...'}

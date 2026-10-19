@@ -106,7 +106,7 @@ export const EvaluationPanel: React.FC<EvaluationPanelProps> = ({
         <div className="flex items-center space-x-2">
           <ShieldCheck className="w-4 h-4 text-emerald-500" />
           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-900 dark:text-white">
-            Quality Control & Guardrail Verification
+            Provenance Certification
           </h3>
         </div>
         <span
@@ -120,16 +120,31 @@ export const EvaluationPanel: React.FC<EvaluationPanelProps> = ({
         </span>
       </div>
 
+      <section aria-label="Resume quality review" className="text-xs rounded-lg p-3 bg-slate-50 dark:bg-slate-800/60 space-y-2 text-slate-800 dark:text-slate-200">
+        <h4 className="font-semibold">Resume quality: {evaluation.quality?.status || 'UNAVAILABLE'}</h4>
+        <p>Human review: PENDING. Provenance READY does not establish a persuasive or submission-ready resume.</p>
+        {evaluation.quality ? <>
+          <p>{evaluation.quality.relevantWorkClaimIds.length} relevant supported work claims. Document checks: {evaluation.quality.documentCompleteness.status}.</p>
+          {evaluation.quality.documentCompleteness.missingFields.length>0 && <p>Missing: {evaluation.quality.documentCompleteness.missingFields.join('; ')}</p>}
+          <ul className="space-y-1">
+            {evaluation.quality.requirements.map(r => <li key={r.requirementId}>{r.excerpt}: {r.status}{!r.important ? ' (preferred)' : ''}</li>)}
+          </ul>
+          <p>{evaluation.quality.limitations.join(' ')}</p>
+          {evaluation.quality.extractionReview && <p>Extraction review: {evaluation.quality.extractionReview.status}. {evaluation.quality.extractionReview.limitations}</p>}
+          {evaluation.quality.extractionReview?.potentialOmissions.map(o => <p key={`${o.start}-${o.end}`}>Potentially omitted: {o.excerpt}</p>)}
+        </> : <p>Evaluate against the current job to inspect relevance, coverage and document completeness.</p>}
+      </section>
+
       {/* Core Checks Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <span className="text-slate-500 text-[11px]">Summary:</span>
+          <span className="text-slate-500 text-[11px]">Summary support:</span>
           <span className={`font-semibold ${summaryPass ? 'text-emerald-600' : 'text-amber-500'}`}>
             {summaryPass ? 'PASS' : 'WARN'}
           </span>
         </div>
         <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <span className="text-slate-500 text-[11px]">Skills Match:</span>
+          <span className="text-slate-500 text-[11px]">Skills support:</span>
           <span className={`font-semibold ${skillsPass ? 'text-emerald-600' : 'text-amber-500'}`}>
             {skillsPass ? 'PASS' : 'WARN'}
           </span>
@@ -141,7 +156,7 @@ export const EvaluationPanel: React.FC<EvaluationPanelProps> = ({
           </span>
         </div>
         <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <span className="text-slate-500 text-[11px]">Role Family:</span>
+          <span className="text-slate-500 text-[11px]">Current basis:</span>
           <span className={`font-semibold ${roleFamilyPass ? 'text-emerald-600' : 'text-amber-500'}`}>
             {roleFamilyPass ? 'PASS' : 'WARN'}
           </span>

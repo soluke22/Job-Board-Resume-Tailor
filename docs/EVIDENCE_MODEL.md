@@ -90,7 +90,7 @@ Resume basis retains assessment fingerprint, JD hash, complete eligible-evidence
 fingerprint, profile fingerprint, master/profile fingerprint and tailoring version.
 Repository reads recheck basis and support. Changes make the historical artifact
 STALE rather than silently current. Identity/contact/education and each employment
-or project name/title/period are assembled from persisted master data. Gemini sees
+or project name/title/period are assembled from persisted master data. The selected structured model sees
 only narrowed requirements, IDs, supported source claims and redacted evidence.
 
 ## Editing, readiness, history and export
@@ -120,7 +120,7 @@ by resume approval. Phase 6 consumes this contract through separate downstream v
 See [TESTING.md](TESTING.md), [Phase 5 acceptance](exec-plans/active/phase-5-acceptance.md)
 and [execution plan](exec-plans/active/productionization.md).
 The standalone evidence validator checks ID/eligibility/ownership integrity only,
-not semantic support. Live Gemini and authenticated/deployed browser/print acceptance
+not semantic support. Live Gateway and authenticated/deployed browser/print acceptance
 remain external configuration gates. Page fit is an estimate, never a page-count
 or ATS guarantee.
 

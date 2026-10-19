@@ -7,6 +7,14 @@ career evidence, imports, resumes, jobs/applications, interviews, outreach, audi
 records, private source files and exports. Never copy private contents into docs,
 tests, screenshots, logs or public artifacts.
 
+Release privacy requires both mechanical scanning and semantic review. Regex and
+credential-shape rules cannot determine whether otherwise ordinary employer,
+school, project, posting or accomplishment text describes the real owner. Every
+public release must therefore review tracked documentation, fixtures and acceptance
+records for candidate- or workspace-specific meaning. Owner-specific resume editing
+instructions stay outside the repository; see
+[the resume editing boundary](manual-follow-up/resume-editing-boundary.md).
+
 ## Current State — Phase 1 implementation
 Better Auth provides Google OAuth only. Email/password is disabled. The current
 Google profile, user creation and session creation must match the server-only
@@ -35,7 +43,7 @@ metadata queries, private Blob storage and authorized attachment streaming.
 File reconciliation uses the same guard/origin check and owner-qualified durable
 upload intents. Pending/abandoned uploads are not API file metadata. Recovery never
 deletes an object with saved metadata; closed serverless DB boundaries deny late work.
-All remaining application APIs (candidate context, evidence, resume, Gemini,
+All remaining application APIs (candidate context, evidence, resume, structured AI,
 search, jobs/ATS, proof, outreach, answers and referral) inherit /api owner
 middleware. Only health and configured Google auth flows are public API surfaces.
 Private/auth/file/export responses carry private, no-store cache semantics.
@@ -96,16 +104,16 @@ persistence. Owner-scoped imports still downgrade evidence/artifact trust and ar
 atomic. Exported owner JSON contains private PII and is not encrypted.
 
 Provider usage is durable owner/category/hour/day data without prompts/content.
-Each Gemini invocation (including proof batches) requires atomic reservation:
+Each external structured-model invocation (including proof batches) requires atomic reservation:
 60/hour and 200/day. External fetch/discovery and private Blob read/mutation
 operations allow 120/hour and 500/day per category. DB outage/limit denial fails
 closed; failed calls retain usage; limits bound counts, not dollars/tokens.
 Fixed-window boundary bursts are possible; provider billing caps/alerts remain
-later operational acceptance. All Gemini requests use 30-second timeouts.
+later operational acceptance. Gateway requests use 30-second timeouts and zero SDK retries.
 
 Unused legacy gap generation returns 410; it cannot send arbitrary client evidence.
 Assessment/resume/regeneration exclude detected sensitive candidate context before
-Gemini; a sensitive edited claim is rejected even with a safe evidence envelope.
+the selected structured model; a sensitive edited claim is rejected even with a safe evidence envelope.
 Core assessment version phase4.1-v3 makes prior cached bases stale without changing
 scoring coefficients. Shared lexical privacy triage is conservative, not exhaustive
 semantic classification; ordinary concurrency/medical-software/booking domain

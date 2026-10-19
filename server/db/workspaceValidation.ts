@@ -2,7 +2,8 @@ import { applicationStatusSchema, applicationEventSchema, applicationSnapshotSch
 import { artifactProvenanceSchema, artifactStateSchema, questionCategorySchema } from '../../src/types/artifacts.js';
 import { z } from 'zod';
 import { claimSchema, resumeBasisSchema } from '../../src/types/provenance.js';
-import { metadataSchema, requirementSchema, extractionSchema } from '../../src/types/assessment.js';
+import { metadataSchema, requirementSchema, extractionSchema, extractionReviewSchema } from '../../src/types/assessment.js';
+import { normalizeWatchlistCompany } from '../../src/utils/watchlist.js';
 
 // Runtime counterparts of the persisted UI contracts. Unknown optional metadata is
 // preserved for forwards compatibility; known fields never bypass shape validation.
@@ -11,6 +12,7 @@ const id = z.string().min(1).max(200);
 const strings = z.array(text).max(5000);
 const flag = z.boolean();
 const number = z.number().finite();
+const count = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const object = <T extends z.ZodRawShape>(shape: T) => z.object(shape).loose();
 const list = <T extends z.ZodType>(schema: T) => z.array(schema).max(5000);
 const links = list(object({ label: text, url: text }));
@@ -19,13 +21,16 @@ export const profileSchema = object({ name: text, title: text, email: text, phon
   coreIdentity: text, masterSummary: text, safeVerbs: strings, restrictedVerbs: strings,
   fullName: text.optional(), preferredName: text.optional(), workAuthorization: text.optional(),
   targetRoleFamilies: strings.optional(), targetSeniority: strings.optional(), locationPreferences: strings.optional(), dealbreakers: strings.optional(), ...review });
+export const discoverySourceSchema = z.object({ id, company: text, provider: z.enum(['ashby','greenhouse','lever']), boardId: text,
+  boardUrl: text, enabled: flag, origin: z.enum(['configured','learned']), validatedAt: text.optional(), removed: flag.optional() }).strict();
 export const searchProfileSchema = object({ preferredRoleFamilies: strings, preferredModifiers: strings, excludedRolePatterns: strings,
   targetSeniority: strings, allowedEmploymentTypes: strings, excludedEmploymentTypes: strings,
   remotePreference: z.enum(['remote_only', 'hybrid_flexible', 'any']), hybridLocations: strings, maximumOnsiteFrequency: text,
   relocationAllowed: flag, clearancePolicy: z.enum(['exclude_clearance', 'open_to_clearance']),
   salaryPreference: object({ minTarget: number.optional(), minimumAcceptable: number.optional() }),
   hiringProcessPreferences: object({ dislikeAiInterviewers: flag.optional(), preferTakeHome: flag.optional(), dislikeLeetcode: flag.optional(), dislikeMultiRoundTakehome: flag.optional(), notes: text.optional() }),
-  companyExclusions: strings, technologyStrengths: strings, technologyAdjacencies: strings, technologyGaps: strings, ...review });
+  companyExclusions: strings, technologyStrengths: strings, technologyAdjacencies: strings, technologyGaps: strings,
+  discoverySources: list(discoverySourceSchema).max(50).optional(), ...review });
 const verification = z.enum(['verified', 'provisional', 'session-unreviewed', 'unverified', 'manual-edit-unvalidated', 'rejected', 'requires-review']);
 export const evidenceSchema = object({ id, sourceType: text, sourceLocation: text, verificationStatus: verification,
   employer: text.optional(), role: text.optional(), period: text.optional(), context: text, rawEvidence: text,
@@ -51,7 +56,10 @@ const fit = object({ qualificationFit: number.min(0).max(10), evidenceCoverage: 
   initialFitScore: number, tailoredFitScore: number, verdict: z.enum(['Apply', 'Borderline', 'Skip']), verdictReason: text,
   strongestMatch: text, biggestActualGap: text, blockers: strings, unsupportedRequirements: strings, canTailor: flag, rejectionNotice: text.optional() });
 const plan = object({ professionalSummaryAngle: text,
-  experienceBulletsPlan: list(object({ evidenceId: text, targetSignal: text, action: z.enum(['keep', 'rewrite', 'swap']), plannedAngle: text })).optional(),
+  requirementPriorities: list(object({requirementId:id,excerpt:text,importance:text,evidenceIds:strings})).optional(),
+  omissions: list(object({evidenceId:id,action:z.enum(['omit','review-shortening']),reason:text})).optional(),
+  experienceBulletsPlan: list(object({ evidenceId: text, targetSignal: text, action: z.enum(['keep', 'rewrite', 'swap']), plannedAngle: text,
+    scopeId: id.optional(), order: count.min(1).max(5000).optional(), targetRequirementIds: z.array(id).max(100).optional() })).optional(),
   projectSelection: list(object({ projectId: text, bulletCount: number, rationale: text })),
   skillsOrdering: list(object({ category: text, skills: strings })), skillsToRemove: strings, skillsToBackfill: strings, unsupportedClaimsToWithhold: strings });
 const letter = object({ id, jobId: text, date: text, recipientName: text, companyName: text, roleTitle: text, paragraphs: strings, signOff: text, evidenceThemesUsed: strings });
@@ -75,6 +83,7 @@ const evaluation = object({ isReady: flag, overallStatus: z.enum(['PASS', 'WARN'
   flags: list(object({ id, type: text, code: text.optional(), severity: z.enum(['critical', 'warning', 'info']), target: text,
     targetId: text.optional(), message: text, suggestedFix: text.optional(), isSafeToAutoFix: flag })) });
 const canonicalJobSchema = object({ id, atsProvider: text, atsBoard: text.optional(), atsJobId: text.optional(), company: text, title: text,
+  extractionReview: extractionReviewSchema.optional(),
   canonicalUrl: text, applyUrl: text, sourceUrl: text.optional(), discoveryUrl: text.optional(), description: text, location: text,
   discoveryTitle: text.optional(), discoveryCompany: text.optional(), discoverySummary: text.optional(),
   discoverySourceUrls: strings.optional(), discoveryAliases: strings.optional(),
@@ -82,7 +91,13 @@ const canonicalJobSchema = object({ id, atsProvider: text, atsBoard: text.option
   canonicalMetadata: z.unknown().optional(), publicationDateSource: text.optional(), assessmentStatus: z.enum(['UNASSESSED', 'ASSESSED', 'STALE']).optional(),
   jdSource: z.literal('user-provided').optional(), requirements: list(requirementSchema).optional(), assessmentMetadata: metadataSchema.optional(), assessmentFacts: extractionSchema.shape.facts.optional(),
   secondaryLocations: strings.optional(), remoteStatus: z.enum(['remote', 'hybrid', 'onsite', 'unknown']), workplaceType: text.optional(), employmentType: text,
-  compensation: object({ min: number.optional(), max: number.optional(), currency: text.optional(), interval: z.enum(['year', 'hour', 'month']).optional(), raw: text.optional() }).optional(),
+  compensation: object({ min: number.optional(), max: number.optional(), currency: text.optional(), interval: z.enum(['year', 'hour', 'month']).optional(), raw: text.optional(),
+    status: z.enum(['available','unavailable','ambiguous','malformed']).optional(),
+    ranges: z.array(object({ min: number.nonnegative().optional(), max: number.nonnegative().optional(), currency: text.optional(),
+      interval: z.enum(['year','hour','month']).optional(), kind: z.enum(['base','bonus','equity','total','unknown']), unit: z.literal('percent').optional(),
+      applicability: text.optional(), source: z.enum(['structured','description']), raw: text.optional()
+    }).refine(range => range.min === undefined || range.max === undefined || range.min <= range.max, 'Inverted compensation range')).max(100).optional()
+  }).optional(),
   department: text.optional(), team: text.optional(), publishedAt: text.optional(), updatedAt: text.optional(), firstSeenAt: text, lastVerifiedAt: text.optional(),
   verificationStatus: text, isCurrentlyListed: flag, freshnessBand: text.optional(), sourceChannel: text, searchQuery: text.optional(),
   primaryRoleFamily: text.optional(), roleModifiers: strings, seniority: text, hardRequirements: strings, preferredRequirements: strings,
@@ -105,7 +120,34 @@ const canonicalJobSchema = object({ id, atsProvider: text, atsBoard: text.option
   });
 export const jobSchema = z.preprocess(normalizeApplicationJob, canonicalJobSchema);
 const unique = <T extends z.ZodType<{ id: string }>>(schema: T) => list(schema).refine(records => new Set(records.map(r => r.id)).size === records.length, 'Duplicate record ids');
+const watchlistSchema = object({ id, companyName: z.string().trim().min(1).max(200), normalizedCompanyName: z.string().trim().min(1).max(200),
+  status: z.enum(['ACTIVE','PAUSED','RESEARCH']), priority: z.enum(['HIGH','MEDIUM','LOW']), lanes: z.array(z.enum(['frontend-product','ui-platform-design-systems','frontend-heavy-fullstack','production-support-frontend','forward-deployed-software'])).max(5),
+  locationPolicy: z.enum(['REMOTE_OK','LOCAL_HYBRID','ANY','UNKNOWN']), notes: text.optional(), careersUrl: z.string().url().max(2000).refine(value => { const protocol = new URL(value).protocol; return protocol === 'http:' || protocol === 'https:'; }, 'Careers URL must use http or https').optional(), atsSourceId: id.optional(), monitoringEnabled: flag, createdAt: text, updatedAt: text, ...review })
+  .superRefine((entry, context) => { if (entry.normalizedCompanyName !== normalizeWatchlistCompany(entry.companyName)) context.addIssue({ code:'custom', message:'Invalid normalized company name' }); if (entry.status === 'RESEARCH' && entry.atsSourceId) context.addIssue({ code:'custom', message:'Research entries cannot claim a configured source' }); if ((!entry.atsSourceId || entry.status === 'RESEARCH' || entry.status === 'PAUSED') && entry.monitoringEnabled) context.addIssue({ code:'custom', message:'Monitoring requires an active configured source' }); });
+const searchSessionSourceSchema = z.object({
+  sourceId:id, provider:z.enum(['ashby','greenhouse','lever']), boardId:id, status:z.enum(['SUCCESS','FAILED']),
+  health:z.enum(['SUCCESS','EMPTY_BOARD','ZERO_ELIGIBLE','HTTP_FAILURE','INVALID_RESPONSE','UNSUPPORTED_PROVIDER','UNKNOWN_FAILURE']).optional(),
+  fetched:count, selected:count
+}).strict().transform(source => ({
+  ...source,
+  health: source.health ?? (source.status === 'FAILED' ? 'UNKNOWN_FAILURE' : source.fetched === 0 ? 'EMPTY_BOARD' : source.selected === 0 ? 'ZERO_ELIGIBLE' : 'SUCCESS')
+}));
+const searchSessionProviderErrorSchema = z.object({
+  sourceId:id, provider:z.enum(['ashby','greenhouse','lever']), boardId:id,
+  reason:z.enum(['HTTP_FAILURE','INVALID_RESPONSE','UNSUPPORTED_PROVIDER','UNKNOWN_FAILURE']).optional()
+}).strict().transform(error => ({ ...error, reason: error.reason ?? 'UNKNOWN_FAILURE' as const }));
+
+export const searchSessionDiagnosticSchema = z.object({
+  id, requestedWindowDays: z.union([z.literal(1),z.literal(2),z.literal(7),z.literal(14)]), searchedAt: z.string().datetime({ offset:true }),
+  scope: z.enum(['WATCHLIST','ALL_ENABLED']),
+  sources: z.array(searchSessionSourceSchema).max(50),
+  filters: z.object({ profileExcluded:count, companyExcluded:count, employmentExcluded:count, employmentNotAllowed:count, roleExcluded:count, locationExcluded:count, knownOlderExcluded:count, futureExcluded:count, unknownDateUnselected:count, capUnselected:count }).strict(),
+  totals: z.object({ candidatesEncountered:count, duplicatesRemoved:count, selectedForVerification:count, successfullyVerified:count, newlyDiscovered:count, rediscovered:count }).strict(),
+  providerErrors: z.array(searchSessionProviderErrorSchema).max(50),
+  unsupportedProviders: z.array(id).max(20),
+}).strict();
+export const searchSessionSchema = z.union([searchSessionDiagnosticSchema, z.object({ id }).strict()]);
 export const workspaceInput = z.object({ profile: profileSchema.nullable().optional(), searchProfile: searchProfileSchema.nullable().optional(), masterResume: resumeSchema.nullable().optional(),
   evidence: unique(evidenceSchema).optional(), projects: unique(projectSchema).optional(), skills: unique(skillSchema).optional(), jobs: unique(jobSchema).optional(),
-  experiences: unique(experienceSchema).optional(), searchSessions: unique(object({ id })).optional(),
+  experiences: unique(experienceSchema).optional(), searchSessions: unique(searchSessionSchema).optional(), companyWatchlist: unique(watchlistSchema).refine(records => new Set(records.map(r => r.normalizedCompanyName)).size === records.length, 'Duplicate company watchlist entry').optional(),
 }).strict();

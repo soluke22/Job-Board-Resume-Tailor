@@ -7,13 +7,69 @@ unassessed record -> source-backed requirements -> approved owner evidence retri
 -> validated semantic matching -> deterministic qualification/coverage/priority.
 
 ### Discovery source is not canonical source
-server/discovery.ts builds the prompt from allowlisted configured SearchProfile
-preferences. No candidate identity/contact/evidence is sent by discovery. Optional
-customQueries are passed as search-query suggestions; provider execution cannot
-be guaranteed. Grounding web source URLs and actual SDK webSearchQueries are
-retained. Missing grounding metadata is not fabricated. Discovery company/title
-labels remain in discoveryCompany/discoveryTitle; a provider title replaces the
-display title when available. No company identity is invented from a board slug.
+src/utils/discovery.ts deterministically builds at most ten human-readable queries from
+allowlisted SearchProfile fields. It uses role families, modifiers, technologies,
+remote/location preferences and targeted Ashby/Greenhouse/Lever domains without
+turning exclusion lists into positive terms. The UI encodes each as a normal
+`https://www.google.com/search?q=...` link. CareerOS neither calls a Google/search API
+nor scrapes or stores Google results. Candidate identity, contact, evidence and
+history never enter query construction. The owner reviews browser results and imports
+a useful posting URL or pasted JD through the manual flow.
+
+Automatic discovery is separate: the server loads the owner-scoped persisted
+SearchProfile, watchlist and jobs, and unions validated configured sources with exact
+board identities learned from verified jobs. WATCHLIST scope scans only sources linked
+by ACTIVE, monitoring-enabled watchlist entries that remain enabled in that registry;
+PAUSED, RESEARCH, unlinked, stale, removed-target and non-watchlist sources are excluded,
+and repeated links still produce one provider request. ALL_ENABLED scope preserves an
+intentional complete enabled-registry scan. Both scan public Ashby, Greenhouse and Lever
+endpoints. Board URLs/identifiers are normalized through a fixed provider allowlist
+before validation; arbitrary hosts cannot become scan endpoints. Provider results are
+positively classified by normalized title and available structured department/team
+metadata into configured engineering families, then conservatively filtered for clear
+location incompatibility before exact posting verification. Ambiguous locations pass;
+the filter does not invent commute feasibility or use an AI classifier.
+One unavailable board yields a failed source result while other boards can complete.
+Workday has no implemented universal public API and remains unsupported.
+
+Checkpoint 1.8A eligibility uses named provider employment/workplace metadata,
+retaining raw values. Conflicting or absent types stay unknown (an explicit
+internship remains excluded even alongside a generic FullTime label). Explicit internship
+titles and student-only enrollment requirements are excluded; ordinary junior,
+associate, entry-level and non-student graduate engineering roles remain eligible.
+Unknown employment never becomes confirmed full-time and does not alone exclude.
+
+Explicit primary backend or pre-sales duties precede positive keyword matching.
+React/JavaScript mentions do not override those duties. Production customer
+integrations remain eligible forward-deployed work; an engineering department
+without demonstrated software delivery returns ROLE_SCOPE_UNKNOWN_PASS rather
+than a claim of confirmed scope. Negated/optional clauses do not establish an
+exclusion. These bounded lexical rules do not certify complete JD interpretation.
+
+Checkpoint 1.8A-R1 treats Finance/Legal/Compliance suffixes on forward-deployed
+engineering titles as business domains. Software-delivery responsibilities support
+eligibility; ambiguous duties pass with ROLE_SCOPE_UNKNOWN_PASS. Explicit business-only,
+backend-primary or pre-sales-primary responsibilities still exclude before title
+matching. Ordinary finance/legal occupations retain their existing exclusions.
+The live validation script's auxiliary employment summaries call the same
+employmentEligibility function as production discovery.
+
+Explicit mandatory attendance applies even when provider workplace metadata is
+missing. Distant required attendance outside configured hybrid locations and
+mandatory relocation can exclude. Potentially local hybrid stays available for
+assessment, without claiming transit access or commute times. A city without
+workplace evidence returns LOCATION_UNKNOWN_PASS and the stored workplace stays
+unknown, with a Discover card notice to confirm attendance. Employment/role/location
+exclusions use existing diagnostic counters;
+allocation, identity, dates and search-session persistence are unchanged.
+
+Canadian geography includes Toronto with Ontario/ON, province-plus-CA location
+notation, and explicitly named country/province metadata (including structured
+address fields). Isolated CA and Ontario, CA remain ambiguous; Ontario, California
+is not Canadian evidence. Explicit US-remote alternatives and configured local US
+alternatives and explicit permitted US-remote work in asserted clauses survive
+Canadian alternatives. This is bounded country recognition,
+not geocoding, transit verification or a claim that unknown workplaces are remote.
 
 discoveryUrl, discoveryAliases, discoverySourceUrls and discoverySummary retain
 untrusted discovery data. canonicalUrl/applyUrl come from supported provider
@@ -41,6 +97,10 @@ trustworthy adapters; no brittle scraper was added.
 
 Ashby: published postings feed, exact ID/jobUrl match and explicit isListed.
 Greenhouse: exact public job-post ID endpoint only; no board-success fallback.
+During a configured-board scan, the fixed Greenhouse boards API row supplies the
+provider, configured board and requisition ID even when `absolute_url` points to the
+employer's HTTPS careers site. That URL remains the canonical/application link;
+cross-board Greenhouse URLs and cross-provider ATS URLs are rejected.
 Lever: public v0 posting endpoint, including EU, never authenticated v1.
 [Official provider contract review](exec-plans/active/phase-3-provider-contracts.md)
 records API/content/date/compensation details and public schema limitations.
@@ -50,6 +110,40 @@ page explicitly reports closure. Redirects or canonical links to supported ATS
 URLs locate an alias; the exact provider endpoint must still verify it. Arbitrary
 custom aliases with no authoritative identity relationship are not guessed.
 
+### Compensation normalization
+
+Checkpoint 1.8B shares one server normalizer between board discovery and exact
+verification. Provider JSON remains in canonicalMetadata, including the original
+compensation, salaryRange, payInputRanges and Lever salary descriptions. Existing
+display surfaces use compensation.raw, now a bounded readable summary with explicit
+currency/period uncertainty and component/applicability labels.
+
+[Greenhouse pay ranges](https://developers.greenhouse.io/job-board.html) supply
+min_cents/max_cents/currency_type and title/blurb; cents are divided by 100, while
+period and base/other-component labels require explicit evidence. Board feeds may
+omit these fields even when exact pay-transparency responses contain them.
+[Ashby compensation](https://developers.ashbyhq.com/docs/public-job-posting-api)
+preserves separate Salary/Bonus/Equity components and tier labels; geographic tiers
+take precedence over aggregate summaryComponents. [Lever salaryRange](https://github.com/lever/postings-api)
+supplies amounts/currency/interval; explicit total/bonus/equity or scope descriptions
+are respected rather than treated as universal base salary.
+
+Optional status and ranges fields distinguish available, unavailable, ambiguous and
+malformed disclosure. Legacy records remain valid without these fields. Only one
+valid unscoped base range with explicit currency and a supported year/hour/month
+period populates legacy flat comparison fields. Regional ranges are never merged;
+bonus, equity and total compensation never populate a base maximum. Percentage
+components retain their unit. JSON contracts are additive; no SQL migration.
+
+Structured fields take precedence over conflicting JD prose, without borrowing
+missing currency/period from it. When structured disclosure is absent, bounded
+canonical text parsing accepts explicitly labelled compensation clauses only.
+Dollar symbols alone do not mean USD. Unknown formats remain raw/uncertain; no
+foreign-exchange conversion, assumed annualization, salary inference or geocoding.
+The existing annual-USD assessment preference/minimum policy and scoring weights
+are unchanged; discovery has no compensation rejection rule. A 100,000 USD target
+is tested as minTarget, not a new minimumAcceptable or a saved-owner profile edit.
+
 ### Dates and freshness
 publishedAt comes only from Ashby publishedAt (last publication), Greenhouse
 first_published, or numeric Lever createdAt when actually supplied (creation,
@@ -57,6 +151,14 @@ optional public v0 field). publicationDateSource labels those semantics.
 updatedAt is Greenhouse updated_at, never substituted for publication.
 firstSeenAt is local observation and survives rediscovery.
 lastVerifiedAt is the local verification attempt, including inconclusive attempts.
+
+Automatic discovery accepts an explicit 1-, 2-, 7- or 14-day publication window;
+14 days is the default. Boundaries compare exact UTC instants and include the lower
+boundary. Invalid or absent publication timestamps remain unknown, future timestamps
+remain future, and known older/future rows do not enter the fresh-window allocation.
+The allocator reserves at most four of the existing 24 slots for unknown-date rows.
+Known in-window rows are ordered newest-first within fair per-board rounds, so a
+large first feed cannot monopolize verification.
 
 Freshness uses publication only: NEW 0-7 days, RECENT 8-21, ESTABLISHED 22-45,
 OLD over 45. Missing, invalid or future publication yields UNKNOWN.
@@ -91,13 +193,37 @@ not certified until reassessed through the Phase 4 contract.
 Classification is not fit. Removed discoveries are not returned as new active leads;
 unlisted/unknown/unsupported records retain visible uncertainty, not active claims.
 
-### Request budget
-One Gemini grounding request runs per successful invocation. queryBudget (1-10)
-is an upper bound on discovery requests, not a requested number of Google queries.
-discoveryRequestsUsed counts the actual request invocation; legacy queryBudgetUsed
-is an alias with queryBudgetUnit discovery_requests. Internal Google query counts
-cannot be measured reliably; returned grounding query strings are provenance only.
-Invalid budgets/custom query shapes reject before any discovery request.
+### Request budget and failures
+discoveryRequestsUsed and queryBudgetUsed report eligible enabled public-board scans with
+queryBudgetUnit public_board_scans. Each scan reserves one owner-scoped external
+budget unit; no AI budget is reserved. Google links use the owner's browser and do not
+consume a CareerOS provider call. Board feeds are bounded to 500 entries. Employment,
+role-family and location filtering precede canonical identity dedupe, freshness
+classification, fair per-board allocation and the 24-lead exact-verification cap;
+ineligible and known-old rows cannot consume a slot. Per-source results distinguish
+fetched, role-eligible, location-eligible and selected counts. A board filtered to zero
+remains a successful source result. Each completed private discovery writes a bounded
+diagnostic record to the existing owner-scoped search_sessions JSON entity without
+changing the workspace revision. It records the requested window, search time, boards,
+stage counts, dedupe/allocation counts, new versus rediscovered totals and safe provider
+failure identities; descriptions, candidate data and secrets are excluded. The latest
+record is summarized in Discover, and only the most recent 100 are retained. Provider
+boundaries have an
+eight-second deadline. A failed board is reported without converting the operation
+into workspace-auth loss. Zero configured sources or zero matching postings is a
+successful empty result. There is no model or general-search fallback.
+
+Provider employment values are normalized conservatively before filtering:
+full-time, part-time, contract, internship and temporary remain distinct, while
+missing or unfamiliar values stay unknown. Raw provider values remain in canonical
+metadata. Deterministic role classification applies management and Staff+ seniority
+blocks before target-lane matching, distinguishes frontend/UI/design-system/DX
+platform work from infrastructure/cloud/compute/network/backend platform work, and
+uses canonical description evidence only to resolve otherwise ambiguous generic
+software or full-stack titles. Senior titles are not rejected by years alone.
+Provider health distinguishes HTTP failure, invalid response, unsupported provider,
+empty board, successful filtered-zero and successful eligible results without
+persisting response bodies.
 
 ### Fetch boundary
 server/safeFetch.ts serves generic verification and /api/fetch-job-url retrieval.
@@ -118,8 +244,8 @@ AVAILABLE canonical description is preferred. Explicit jdSource user-provided is
 allowed and labeled honestly; discovery snippets and generic URL fetches alone
 return INSUFFICIENT_JD. A user editing/pasting description explicitly supplies it.
 
-Shared strict Zod contracts live in src/types/assessment.ts. Gemini 3.8 Flash
-extracts exact short excerpts for job facts and hard/preferred/responsibility
+Shared strict Zod contracts live in src/types/assessment.ts. The configured model
+through Vercel AI Gateway extracts exact short excerpts for job facts and hard/preferred/responsibility
 requirements. Exact substring checks reject invented excerpts. Stable IDs hash
 kind and excerpt; source start/end offsets are retained. The model classifies
 the canonical five families/modifiers but never supplies final scores.
@@ -218,7 +344,7 @@ The UI displays a ten-point score and priority; no separate five-point fit exist
 Canonical refresh invalidates
 immediately; client evidence/profile edits conservatively mark scores stale.
 Current triage hides stale scores, without deleting history. Unchanged certified
-metadata reuses persisted assessment and invokes no Gemini; process-local cache
+metadata reuses persisted assessment and invokes no model provider; process-local cache
 and candidate title heuristics were removed. Ordinary saves cannot certify changed
 assessment or derived display fields; only the assessment service does so under
 the original workspace revision. In-flight conflicts return 409; client never
@@ -232,18 +358,17 @@ interview/provenance behavior is deferred to Phase 5 and is not certified here.
 
 ### Model boundary and live status
 Two bounded semantic requests maximum: extraction, then matching when relevant
-eligible evidence exists. Strict structured JSON schema, separate systemInstruction,
-MEDIUM thinking and 30-second SDK request timeout; no fake fallback or retry.
+eligible evidence exists. The Vercel AI SDK receives the existing Zod schema through
+`Output.object`, a separate system instruction, temperature zero and a 30-second
+request timeout; SDK retries are zero and there is no fallback.
 Scores/priorities are absent from model schemas, so injected output fields fail.
 Candidate contact/identity metadata is excluded, free-text evidence is redacted
 against the persisted profile, and evidence IDs remain unchanged.
-No GEMINI_API_KEY configured during acceptance: deterministic/mocked contracts
-verified, live semantic acceptance pending external configuration.
-SDK syntax reviewed against [official SDK config](https://googleapis.github.io/js-genai/release_docs/interfaces/types.GenerateContentConfig.html),
-[structured outputs](https://ai.google.dev/gemini-api/docs/structured-output),
-[model](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash) and
-[Zod JSON Schema](https://zod.dev/json-schema). Zod dialect metadata is removed;
-actual schema/service acceptance still needs the bounded synthetic live smoke.
+The application validates the SDK output again with the same strict Zod schema.
+SDK usage follows the [AI SDK generateText](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text)
+and [structured Output](https://ai-sdk.dev/docs/reference/ai-sdk-core/output)
+contracts plus [Zod JSON Schema](https://zod.dev/json-schema). Live Gateway semantics
+remain a bounded Preview acceptance gate rather than an inference from mocks.
 
 JD != evidence; classification != fit; fit != application priority;
 preference != blocker; adjacency != direct experience;
@@ -255,7 +380,7 @@ eligible owner evidence. SKIP/hard blockers are excluded; calibrated stretches
 remain eligible without an 8.0 score gate. Deterministic plans use requirement and
 evidence IDs for keep/omit decisions, project selection and supported skill labels.
 Master content supplies presentation/identity, never independent truth. Structured
-Gemini output may select/reorder complete approved evidence statements, with scope,
+Structured Gateway output may select/reorder complete approved evidence statements, with scope,
 IDs and exact text validated server-side before readiness. No free JD skill backfill.
 
 Manual edits invalidate exact-text approval; explicit checkpoints/revalidation and
@@ -368,3 +493,32 @@ candidate evidence. Export/import and disk restart have synthetic coverage.
 current status ≠ historical funnel; rejection ≠ known reason; outcome ≠ causal
 scoring signal; current score ≠ application-time score; ATS provider ≠ application
 channel; archived ≠ rejected; small sample ≠ reliable conclusion.
+# Daily shortlist (Checkpoint 1.9)
+
+The UI presents a deterministic review queue from already saved jobs. The
+default list contains at most ten deduplicated reviewable records with actual
+`publishedAt` values in the inclusive last 24 hours. Older 1-to-14-day postings and
+unknown publication dates are separate views; future or older records never fill the
+daily list. It does not fetch ATS records, analyze jobs, tailor documents, or change
+eligibility/scoring policy on page load. Explicit user review decisions use the
+existing acknowledged application-status pathway only.
+
+Current assessments can order a record, while stale and unassessed records remain
+explicitly review-needed. Compensation shows normalized components and unresolved
+currency, period, or regional applicability without conversion. The existing
+acknowledged application transitions support `SHORTLISTED` (Pursue) and `ARCHIVED`
+(Dismiss); neither submits an application. Review opens the existing analysis page.
+
+Queue records must be DISCOVERED or SHORTLISTED, without a current Skip decision
+or confirmed unavailable/unlisted posting. Unknown fit/availability remains a visible
+review requirement rather than confirmed eligibility. Ordering uses current priority,
+qualification fit, actual publication descending and stable requisition/record identity
+for ties. Counts cover all unique records in the three views before each ten-card cap;
+future and over-14-day dates are excluded. A local clock refreshes time boundaries
+every minute and on focus/visibility, without fetching. Verification counts reuse card
+concerns, including workplace, compensation and current unknown constraints.
+
+Workspace switches clear the in-memory scan label and discovery spinner. Discovery
+continuations check the workspace epoch before publishing jobs, diagnostics, errors
+or completion state; the existing keyed main view resets shortlist-local decisions
+and timeframe state. These UI guards do not replace server authorization.

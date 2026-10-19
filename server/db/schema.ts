@@ -46,6 +46,7 @@ export const contacts = entity('contacts');
 export const outreachRecords = entity('outreach_records');
 export const proofRecords = entity('proof_records');
 export const searchSessions = entity('search_sessions');
+export const companyWatchlists = entity('company_watchlists', { name: text('name') });
 export const auditEvents = entity('audit_events');
 export const privateFiles = pgTable('private_files', {
   ownerId: text('owner_id').notNull().references(() => user.id, { onDelete: 'cascade' }), id: text('id').notNull(),

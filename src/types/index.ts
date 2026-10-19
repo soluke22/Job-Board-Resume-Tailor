@@ -67,6 +67,66 @@ import type { ApplicationStatus, StatusTransitionEvent, ApplicationSnapshot } fr
 export type { OutcomeAnalytics } from '../utils/outcomeAnalytics';
 
 export type WorkspaceMode = 'PUBLIC_DEMO' | 'PRIVATE_WORKSPACE';
+export type WatchlistStatus = 'ACTIVE' | 'PAUSED' | 'RESEARCH';
+export type WatchlistPriority = 'HIGH' | 'MEDIUM' | 'LOW';
+export type WatchlistLocationPolicy = 'REMOTE_OK' | 'LOCAL_HYBRID' | 'ANY' | 'UNKNOWN';
+export type DiscoveryScope = 'WATCHLIST' | 'ALL_ENABLED';
+export type DiscoveryWindowDays = 1 | 2 | 7 | 14;
+export type CanonicalEmploymentType = 'full-time' | 'part-time' | 'contract' | 'internship' | 'temporary' | 'unknown';
+export type DiscoverySeniority = 'JUNIOR' | 'MID' | 'SENIOR' | 'STAFF' | 'PRINCIPAL' | 'DIRECTOR_MANAGEMENT' | 'UNKNOWN';
+export type DiscoverySourceHealth = 'SUCCESS' | 'EMPTY_BOARD' | 'ZERO_ELIGIBLE' | 'HTTP_FAILURE' | 'INVALID_RESPONSE' | 'UNSUPPORTED_PROVIDER' | 'UNKNOWN_FAILURE';
+export interface DiscoverySourceResult {
+  sourceId: string;
+  status: 'SUCCESS' | 'FAILED';
+  health: DiscoverySourceHealth;
+  fetched: number;
+  roleEligible: number;
+  locationEligible: number;
+  selected: number;
+}
+export interface SearchSessionDiagnostic {
+  id: string;
+  requestedWindowDays: DiscoveryWindowDays;
+  searchedAt: string;
+  scope: DiscoveryScope;
+  sources: Array<{
+    sourceId: string;
+    provider: 'ashby' | 'greenhouse' | 'lever';
+    boardId: string;
+    status: 'SUCCESS' | 'FAILED';
+    health: DiscoverySourceHealth;
+    fetched: number;
+    selected: number;
+  }>;
+  filters: {
+    profileExcluded: number;
+    companyExcluded: number;
+    employmentExcluded: number;
+    employmentNotAllowed: number;
+    roleExcluded: number;
+    locationExcluded: number;
+    knownOlderExcluded: number;
+    futureExcluded: number;
+    unknownDateUnselected: number;
+    capUnselected: number;
+  };
+  totals: {
+    candidatesEncountered: number;
+    duplicatesRemoved: number;
+    selectedForVerification: number;
+    successfullyVerified: number;
+    newlyDiscovered: number;
+    rediscovered: number;
+  };
+  providerErrors: Array<{ sourceId: string; provider: 'ashby' | 'greenhouse' | 'lever'; boardId: string; reason: Exclude<DiscoverySourceHealth, 'SUCCESS' | 'EMPTY_BOARD' | 'ZERO_ELIGIBLE'> }>;
+  unsupportedProviders: string[];
+}
+export interface CompanyWatchlistEntry {
+  id: string; companyName: string; normalizedCompanyName: string;
+  status: WatchlistStatus; priority: WatchlistPriority; lanes: PrimaryRoleFamily[];
+  locationPolicy: WatchlistLocationPolicy; notes?: string; careersUrl?: string;
+  atsSourceId?: string; monitoringEnabled: boolean; createdAt: string; updatedAt: string;
+}
 
 export interface AuthSession {
   isAuthenticated: boolean;
@@ -104,6 +164,7 @@ export interface SearchProfile {
   technologyStrengths: string[];
   technologyAdjacencies: string[];
   technologyGaps: string[];
+  discoverySources?: import('../utils/discovery').DiscoverySource[];
 }
 
 export type EvidenceStrength = 'Strong' | 'Moderate' | 'Weak' | 'Missing';
@@ -284,7 +345,12 @@ export interface TailoringPlan {
     targetSignal: string;
     action: 'keep' | 'rewrite' | 'swap';
     plannedAngle: string;
+    targetRequirementIds?: string[];
+    scopeId?: string;
+    order?: number;
   }[];
+  requirementPriorities?: { requirementId: string; excerpt: string; importance: string; evidenceIds: string[] }[];
+  omissions?: { evidenceId: string; action: 'omit' | 'review-shortening'; reason: string }[];
   projectSelection: {
     projectId: string;
     bulletCount: number;
@@ -402,7 +468,22 @@ export interface EvalFlag {
 
 export type EvaluationFlag = EvalFlag;
 
+// Advisory quality is separate from exact-text provenance and final-export eligibility.
+// No generated or imported assertion can approve human review.
+export interface ResumeQualityAssessment {
+  extractionReview?: import('./assessment').ExtractionReview;
+  status: 'UNAVAILABLE' | 'GAPS_FOUND' | 'REVIEW_REQUIRED';
+  humanReview: 'PENDING';
+  relevantWorkClaimIds: string[];
+  unlinkedWorkClaimIds: string[];
+  requirements: { requirementId: string; excerpt: string; important: boolean;
+    status: 'COVERED' | 'PARTIAL_SUPPORT' | 'NOT_REPRESENTED' | 'EVIDENCE_GAP'; claimIds: string[] }[];
+  documentCompleteness: { status: 'CHECKS_PASSED' | 'GAPS_FOUND'; missingFields: string[] };
+  limitations: string[];
+}
+
 export interface ResumeEvaluation {
+  quality?: ResumeQualityAssessment;
   isReady: boolean;
   overallStatus?: 'PASS' | 'WARN' | 'FAIL';
   summaryPass: boolean;
@@ -449,12 +530,26 @@ export type JobSourceChannel =
   | 'Recruiter Reachout'
   | 'Other';
 
+export interface CompensationRange {
+  min?: number;
+  max?: number;
+  currency?: string;
+  interval?: 'year' | 'hour' | 'month';
+  kind: 'base' | 'bonus' | 'equity' | 'total' | 'unknown';
+  unit?: 'percent';
+  applicability?: string;
+  source: 'structured' | 'description';
+  raw?: string;
+}
+
 export interface CompensationDetails {
   min?: number;
   max?: number;
   currency?: string;
   interval?: 'year' | 'hour' | 'month';
   raw?: string;
+  status?: 'available' | 'unavailable' | 'ambiguous' | 'malformed';
+  ranges?: CompensationRange[];
 }
 
 export interface InterviewProofClaim {
@@ -520,6 +615,7 @@ export interface ApplicationAnswer {
 }
 
 export interface JobRecord {
+  extractionReview?: import('./assessment').ExtractionReview;
   // Canonical identity & ATS
   id: string;
   atsProvider: AtsProvider;
@@ -550,7 +646,7 @@ export interface JobRecord {
   secondaryLocations?: string[];
   remoteStatus: 'remote' | 'hybrid' | 'onsite' | 'unknown';
   workplaceType?: string;
-  employmentType: 'full-time' | 'contract' | 'part-time' | 'internship' | string;
+  employmentType: CanonicalEmploymentType | string;
   compensation?: CompensationDetails;
   department?: string;
   team?: string;

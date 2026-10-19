@@ -10,7 +10,8 @@ import {
   OutcomeAnalytics,
   WorkspaceMode,
   AuthSession,
-  AuditLogEntry
+  AuditLogEntry,
+  CompanyWatchlistEntry
 } from '../types';
 import {
   DEMO_CANDIDATE_PROFILE,
@@ -19,7 +20,8 @@ import {
   DEMO_SKILLS,
   DEMO_MASTER_RESUME,
   DEMO_JOBS,
-  DEMO_SEARCH_PROFILE
+  DEMO_SEARCH_PROFILE,
+  DEMO_COMPANY_WATCHLIST
 } from '../data/syntheticDemoData';
 import {
   DEFAULT_PRIVATE_PROFILE,
@@ -39,6 +41,7 @@ const KEYS = {
   PRIVATE_MASTER_RESUME: 'caos_priv_master_resume',
   PRIVATE_SEARCH_PROFILE: 'caos_priv_search_profile',
   PRIVATE_AUDIT_LOG: 'caos_priv_audit_log',
+  PRIVATE_WATCHLIST: 'caos_priv_watchlist',
   // Demo Workspace storage keys
   DEMO_PROFILE: 'caos_demo_profile',
   DEMO_EVIDENCE: 'caos_demo_evidence',
@@ -46,7 +49,7 @@ const KEYS = {
   DEMO_SKILLS: 'caos_demo_skills',
   DEMO_JOBS: 'caos_demo_jobs',
   DEMO_MASTER_RESUME: 'caos_demo_master_resume',
-  DEMO_SEARCH_PROFILE: 'caos_demo_search_profile'
+  DEMO_SEARCH_PROFILE: 'caos_demo_search_profile', DEMO_WATCHLIST: 'caos_demo_watchlist'
 };
 
 const privateMemory = new Map<string, string>();
@@ -56,7 +59,7 @@ let currentSession = publicSession();
 export const PRIVATE_FIELDS = {
   profile: KEYS.PRIVATE_PROFILE, searchProfile: KEYS.PRIVATE_SEARCH_PROFILE, evidence: KEYS.PRIVATE_EVIDENCE,
   projects: KEYS.PRIVATE_PROJECTS, skills: KEYS.PRIVATE_SKILLS, jobs: KEYS.PRIVATE_JOBS,
-  masterResume: KEYS.PRIVATE_MASTER_RESUME, auditLog: KEYS.PRIVATE_AUDIT_LOG
+  masterResume: KEYS.PRIVATE_MASTER_RESUME, auditLog: KEYS.PRIVATE_AUDIT_LOG, companyWatchlist: KEYS.PRIVATE_WATCHLIST
 };
 const cache = {
   getItem(key: string) { return key.startsWith('caos_priv_') ? privateMemory.get(key) ?? null : localStorage.getItem(key); },
@@ -76,7 +79,7 @@ export const storageService = {
     }
   },
   privateSnapshot(): any {
-    return { profile: this.getProfile('PRIVATE_WORKSPACE'), searchProfile: this.getSearchProfile('PRIVATE_WORKSPACE'), evidence: this.getEvidence('PRIVATE_WORKSPACE'), projects: this.getProjects('PRIVATE_WORKSPACE'), skills: this.getSkills('PRIVATE_WORKSPACE'), jobs: this.getJobs('PRIVATE_WORKSPACE'), masterResume: this.getMasterResume('PRIVATE_WORKSPACE') };
+    return { profile: this.getProfile('PRIVATE_WORKSPACE'), searchProfile: this.getSearchProfile('PRIVATE_WORKSPACE'), evidence: this.getEvidence('PRIVATE_WORKSPACE'), projects: this.getProjects('PRIVATE_WORKSPACE'), skills: this.getSkills('PRIVATE_WORKSPACE'), jobs: this.getJobs('PRIVATE_WORKSPACE'), masterResume: this.getMasterResume('PRIVATE_WORKSPACE'), companyWatchlist: this.getCompanyWatchlist('PRIVATE_WORKSPACE') };
   },
   clearPrivateCache(): void { privateMemory.clear(); },
   resetPublicDemo(): void {
@@ -129,6 +132,8 @@ export const storageService = {
     const key = currentMode === 'PRIVATE_WORKSPACE' ? KEYS.PRIVATE_SEARCH_PROFILE : KEYS.DEMO_SEARCH_PROFILE;
     cache.setItem(key, JSON.stringify(profile));
   },
+  getCompanyWatchlist(mode?: WorkspaceMode): CompanyWatchlistEntry[] { const currentMode=mode||this.getWorkspaceMode(); const key=currentMode==='PRIVATE_WORKSPACE'?KEYS.PRIVATE_WATCHLIST:KEYS.DEMO_WATCHLIST; const fallback=currentMode==='PRIVATE_WORKSPACE'?[]:DEMO_COMPANY_WATCHLIST; try { const data=cache.getItem(key); return data?JSON.parse(data):structuredClone(fallback); } catch { return structuredClone(fallback); } },
+  saveCompanyWatchlist(entries: CompanyWatchlistEntry[], mode?: WorkspaceMode): void { const currentMode=mode||this.getWorkspaceMode(); cache.setItem(currentMode==='PRIVATE_WORKSPACE'?KEYS.PRIVATE_WATCHLIST:KEYS.DEMO_WATCHLIST,JSON.stringify(entries)); },
 
   // Evidence Items
   getEvidence(mode?: WorkspaceMode): EvidenceItem[] {
@@ -282,6 +287,7 @@ export const storageService = {
       skills: this.getSkills('PRIVATE_WORKSPACE'),
       jobs: this.getJobs('PRIVATE_WORKSPACE'),
       masterResume: this.getMasterResume('PRIVATE_WORKSPACE'),
+      companyWatchlist: this.getCompanyWatchlist('PRIVATE_WORKSPACE'),
       auditLog: this.getAuditLog()
     };
     return JSON.stringify(data, null, 2);
@@ -296,6 +302,7 @@ export const storageService = {
     cache.removeItem(KEYS.PRIVATE_JOBS);
     cache.removeItem(KEYS.PRIVATE_MASTER_RESUME);
     cache.removeItem(KEYS.PRIVATE_SEARCH_PROFILE);
+    cache.removeItem(KEYS.PRIVATE_WATCHLIST);
     this.addAuditLog('FILE_DELETED', 'all-records', 'Private workspace cleared by owner');
   }
 };

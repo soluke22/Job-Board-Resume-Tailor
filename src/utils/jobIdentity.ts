@@ -13,27 +13,36 @@ export function normalizedJobUrl(input?: string): string | undefined {
     return u.href;
   } catch { return undefined; }
 }
-function atsKey(j: Partial<JobRecord>) {
+export function supportedAtsIdentityKey(j: Partial<JobRecord>) {
   return j.atsJobId && j.atsBoard && ['ashby', 'greenhouse', 'lever'].includes(j.atsProvider || '')
     ? `${j.atsProvider}:${j.atsBoard}:${j.atsJobId}` : undefined;
 }
 const normalize = (s?: string) => s?.trim().toLowerCase().replace(/\s+/g, ' ');
+export function normalizedJobUrls(job: Partial<JobRecord>): Set<string> {
+  return new Set([job.canonicalUrl, job.sourceUrl, job.discoveryUrl, ...(job.discoveryAliases || [])]
+    .map(normalizedJobUrl).filter((url): url is string => !!url));
+}
 export function sameJob(a: Partial<JobRecord>, b: Partial<JobRecord>): boolean {
-  const ak = atsKey(a), bk = atsKey(b);
+  const ak = supportedAtsIdentityKey(a), bk = supportedAtsIdentityKey(b);
   if (ak && bk) return ak === bk; // Different requisitions are never title-merged.
-  const au = normalizedJobUrl(a.canonicalUrl || a.sourceUrl || a.discoveryUrl);
-  const bu = normalizedJobUrl(b.canonicalUrl || b.sourceUrl || b.discoveryUrl);
-  if (au && bu && au === bu) return true;
+  const aUrls = normalizedJobUrls(a), bUrls = normalizedJobUrls(b);
+  if ([...aUrls].some(url => bUrls.has(url))) return true;
   // Fallback only without conflicting strong identities/URLs and with known location.
-  if (ak || bk || au && bu) return false;
+  if (ak || bk || aUrls.size && bUrls.size) return false;
   return !!a.company && !!a.title && !!a.location && !!b.location &&
     normalize(a.company) === normalize(b.company) && normalize(a.title) === normalize(b.title) && normalize(a.location) === normalize(b.location);
 }
 const verifiedFields = ['atsProvider','atsBoard','atsJobId','title','canonicalUrl','applyUrl','description','rawDescription','location','secondaryLocations','remoteStatus','workplaceType','employmentType','compensation','department','team','publishedAt','publicationDateSource','updatedAt','lastVerifiedAt','verificationStatus','isCurrentlyListed','freshnessBand','canonicalContentStatus','canonicalContentSource','canonicalMetadata'] as const;
 export function refreshJob(existing: JobRecord, incoming: JobRecord): JobRecord {
   const merged = {...existing};
+  if (incoming.jdSource === 'user-provided' && (incoming.rawDescription || incoming.description)) {
+    merged.description = incoming.description;
+    merged.rawDescription = incoming.rawDescription;
+    merged.jdSource = 'user-provided';
+  }
   if (['LISTED', 'UNLISTED'].includes(incoming.verificationStatus)) {
     for (const key of verifiedFields) if ((incoming as any)[key] !== undefined && (incoming as any)[key] !== '') (merged as any)[key] = (incoming as any)[key];
+    if (!merged.company && incoming.company) merged.company = incoming.company;
   } else {
     merged.verificationStatus = incoming.verificationStatus;
     merged.isCurrentlyListed = incoming.isCurrentlyListed;

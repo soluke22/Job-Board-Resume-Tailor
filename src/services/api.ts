@@ -21,9 +21,12 @@ export function invalidatePrivateRequests() { generation++; }
 type SafeApiError = { error?: unknown; code?: unknown };
 function accessLost(response: Response, data?: SafeApiError) {
   const code = typeof data?.code === 'string' ? data.code : undefined;
-  const authLoss = response.status === 401 ||
+  // Provider errors are never authentication verdicts for the private workspace,
+  // even if an upstream service accidentally uses an auth-like HTTP status.
+  const providerFailure = code?.startsWith('AI_') === true || code?.startsWith('GEMINI_') === true || code?.startsWith('OLLAMA_') === true || code?.startsWith('SEARCH_') === true;
+  const authLoss = !providerFailure && (response.status === 401 ||
     (response.status === 403 && code === 'AUTH_FORBIDDEN') ||
-    code === 'AUTH_UNAVAILABLE';
+    code === 'AUTH_UNAVAILABLE');
   if (authLoss && storageService.getAuthSession().isAuthenticated) window.dispatchEvent(new Event('workspace-access-lost'));
   return authLoss;
 }
@@ -163,21 +166,28 @@ export const apiService = {
     return res.json();
   },
 
-  async discoverJobs(
-    searchProfile: any,
-    customQueries?: string[],
-    queryBudget?: number,
-    existingJobs?: any[]
-  ): Promise<{ discoveredJobs: any[]; refreshedJobs?: any[]; discoveryRequestsUsed?: number; queryBudgetUsed: number; freshnessStats: any }> {
+  async discoverJobs(scope: import('../types').DiscoveryScope, windowDays: import('../types').DiscoveryWindowDays = 14): Promise<{ discoveredJobs: any[]; refreshedJobs?: any[]; discoverySources?: any[]; discoveryScope: import('../types').DiscoveryScope; sourceResults?: import('../types').DiscoverySourceResult[]; googleSearches?: {query:string;url:string}[]; discoveryRequestsUsed?: number; queryBudgetUsed: number; freshnessStats: any; searchSession: import('../types').SearchSessionDiagnostic }> {
     const res = await privateFetch('/api/discover-jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ searchProfile, customQueries, queryBudget, existingJobs })
+      body: JSON.stringify({ scope, windowDays })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Job discovery failed');
     }
+    return res.json();
+  },
+
+  async validateDiscoverySource(input: string, company: string): Promise<{source: import('../utils/discovery').DiscoverySource}> {
+    const res = await privateFetch('/api/discovery-sources/validate', jsonRequest({ input, company }));
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Discovery source validation failed'); }
+    return res.json();
+  },
+
+  async importJob(input: {url:string;description?:string;company?:string;title?:string}): Promise<{discoveredJobs:any[];refreshedJobs?:any[]}> {
+    const res = await privateFetch('/api/import-job', jsonRequest(input));
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Posting import failed'); }
     return res.json();
   },
 

@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assessJob, assessmentSource, assessmentMetadata, eligibleEvidence, isCurrent, retrieveEvidence, scoreAssessment, sourceRequirements, validateMatches, constraints, ALGORITHM_VERSION } from '../server/assessment';
+import { assessJob, assessmentSource, assessmentMetadata, eligibleEvidence, isCurrent, retrieveEvidence, scoreAssessment, sourceRequirements, validateMatches, constraints, ALGORITHM_VERSION, AssessmentValidationFailure } from '../server/assessment';
 import { extractionSchema, semanticMatchesSchema } from '../src/types/assessment';
 import type { EvidenceItem, JobRecord, SearchProfile } from '../src/types';
 import { persistenceDb, syntheticJob, syntheticEvidence, approveAllEvidence } from './helpers/persistence';
-import { createWorkspaceRepository } from '../server/workspaceRepository';
+import { createWorkspaceRepository, WorkspaceConflict } from '../server/workspaceRepository';
 import { createAssessmentHandler } from '../server/assessmentRoutes';
+import { LlmProviderFailure, StructuredOutputFailure } from '../server/llmProvider';
+import { ProviderBudgetExceeded, ProviderBudgetUnavailable } from '../server/providerBudget';
 import { and, eq } from 'drizzle-orm';
 import { jobs as jobsTable } from '../server/db/schema';
 
@@ -17,10 +19,12 @@ const extracted={roleFamily:'frontend-product',modifiers:[],facts:[{kind:'compan
 const contract=()=>sourceRequirements(extracted,jd);
 const matching=(strength='Strong',relationship='direct')=>({matches:contract().requirements.map(r=>({requirementId:r.id,strength,relationship,evidenceIds:strength==='Missing'?[]:['e']}))});
 const scored=(strength='Strong',p=profile,j=job)=>{const c=contract();return scoreAssessment(j,c.extraction,c.requirements,validateMatches(matching(strength,strength==='Missing'?'none':strength==='Strong'?'direct':'adjacent'),c.requirements,[evidence()]),p);};
+const failure = (stage:string,code:string) => (error:unknown) => error instanceof AssessmentValidationFailure && error.stage===stage && error.code===code;
 
 test('source sufficiency: canonical, explicit user provided, discovery snippets fail closed',()=>{
   assert.equal(assessmentSource(job).source,'canonical');
   assert.equal(assessmentSource({...job,canonicalContentStatus:'UNAVAILABLE',jdSource:'user-provided'}).source,'user-provided');
+  assert.equal(assessmentSource({...job,jdSource:'user-provided'}).source,'user-provided','explicit user provenance wins over stale canonical availability');
   assert.throws(()=>assessmentSource({...job,canonicalContentStatus:'UNAVAILABLE'}),/INSUFFICIENT_JD/);
 });
 test('enabled verified owner snapshot records only; every nonapproved state excluded',()=>{
@@ -96,6 +100,31 @@ test('fingerprints invalidate JD, evidence, profile; legacy uncertified; rejecte
   assert.ok(!isCurrent(undefined,base));
   assert.ok(isCurrent(base,assessmentMetadata(job,[evidence(),{...evidence('bad'),verificationStatus:'rejected'}],profile)));
 });
+test('extraction failure matrix returns only finite stage and reason codes',async()=>{
+  await assert.rejects(assessJob(job,[evidence()],profile,async()=>{throw new StructuredOutputFailure('EMPTY_RESPONSE');}),failure('EXTRACTION_SCHEMA','ASSESSMENT_EXTRACTION_EMPTY_RESPONSE'));
+  await assert.rejects(assessJob(job,[evidence()],profile,async()=>{throw new StructuredOutputFailure('INVALID_JSON');}),failure('EXTRACTION_SCHEMA','ASSESSMENT_EXTRACTION_INVALID_JSON'));
+  await assert.rejects(assessJob(job,[evidence()],profile,async()=>({private:'schema payload'})),failure('EXTRACTION_SCHEMA','ASSESSMENT_EXTRACTION_SCHEMA_INVALID'));
+  assert.throws(()=>sourceRequirements({...extracted,requirements:[{kind:'hard',excerpt:'private absent excerpt'}]},jd),failure('EXTRACTION_CONTRACT','ASSESSMENT_EXTRACTION_EXCERPT_NOT_IN_JD'));
+  assert.throws(()=>sourceRequirements({...extracted,requirements:[{kind:'hard',excerpt:'React development required',centrality:'core',centralityExcerpt:'React development required'}]},jd),failure('EXTRACTION_CONTRACT','ASSESSMENT_EXTRACTION_INVALID_CENTRALITY_KIND'));
+  const neutral='Acme\nReact development expertise';
+  assert.throws(()=>sourceRequirements({...extracted,requirements:[{kind:'hard',excerpt:'React development expertise',centrality:'critical',centralityExcerpt:'React development expertise'}]},neutral),failure('EXTRACTION_CONTRACT','ASSESSMENT_EXTRACTION_CRITICAL_CONTEXT_INVALID'));
+  assert.throws(()=>sourceRequirements({...extracted,requirements:[extracted.requirements[0],extracted.requirements[0]]},jd),failure('EXTRACTION_CONTRACT','ASSESSMENT_EXTRACTION_DUPLICATE_REQUIREMENT'));
+});
+test('semantic failure matrix returns only finite stage and reason codes',async()=>{
+  let calls=0;
+  await assert.rejects(assessJob(job,[evidence()],profile,async()=>{calls++;if(calls===1)return extracted;throw new StructuredOutputFailure('EMPTY_RESPONSE');}),failure('SEMANTIC_SCHEMA','ASSESSMENT_SEMANTIC_EMPTY_RESPONSE'));
+  calls=0;
+  await assert.rejects(assessJob(job,[evidence()],profile,async()=>{calls++;if(calls===1)return extracted;throw new StructuredOutputFailure('INVALID_JSON');}),failure('SEMANTIC_SCHEMA','ASSESSMENT_SEMANTIC_INVALID_JSON'));
+  calls=0;
+  await assert.rejects(assessJob(job,[evidence()],profile,async()=>++calls===1?extracted:{private:'schema payload'}),failure('SEMANTIC_SCHEMA','ASSESSMENT_SEMANTIC_SCHEMA_INVALID'));
+  const c=contract(),complete=matching().matches;
+  assert.throws(()=>validateMatches({matches:[]},c.requirements,[evidence()]),failure('SEMANTIC_CONTRACT','ASSESSMENT_SEMANTIC_INCOMPLETE_COVERAGE'));
+  assert.throws(()=>validateMatches({matches:complete.map((m,i)=>({...m,requirementId:`unknown-${i}`}))},c.requirements,[evidence()]),failure('SEMANTIC_CONTRACT','ASSESSMENT_SEMANTIC_UNKNOWN_REQUIREMENT'));
+  assert.throws(()=>validateMatches({matches:complete.map(m=>({...m,evidenceIds:['private-ineligible-id']}))},c.requirements,[evidence()]),failure('SEMANTIC_CONTRACT','ASSESSMENT_SEMANTIC_INELIGIBLE_EVIDENCE'));
+  assert.throws(()=>validateMatches({matches:complete.map(m=>({...m,strength:'Missing',relationship:'none',evidenceIds:['e']}))},c.requirements,[evidence()]),failure('SEMANTIC_CONTRACT','ASSESSMENT_SEMANTIC_INVALID_SUPPORT_RELATIONSHIP'));
+  assert.throws(()=>validateMatches({matches:complete.map(m=>({...m,strength:'Moderate',relationship:'direct',evidenceIds:[]}))},c.requirements,[evidence()]),failure('SEMANTIC_CONTRACT','ASSESSMENT_SEMANTIC_INVALID_SUPPORT_RELATIONSHIP'));
+  assert.throws(()=>validateMatches({matches:complete.map(m=>({...m,strength:'Strong',relationship:'adjacent'}))},c.requirements,[evidence()]),failure('SEMANTIC_CONTRACT','ASSESSMENT_SEMANTIC_STRONG_ADJACENT'));
+});
 test('owner snapshot normalizes only freshness-verified legacy assessments', async () => {
   const {pg, db} = await persistenceDb();
   const repo = createWorkspaceRepository(() => db as any);
@@ -164,6 +193,51 @@ test('real owner repository certification, caller forgery, stale history and HTT
     const changed=await repo.save('owner-a',{evidence:[{...syntheticEvidence('e'),rawEvidence:'Different React scope'}]},bad.revision);
     assert.equal(changed.jobs[0].assessmentStatus,'STALE');
   } finally {await pg.close();}
+});
+test('assessment handler maps structured provider and AI-budget failures without private detail',async()=>{
+  const {pg,db}=await persistenceDb();const repo=createWorkspaceRepository(()=>db as any);
+  const persisted={...syntheticJob(),...job,applicationPriority:'UNASSESSED',qualificationFit:undefined,evidenceCoverage:undefined,fit:undefined};
+  try {
+    await repo.save('owner-a',{jobs:[persisted],evidence:[{...syntheticEvidence('e'),...evidence(),sourceType:'manual-entry'}],searchProfile:profile},0);
+    await approveAllEvidence(repo,'owner-a');
+    const invoke=async(error:Error)=>{
+      const handler=createAssessmentHandler(()=>async()=>{throw error;},repo);let status=200,payload:any;
+      const response={locals:{ownerId:'owner-a'},set:()=>response,status:(value:number)=>{status=value;return response;},json:(value:any)=>{payload=value;return response;}};
+      await handler({body:{jobId:'j'}} as any,response as any);return {status,payload};
+    };
+    assert.deepEqual(await invoke(new LlmProviderFailure('OLLAMA_INVALID_OUTPUT','Local model returned invalid structured output.')), {status:502,payload:{error:'Local model returned invalid structured output.',code:'OLLAMA_INVALID_OUTPUT',stage:'EXTRACTION_PROVIDER'}});
+    assert.deepEqual(await invoke(new LlmProviderFailure('AI_UNAVAILABLE','AI Gateway is temporarily unavailable; retry later.')), {status:503,payload:{error:'AI Gateway is temporarily unavailable; retry later.',code:'AI_UNAVAILABLE',stage:'EXTRACTION_PROVIDER'}});
+    assert.deepEqual(await invoke(new ProviderBudgetExceeded('private budget detail')), {status:429,payload:{error:'AI operation budget exceeded; retry after the current window',code:'PROVIDER_BUDGET_EXCEEDED',stage:'EXTRACTION_PROVIDER'}});
+    assert.deepEqual(await invoke(new ProviderBudgetUnavailable('private outage detail')), {status:503,payload:{error:'AI operation budget is temporarily unavailable; retry later',code:'PROVIDER_UNAVAILABLE',stage:'EXTRACTION_PROVIDER'}});
+    let semanticCalls=0;
+    const semanticHandler=createAssessmentHandler(()=>async()=>{
+      semanticCalls++;
+      if(semanticCalls===1)return extracted;
+      throw new LlmProviderFailure('AI_UNAVAILABLE','AI Gateway is temporarily unavailable; retry later.');
+    },repo);
+    let semanticStatus=200,semanticPayload:any;
+    const semanticResponse={locals:{ownerId:'owner-a'},set:()=>semanticResponse,status:(value:number)=>{semanticStatus=value;return semanticResponse;},json:(value:any)=>{semanticPayload=value;return semanticResponse;}};
+    await semanticHandler({body:{jobId:'j'}} as any,semanticResponse as any);
+    assert.deepEqual({status:semanticStatus,payload:semanticPayload},{status:503,payload:{error:'AI Gateway is temporarily unavailable; retry later.',code:'AI_UNAVAILABLE',stage:'SEMANTIC_PROVIDER'}});
+    assert.equal(semanticCalls,2);
+  } finally {await pg.close();}
+});
+test('assessment handler exposes safe validation diagnostics and persistence conflict only',async()=>{
+  const workspace:any={revision:4,profile:{},searchProfile:profile,evidence:[evidence()],jobs:[job]};
+  const invoke=async(model:any,repository:any={read:async()=>workspace,saveAssessment:async()=>workspace})=>{
+    const handler=createAssessmentHandler(()=>model,repository);let status=200,payload:any;
+    const response={locals:{ownerId:'owner-a'},set:()=>response,status:(value:number)=>{status=value;return response;},json:(value:any)=>{payload=value;return response;}};
+    await handler({body:{jobId:'j'}} as any,response as any);return {status,payload};
+  };
+  const extraction=await invoke(async()=>({private:'schema payload'}));
+  assert.deepEqual(extraction,{status:422,payload:{error:'Assessment response failed validation.',code:'ASSESSMENT_EXTRACTION_SCHEMA_INVALID',stage:'EXTRACTION_SCHEMA'}});
+  assert.doesNotMatch(JSON.stringify(extraction),/schema payload|React development required|Acme/);
+  const provider=await invoke(async()=>{throw new Error('private provider detail');});
+  assert.deepEqual(provider,{status:503,payload:{error:'Assessment provider request failed.',code:'ASSESSMENT_EXTRACTION_PROVIDER_FAILED',stage:'EXTRACTION_PROVIDER'}});
+  assert.doesNotMatch(JSON.stringify(provider),/private provider detail/);
+  let calls=0;
+  const conflict=await invoke(async()=>++calls===1?extracted:matching(),{read:async()=>workspace,saveAssessment:async()=>{throw new WorkspaceConflict();}});
+  assert.deepEqual(conflict,{status:409,payload:{error:'Workspace changed during assessment; reload and retry',code:'ASSESSMENT_WORKSPACE_CONFLICT',stage:'PERSISTENCE'}});
 });
 test('malicious score/priority and malformed model output fail strict contracts',()=>{
   assert.equal(extractionSchema.safeParse({...extracted,qualificationFit:10}).success,false);

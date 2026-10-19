@@ -2,7 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 import * as schema from '../../server/db/schema';
-import { DEFAULT_BLANK_MASTER_RESUME } from '../../src/data/privateSeedTemplate';
+import { DEFAULT_BLANK_MASTER_RESUME, DEFAULT_PRIVATE_PROFILE, DEFAULT_SEARCH_PROFILE } from '../../src/data/privateSeedTemplate';
 import { evidenceReviewHash } from '../../server/workspaceRepository';
 export async function approveAllEvidence(repo: any, ownerId: string) {
   let workspace = await repo.read(ownerId);
@@ -18,6 +18,15 @@ export async function persistenceDb(path?: string) {
   await migrate(db, { migrationsFolder: './migrations' });
   await db.insert(schema.user).values(['owner-a', 'owner-b'].map(id => ({ id, name: `Synthetic ${id}`, email: `${id}@example.invalid` }))).onConflictDoNothing();
   return { pg, db };
+}
+export function workspaceSaveSnapshot(workspace: any) {
+  return {
+    profile: workspace.profile ?? structuredClone(DEFAULT_PRIVATE_PROFILE),
+    searchProfile: workspace.searchProfile ?? structuredClone(DEFAULT_SEARCH_PROFILE),
+    evidence: workspace.evidence ?? [], projects: workspace.projects ?? [], skills: workspace.skills ?? [],
+    jobs: workspace.jobs ?? [], masterResume: workspace.masterResume ?? structuredClone(DEFAULT_BLANK_MASTER_RESUME),
+    companyWatchlist: workspace.companyWatchlist ?? [],
+  };
 }
 export const syntheticEvidence = (id = 'same-id', rawEvidence = 'Synthetic evidence') => ({
   id, rawEvidence, sourceType: 'user-interview', sourceLocation: 'synthetic fixture',

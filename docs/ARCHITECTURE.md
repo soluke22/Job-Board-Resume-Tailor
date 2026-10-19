@@ -3,7 +3,8 @@
 ## Current State — committed dev implementation
 React 19/Vite renders through src/main.tsx and src/App.tsx. AppContext coordinates
 candidate setup, discovery, evidence, tailoring and application workflows.
-Express/Gemini remains the application server; server/local.ts serves Vite in
+Express remains the application server, with Vercel AI Gateway behind the
+provider-neutral structured-model boundary; server/local.ts serves Vite in
 development and dist/client in production. api/index.ts is the Vercel adapter.
 Build emits dist/client and dist/server.mjs; Next.js remains conditional.
 
@@ -40,7 +41,7 @@ Local Node pools reuse until shutdown; Node serverless pools/auth instances are
 request-local and closed boundaries reject late continuations without reopening.
 
 Private data flow: server session -> authorized workspace read -> in-memory
-browser cache -> AppContext -> API -> guarded Express -> database/Gemini/Blob.
+browser cache -> AppContext -> API -> guarded Express -> database/providers/Blob.
 Workspace changes synchronize through revisioned APIs. src/services/storage.ts
 keeps private data/auth UI metadata in memory; public demo uses separate synthetic
 fixtures and public localStorage keys. legacyImport previews explicit local
@@ -50,13 +51,47 @@ session/auth verification clear private UI/cache; direct non-auth service failur
 preserve a verified session. Stale responses are rejected by generation.
 Public demo rendering remains independent of auth/database configuration.
 
-## AI and ATS boundaries
-Gemini initializes server-side from GEMINI_API_KEY. Discovery uses search
-through Gemini; analysis, evidence matches, plans, resumes, letters, evaluations,
-proof packs and outreach run through owner-protected API routes. AI outputs remain
+## Discovery, AI and ATS boundaries
+Discovery is deterministic and does not instantiate an AI client. Automatic
+discovery has two explicit scopes: WATCHLIST intersects active, monitoring-enabled
+watchlist links with still-enabled registry sources, while ALL_ENABLED intentionally
+scans the complete enabled registry. A watchlist link cannot create or re-enable a
+source. Both scopes scan public Ashby, Greenhouse and Lever boards through fixed
+provider endpoints. The source registry combines validated owner configuration
+with exact board identities learned from already-verified jobs; unknown board IDs are
+never inferred from company names. Each board scan consumes the external provider
+  budget only. No general-search API or credential is required. Each enabled source
+is normalized, positively classified into configured engineering role families,
+conservatively location-filtered, and globally canonical-identity-deduplicated with
+deterministic first-source attribution, then selected in deterministic round-robin
+order before the global 24 verification cap. Source outcomes report only safe fetched,
+role-eligible, location-eligible and selected counts, never payloads/errors or
+workspace-save counts. Filtered-zero is a successful board outcome, not a provider
+failure. Company priority is strategy metadata and does not influence allocation.
+
+A bounded allowlisted SearchProfile query builder separately creates normal
+`google.com/search` links for owner-reviewed broader exploration. CareerOS does not
+request, scrape or ingest Google result pages. The owner imports a useful URL or JD
+through the manual flow, where exact ATS verification, canonical dedupe and
+UNASSESSED defaults apply before any AI workflow.
+
+The structured-model boundary defaults to Vercel AI Gateway for analysis, evidence
+matches, plans, resumes, evaluations, proof packs and outreach through owner-protected
+API routes. The uncertified legacy cover-letter route is fail-closed with HTTP 410
+pending a separate provenance review; it sends no request body to a model provider.
+`AI_GATEWAY_MODEL` centralizes the hosted model; Vercel
+OIDC supplies server-side Gateway authentication, with `AI_GATEWAY_API_KEY` reserved
+for server-only execution outside Vercel. The AI SDK receives each existing Zod
+schema through `Output.object`, with temperature zero, a 30-second timeout, zero SDK
+retries, one budget reservation per request and a second application Zod validation.
+A developer may explicitly choose local Ollama with `AI_PROVIDER=ollama` (legacy
+`LLM_PROVIDER=ollama` remains accepted) and `OLLAMA_MODEL`; it is fixed to loopback
+`127.0.0.1:11434/api/generate`, uses strict JSON Schema output, and never falls back
+to Gateway. Cover letters remain unavailable in local mode. No selected provider
+falls back to another provider. AI outputs remain
 untrusted; route authorization does not establish semantic candidate provenance.
 JSON parsing and redaction are not sufficient evidence validation.
-Phase 3 discovery uses server/discovery.ts and exact public ATS adapters, preserving
+Discovery uses server/discovery.ts and exact public ATS adapters, preserving
 search provenance separately from canonical content, independent source/local dates,
 uncertain freshness and unassessed jobs. Shared src/utils/jobIdentity.ts merges
 current/history matches without replacing application lifecycle/attachments.
@@ -74,7 +109,11 @@ eligibility, require READY resume ledgers for proofs, and persist fingerprinted
 downstream artifacts under workspace revisions. Existing JSON-backed proof/outreach/
 contact/application records need no migration. Repository reads recheck stale bases;
 ordinary saves/imports cannot forge approval. Profile/manual question routing bypasses
-Gemini; model context excludes private contact/history and unrelated evidence metadata.
+the hosted model; model context excludes private contact/history and unrelated evidence metadata.
+
+`server/geminiDiagnostics.ts`, its isolated test and `@google/genai` are
+`DEAD_COMPATIBILITY_CODE_PENDING_REMOVAL`; no deployed structured workflow imports
+or calls them, and `GEMINI_API_KEY` is not required for assessment.
 
 ## Acceptance versus target
 Phase 8 pins npm/package-lock and Node 24.x, with Vite static `dist/client` plus

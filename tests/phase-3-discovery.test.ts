@@ -2,29 +2,34 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { verifyPostingAts, detectAtsProvider, genericPageResult, verifyGenericPage } from '../server/atsAdapters';
-import { buildDiscoveredJobs, discoveryPrompt, executeDiscoveryRequest } from '../server/discovery';
+import { assessmentSource } from '../server/assessment';
+import { boardEndpoint, buildDiscoveredJobs, buildManualImportedJob, deduplicateDiscoveryLeads, matchesSearchProfile, scanDiscoverySources, scanPublicBoard } from '../server/discovery';
+import { buildDiscoveryQueries, discoverySourcesForWorkspace, googleSearchUrl, parseDiscoverySource } from '../src/utils/discovery';
 import { calculateFreshnessBand } from '../server/searchEngine';
 import { mergeDiscoveredJobs, sameJob, normalizedJobUrl } from '../src/utils/jobIdentity';
 import { safeFetchText, validatePublicUrl, blockedAddress } from '../server/safeFetch';
 import { jobSchema } from '../server/db/workspaceValidation';
 
-const fixture = {company: 'Synthetic Company', title: 'Engineer', canonicalUrl: 'https://jobs.ashbyhq.com/synthetic/id', descriptionSummary: 'Search snippet', technologies: ['Fake'], publishedEstimate: 'Recent'};
+const fixture = {url: 'https://jobs.ashbyhq.com/synthetic/id', canonicalUrl: 'https://jobs.ashbyhq.com/synthetic/id', title: 'Engineer', company: 'Synthetic Company', description: 'Build React and TypeScript web interfaces.', source: 'public-board' as const};
+const freshVerification = {status:'LISTED' as const,isListed:true,lastVerifiedAt:'2026-10-14T12:00:00.000Z',rawDetails:{publishedAt:'2026-10-14T00:00:00.000Z'}};
 const json = (data: any, status = 200) => new Response(JSON.stringify(data), {status, headers: {'content-type': 'application/json'}});
 test('exact provider contracts and dates', async () => {
   const original = globalThis.fetch;
   try {
-    const ashby = {jobUrl: fixture.canonicalUrl, applyUrl: fixture.canonicalUrl + '/application', title: 'Canonical title', isListed: true, descriptionPlain: 'Actual posting content', publishedAt: '2026-08-01T00:00:00Z'};
+    const ashby = {jobUrl: fixture.url, applyUrl: fixture.url + '/application', title: 'Canonical title', companyName: 'Canonical Company', isListed: true, descriptionPlain: 'Actual posting content', publishedAt: '2026-08-01T00:00:00Z'};
     globalThis.fetch = async () => json({jobs: [ashby]});
     assert.equal((await verifyPostingAts(fixture.canonicalUrl)).status, 'LISTED');
-    const records = await buildDiscoveredJobs([fixture], ['https://source.example.org'], ['actual query']);
+    const records = await buildDiscoveredJobs([fixture]);
     assert.equal(records[0].description, ashby.descriptionPlain);
+    assert.equal(records[0].company, fixture.company, 'an existing board label is not overwritten');
+    assert.equal((await buildManualImportedJob({url:fixture.url}, async url => verifyPostingAts(url))).company, 'Canonical Company');
     assert.equal(records[0].publishedAt, '2026-08-01T00:00:00.000Z');
     assert.notEqual(records[0].firstSeenAt, records[0].publishedAt);
     assert.equal(records[0].qualificationFit, undefined);
     assert.equal(records[0].applicationPriority, 'UNASSESSED');
     assert.deepEqual(records[0].responsibilities, []);
     assert.deepEqual(records[0].technologies, []);
-    assert.deepEqual(records[0].discoverySourceUrls, ['https://source.example.org']);
+    assert.deepEqual(records[0].discoverySourceUrls, [fixture.url]);
     globalThis.fetch = async () => json({jobs: [{...ashby, isListed: false}]});
     assert.equal((await verifyPostingAts(fixture.canonicalUrl)).status, 'UNLISTED');
     globalThis.fetch = async () => json({jobs: [{...ashby, isListed: undefined}]});
@@ -36,9 +41,10 @@ test('exact provider contracts and dates', async () => {
     assert.equal((await verifyPostingAts('https://jobs.ashbyhq.com/synthetic')).status, 'UNKNOWN');
     const gh = 'https://job-boards.greenhouse.io/synthetic/jobs/123';
     let calls = 0;
-    globalThis.fetch = async () => {calls++; return json({id: 123, title: 'Engineer', absolute_url: gh, content: 'Actual GH content', updated_at: '2026-08-01T00:00:00Z'});};
+    globalThis.fetch = async () => {calls++; return json({id: 123, title: 'Engineer', companyName: 'Greenhouse Company', absolute_url: gh, content: 'Actual GH content', updated_at: '2026-08-01T00:00:00Z'});};
     const greenhouse = await verifyPostingAts(gh);
     assert.equal(greenhouse.status, 'LISTED');
+    assert.equal(greenhouse.rawDetails.company, 'Greenhouse Company');
     assert.equal(greenhouse.rawDetails.publishedAt, undefined);
     assert.equal(greenhouse.rawDetails.updatedAt, '2026-08-01T00:00:00.000Z');
     assert.equal((await verifyPostingAts('https://job-boards.greenhouse.io/synthetic')).status, 'UNKNOWN');
@@ -50,9 +56,10 @@ test('exact provider contracts and dates', async () => {
     globalThis.fetch = async () => json({jobs: [{id: 123}]});
     assert.equal((await verifyPostingAts(gh)).status, 'UNKNOWN');
     const lever = 'https://jobs.lever.co/synthetic/id';
-    globalThis.fetch = async () => json({id: 'id', text: 'Engineer', hostedUrl: lever, descriptionPlain: 'Lever description', createdAt: 1754006400000});
+    globalThis.fetch = async () => json({id: 'id', text: 'Engineer', company: 'Lever Company', hostedUrl: lever, descriptionPlain: 'Lever description', createdAt: 1754006400000});
     const lv = await verifyPostingAts(lever);
     assert.equal(lv.status, 'LISTED'); assert.equal(lv.rawDetails.publishedAt, '2025-08-01T00:00:00.000Z');
+    assert.equal(lv.rawDetails.company, 'Lever Company');
     globalThis.fetch = async () => json({}, 404);
     assert.equal((await verifyPostingAts(lever)).status, 'NOT_LISTED');
     globalThis.fetch = async () => {throw new Error('network');};
@@ -63,7 +70,7 @@ test('exact provider contracts and dates', async () => {
   } finally { globalThis.fetch = original; }
 });
 test('unknown dates, exceptions and missing URL never fabricate facts', async () => {
-  const [job] = await buildDiscoveredJobs([fixture], [], [], async () => {throw new Error('failure');});
+  const [job] = await buildDiscoveredJobs([fixture], async () => {throw new Error('failure');});
   assert.equal(job.verificationStatus, 'UNKNOWN'); assert.equal(job.isCurrentlyListed, false);
   assert.equal(job.publishedAt, undefined); assert.equal(job.freshnessBand, 'UNKNOWN');
   assert.equal(job.description, ''); assert.equal(job.canonicalUrl, ''); assert.equal(job.location, '');
@@ -73,42 +80,199 @@ test('unknown dates, exceptions and missing URL never fabricate facts', async ()
   assert.equal(calculateFreshnessBand(undefined, new Date().toISOString()), 'UNKNOWN');
   assert.equal(calculateFreshnessBand('Recent'), 'UNKNOWN');
   assert.equal(calculateFreshnessBand('2999-01-01'), 'UNKNOWN');
-  assert.deepEqual(await buildDiscoveredJobs([{title: 'Missing URL'}], [], []), []);
-  const prompt = discoveryPrompt({preferredRoleFamilies: [], technologyStrengths: ['SyntheticTech'], remotePreference: 'any'} as any, ['custom query']);
-  assert.ok(prompt.includes('SyntheticTech')); assert.ok(prompt.includes('custom query'));
-  assert.ok(!prompt.includes('Tailwind')); assert.ok(!prompt.includes('Remote US'));
+  assert.deepEqual(await buildDiscoveredJobs([{title: 'Missing URL'} as any]), []);
+  const queries = buildDiscoveryQueries({preferredRoleFamilies: ['frontend-product', 'ui-platform-design-systems'], preferredModifiers: ['DESIGN_SYSTEMS'], technologyStrengths: ['React', 'TypeScript'], targetSeniority: ['Senior'], remotePreference: 'remote_only', excludedRolePatterns: ['Tailwind'], companyExclusions: ['Excluded Co']} as any, 10);
+  assert.ok(queries.some(query => query.includes('React'))); assert.ok(queries.some(query => query.includes('TypeScript'))); assert.ok(queries.some(query => query.includes('remote')));
+  const joined = queries.join('\n');
+  assert.match(joined, /frontend engineer/); assert.match(joined, /design systems/); assert.match(joined, /site:jobs\.ashbyhq\.com/);
+  assert.doesNotMatch(joined, /frontend-product|ui-platform-design-systems|DESIGN_SYSTEMS/);
+  assert.ok(!joined.includes('Tailwind')); assert.ok(!joined.includes('Excluded Co')); assert.ok(queries.length <= 10);
 });
-test('grounding provenance and measured request budget use configured preferences only', async () => {
+test('keyless public board registry, provider endpoints and partial failures are deterministic', async () => {
+  const configured = parseDiscoverySource('greenhouse:synthetic', 'Synthetic Company');
+  assert.match(boardEndpoint(configured), /boards-api\.greenhouse\.io\/v1\/boards\/synthetic\/jobs/);
+  assert.throws(() => parseDiscoverySource('https://evil.example.org/board', 'Synthetic Company'));
+  assert.throws(() => parseDiscoverySource('http://jobs.lever.co/synthetic', 'Synthetic Company'));
+  const ashby = parseDiscoverySource('https://jobs.ashbyhq.com/synthetic', 'Synthetic Company');
+  const lever = parseDiscoverySource('lever-eu:synthetic', 'Synthetic EU');
+  const ashbyLeads = await scanPublicBoard(ashby, (async () => json({jobs:[{jobUrl:fixture.url,title:'Frontend Engineer',location:'Remote',isRemote:true}]})) as typeof fetch);
+  const greenhouseLeads = await scanPublicBoard(configured, (async () => json({jobs:[{id:123,absolute_url:'https://job-boards.greenhouse.io/synthetic/jobs/123',title:'Product Engineer',location:{name:'Washington, DC'}}]})) as typeof fetch);
+  const leverLeads = await scanPublicBoard(lever, (async () => json([{hostedUrl:'https://jobs.eu.lever.co/synthetic/id',text:'UI Engineer',workplaceType:'remote',categories:{commitment:'full-time'}}])) as typeof fetch);
+  assert.deepEqual([ashbyLeads.length, greenhouseLeads.length, leverLeads.length], [1,1,1]);
+  const customGreenhouse = await scanPublicBoard(configured, (async () => json({jobs:[{id:456,absolute_url:'https://careers.synthetic.example/jobs/456',title:'Frontend Engineer'}]})) as typeof fetch);
+  assert.equal(customGreenhouse.length, 1, 'the configured Greenhouse feed remains authoritative when it returns an employer-hosted URL');
+  assert.equal((customGreenhouse[0].verification?.rawDetails as any).atsJobId, '456');
+  assert.equal(customGreenhouse[0].verification?.canonicalUrl, 'https://careers.synthetic.example/jobs/456');
+  assert.deepEqual(await scanPublicBoard(configured, (async () => json({jobs:[{id:123,absolute_url:'https://job-boards.greenhouse.io/other-board/jobs/123',title:'Cross-board Engineer'}]})) as typeof fetch), [], 'a different Greenhouse board cannot inherit the configured board identity');
+  assert.deepEqual(await scanPublicBoard(configured, (async () => json({jobs:[{id:123,absolute_url:'https://jobs.ashbyhq.com/other-board/123',title:'Cross-provider Engineer'}]})) as typeof fetch), [], 'a different ATS provider cannot inherit the configured Greenhouse identity');
+  assert.deepEqual(await scanPublicBoard(configured, (async () => json({jobs:[{id:123,absolute_url:'http://careers.synthetic.example/jobs/123',title:'Insecure Engineer'}]})) as typeof fetch), [], 'employer-hosted Greenhouse links must use HTTPS');
+  const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'remote_only',excludedRolePatterns:['sales'],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
+  const outcome = await scanDiscoverySources([ashby, configured], profile, async source => source.provider === 'greenhouse' ? Promise.reject(new Error('down')) : ashbyLeads, async () => ({status:'UNKNOWN',isListed:false,lastVerifiedAt:'2026-09-24'}));
+  assert.deepEqual(outcome.sourceResults.map(result => result.status), ['SUCCESS','FAILED']);
+  assert.equal(outcome.jobs.length, 1); assert.equal(outcome.queryBudgetUnit, 'public_board_scans');
+  assert.equal(matchesSearchProfile({...fixture,title:'Sales Engineer'}, profile), false);
+  assert.equal(matchesSearchProfile({...fixture,remoteStatus:'unknown'}, profile), true);
+  assert.equal(matchesSearchProfile({...fixture,remoteStatus:'onsite'}, profile), false);
+});
+test('board discovery deduplicates before a deterministic fair global cap with truthful source outcomes', async () => {
+  const first = parseDiscoverySource('ashby:first', 'First');
+  const second = parseDiscoverySource('greenhouse:second', 'Second');
+  const third = parseDiscoverySource('lever:third', 'Third');
+  const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'any',excludedRolePatterns:[],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
+  const leads = (source: string, count: number) => Array.from({length: count}, (_, index) => ({
+    url: source === 'first' ? `https://jobs.ashbyhq.com/first/${index}` : source === 'second' ? `https://job-boards.greenhouse.io/second/jobs/${index}` : `https://jobs.lever.co/third/${index}`,
+    title: `Engineer ${index}`, company: source, description: 'Build React and TypeScript web interfaces.', location: 'Remote', source: 'public-board' as const, verification: freshVerification
+  }));
+  const scan = async (source: any) => source === first ? leads('first', 30) : source === second ? [...leads('second', 4), {...leads('first', 1)[0], company: 'duplicate'}] : leads('third', 0);
+  const verify = async () => ({status:'UNKNOWN' as const,isListed:false,lastVerifiedAt:'2026-10-01'});
+  const outcome = await scanDiscoverySources([first, second, third], profile, scan, verify);
+  const repeat = await scanDiscoverySources([first, second, third], profile, scan, verify);
+  assert.equal(outcome.jobs.length, 24);
+  assert.deepEqual(outcome.sourceResults, [
+    {sourceId:first.id,status:'SUCCESS',health:'SUCCESS',fetched:30,roleEligible:30,locationEligible:30,selected:20},
+    {sourceId:second.id,status:'SUCCESS',health:'SUCCESS',fetched:5,roleEligible:5,locationEligible:5,selected:4},
+    {sourceId:third.id,status:'SUCCESS',health:'EMPTY_BOARD',fetched:0,roleEligible:0,locationEligible:0,selected:0}
+  ]);
+  assert.deepEqual(outcome.sourceResults, repeat.sourceResults, 'same source order and rows yield the same allocation');
+  assert.deepEqual(outcome.jobs.map(job => [job.atsProvider, job.atsBoard, job.atsJobId]), repeat.jobs.map(job => [job.atsProvider, job.atsBoard, job.atsJobId]));
+  assert.ok(outcome.jobs.every(job => job.assessmentStatus === 'UNASSESSED' && job.applicationPriority === 'UNASSESSED'));
+  const underCap = await scanDiscoverySources([first, second], profile, async source => source === first ? leads('first', 1) : leads('second', 1), verify);
+  assert.deepEqual(underCap.sourceResults.map(result => result.selected), [1,1]);
+  const failed = await scanDiscoverySources([first, second], profile, async source => source === first ? leads('first', 1) : Promise.reject(new Error('synthetic')), verify);
+  assert.deepEqual(failed.sourceResults, [
+    {sourceId:first.id,status:'SUCCESS',health:'SUCCESS',fetched:1,roleEligible:1,locationEligible:1,selected:1},
+    {sourceId:second.id,status:'FAILED',health:'UNKNOWN_FAILURE',fetched:0,roleEligible:0,locationEligible:0,selected:0}
+  ]);
+});
+test('supported maximum strong identities use bounded indexed dedupe before fair selection', async () => {
+  const sourceCount = 50, leadsPerSource = 500;
+  const sources = Array.from({length: sourceCount}, (_, index) => parseDiscoverySource(`ashby:board-${index}`, `Company ${index}`));
+  const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'any',excludedRolePatterns:[],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
+  const scan = async (source: any) => Array.from({length: leadsPerSource}, (_, index) => ({
+    url: `https://jobs.ashbyhq.com/${source.boardId}/${index}`,
+    title: `Engineer ${index}`, company: source.company, description: 'Build React and TypeScript web interfaces.', location: 'Remote', source: 'public-board' as const, verification: freshVerification
+  }));
+  const verify = async () => ({status:'UNKNOWN' as const,isListed:false,lastVerifiedAt:'2026-10-01'});
+  const outcome = await scanDiscoverySources(sources, profile, scan, verify);
+  assert.equal(outcome.jobs.length, 24);
+  assert.deepEqual(outcome.sourceResults.map(result => result.selected), [...Array(24).fill(1), ...Array(26).fill(0)]);
+  assert.deepEqual(outcome.dedupeStats, {
+    candidateTraversals: 25_000,
+    atsIdentityLookups: 25_000,
+    urlIdentityLookups: 25_000,
+    fallbackSameJobComparisons: 0,
+    acceptedUnique: 25_000
+  });
+});
+test('mass strong duplicates collapse with first-source attribution and bounded lookups', async () => {
+  const sources = Array.from({length: 50}, (_, index) => parseDiscoverySource(`ashby:source-${index}`, `Company ${index}`));
+  const shared = Array.from({length: 500}, (_, index) => ({
+    url: `https://jobs.ashbyhq.com/shared/${index}`, title: `Engineer ${index}`, company: 'First', description: 'Build React and TypeScript web interfaces.', location: 'Remote', source: 'public-board' as const, verification: freshVerification
+  }));
+  const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'any',excludedRolePatterns:[],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
+  const outcome = await scanDiscoverySources(sources, profile, async () => shared, async () => ({status:'UNKNOWN' as const,isListed:false,lastVerifiedAt:'2026-10-01'}));
+  assert.equal(outcome.jobs.length, 24);
+  assert.deepEqual(outcome.sourceResults.map(result => result.selected), [24, ...Array(49).fill(0)]);
+  assert.deepEqual(outcome.dedupeStats, {
+    candidateTraversals: 25_000,
+    atsIdentityLookups: 25_000,
+    urlIdentityLookups: 500,
+    fallbackSameJobComparisons: 0,
+    acceptedUnique: 500
+  });
+});
+test('mixed strong and weak identities isolate conservative fallback comparisons', () => {
+  const strong = {url:'https://jobs.ashbyhq.com/strong/1',title:'Strong',company:'Strong Co',location:'Remote',source:'public-board' as const};
+  const weakUrl = {url:'https://careers.example.org/jobs/1',title:'Weak URL',company:'Weak Co',location:'Remote',source:'public-board' as const};
+  const weakNoUrl = {url:'not-a-url',title:'Weak fallback',company:'Weak Co',location:'Remote',source:'public-board' as const};
+  const outcome = deduplicateDiscoveryLeads([
+    [strong, {...strong}],
+    [weakUrl, {...weakUrl}],
+    [weakNoUrl, {...weakNoUrl}]
+  ]);
+  assert.deepEqual(outcome.queues.map(queue => queue.leads.length), [1,1,1]);
+  assert.deepEqual(outcome.stats, {
+    candidateTraversals: 6,
+    atsIdentityLookups: 2,
+    urlIdentityLookups: 3,
+    fallbackSameJobComparisons: 3,
+    acceptedUnique: 3
+  });
+});
+test('small weak-only input retains conservative sameJob fallback behavior', () => {
+  const base = {url:'invalid-url',title:'Engineer',company:'Weak Co',location:'Remote',source:'public-board' as const};
+  const outcome = deduplicateDiscoveryLeads([[base, {...base}, {...base,title:'Designer'}]]);
+  assert.deepEqual(outcome.queues[0].leads.map(lead => lead.title), ['Engineer','Designer']);
+  assert.equal(outcome.stats.atsIdentityLookups, 0);
+  assert.equal(outcome.stats.urlIdentityLookups, 0);
+  assert.equal(outcome.stats.fallbackSameJobComparisons, 2);
+});
+test('deterministic Google queries use configured preferences only', () => {
   const profile = {preferredRoleFamilies: [], technologyStrengths: ['SyntheticTech'], remotePreference: 'any', name: 'PRIVATE_IDENTITY', email: 'PRIVATE_CONTACT', salaryPreference: {minTarget: 123, email: 'PRIVATE_NESTED_CONTACT'}} as any;
-  let calls = 0;
-  const generate = async (prompt: string) => {
-    calls++; assert.ok(prompt.includes('custom query')); assert.ok(prompt.includes('SyntheticTech')); assert.ok(!prompt.includes('PRIVATE_'));
-    return {text: JSON.stringify({discovered: [fixture]}), candidates: [{groundingMetadata: {groundingChunks: [{web: {uri: 'https://source.example.org'}}], webSearchQueries: ['provider executed query']}}]};
-  };
-  const verify = async () => ({status: 'UNKNOWN' as const, isListed: false, lastVerifiedAt: '2026-09-12'});
-  const outcome = await executeDiscoveryRequest(generate, profile, 4, ['custom query'], verify);
-  assert.equal(calls, 1); assert.equal(outcome.discoveryRequestsUsed, calls); assert.equal(outcome.queryBudgetUnit, 'discovery_requests');
-  assert.deepEqual(outcome.jobs[0].discoverySourceUrls, ['https://source.example.org']);
-  assert.equal(outcome.jobs[0].searchQuery, 'provider executed query');
-  for (const budget of [0, -1, 11, 1.5]) await assert.rejects(executeDiscoveryRequest(generate, profile, budget));
-  await assert.rejects(executeDiscoveryRequest(generate, profile, 1, [123] as any));
-  assert.equal(calls, 1);
+  const queries = buildDiscoveryQueries(profile, 10);
+  assert.ok(queries.join('\n').includes('SyntheticTech')); assert.ok(!queries.join('\n').includes('PRIVATE_'));
+  assert.ok(queries.length <= 10); assert.match(googleSearchUrl(queries[0]), /^https:\/\/www\.google\.com\/search\?q=/);
+  assert.equal(new URL(googleSearchUrl(queries[0])).searchParams.get('q'), queries[0]);
+  for (const maximum of [0, -1, 11, 1.5]) assert.throws(() => buildDiscoveryQueries(profile, maximum));
+});
+test('verified jobs teach board sources and manual URL/JD imports remain unassessed', async () => {
+  const verified = async () => ({status:'LISTED' as const,isListed:true,lastVerifiedAt:'2026-09-24',canonicalUrl:fixture.url,rawDetails:{atsProvider:'ashby',atsBoard:'synthetic',atsJobId:'id',title:'Canonical Engineer',rawContent:'Canonical JD'}});
+  const imported = await buildManualImportedJob({url:fixture.url,description:'Owner pasted JD',company:'Synthetic Company',title:'Fallback title'}, verified);
+  assert.equal(imported.sourceChannel, 'Manual Web Import'); assert.equal(imported.jdSource, 'user-provided');
+  assert.equal(imported.canonicalContentStatus, 'UNAVAILABLE'); assert.equal(assessmentSource(imported).source, 'user-provided');
+  assert.equal(imported.description, 'Owner pasted JD'); assert.equal(imported.assessmentStatus, 'UNASSESSED'); assert.equal(imported.applicationPriority, 'UNASSESSED');
+  const profile = {discoverySources:[]} as any;
+  const learned = discoverySourcesForWorkspace(profile, [imported]);
+  assert.equal(learned.length, 1); assert.equal(learned[0].origin, 'learned'); assert.equal(learned[0].boardId, 'synthetic');
+  const disabled = {...learned[0],origin:'configured' as const,enabled:false};
+  assert.equal(discoverySourcesForWorkspace({discoverySources:[disabled]} as any,[imported])[0].enabled,false,'owner override wins over learned source');
+  assert.deepEqual(discoverySourcesForWorkspace({discoverySources:[{...disabled,removed:true}]} as any,[imported]),[], 'removed configured source must suppress its learned counterpart');
+  const generic = await buildManualImportedJob({url:'https://careers.example.org/job',company:'Synthetic Company',title:'Role'}, async () => ({status:'UNKNOWN',isListed:false,lastVerifiedAt:'2026-09-24'}), async url => ({status:200,url,text:'<main>Fetched public JD</main>'}));
+  assert.equal(generic.description,'Fetched public JD'); assert.equal(generic.jdSource,undefined); assert.equal(generic.assessmentStatus,'UNASSESSED');
+  await assert.rejects(buildManualImportedJob({url:'http://127.0.0.1/private'}));
+});
+test('exact Ashby page metadata fills a blank URL-only company without inventing missing facts', async () => {
+  const url = 'https://jobs.ashbyhq.com/synthetic-board/00000000-0000-4000-8000-000000000001';
+  const title = 'Synthetic Infrastructure Engineer';
+  const verify = async () => ({status:'LISTED' as const,isListed:true,lastVerifiedAt:'2026-09-25',canonicalUrl:url,rawDetails:{atsProvider:'ashby',atsBoard:'synthetic-board',atsJobId:'00000000-0000-4000-8000-000000000001',title,rawContent:'Synthetic canonical JD'}});
+  let pages = 0;
+  const page = async () => { pages++; return {status:200,url,text:`<script type="application/ld+json">${JSON.stringify({'@type':'JobPosting',title,hiringOrganization:{'@type':'Organization',name:'Synthetic Company'}})}</script>`}; };
+  const imported = await buildManualImportedJob({url}, verify, page);
+  assert.equal(imported.company, 'Synthetic Company'); assert.equal(imported.assessmentStatus, 'UNASSESSED');
+  assert.equal(imported.qualificationFit, undefined); assert.equal(pages, 1);
+  const retained = await buildManualImportedJob({url,company:'Owner Reviewed Company'}, verify, page);
+  assert.equal(retained.company, 'Owner Reviewed Company'); assert.equal(pages, 1);
+  const meta = await buildManualImportedJob({url}, verify, async () => ({status:200,url,text:`<meta name="title" content="${title} @ Synthetic Company">`}));
+  assert.equal(meta.company, 'Synthetic Company');
+  const unknown = await buildManualImportedJob({url}, verify, async () => ({status:200,url,text:'<meta name="title" content="Unrelated title @ Invented Company">'}));
+  assert.equal(unknown.company, '');
+  const redirected = await buildManualImportedJob({url}, verify, async () => ({status:200,url:'https://example.org/other',text:`<meta name="title" content="${title} @ Wrong Company">`}));
+  assert.equal(redirected.company, '');
 });
 test('identity hierarchy and history-safe canonical refresh', async () => {
   const verify = async () => ({status: 'LISTED' as const, isListed: true, lastVerifiedAt: '2026-09-12', canonicalUrl: fixture.canonicalUrl, rawDetails: {rawContent: 'JD'}});
-  const [a] = await buildDiscoveredJobs([fixture], [], [], verify);
+  const [a] = await buildDiscoveredJobs([fixture], verify);
   const applied = {...a, id: 'existing', applicationStatus: 'APPLIED' as const, firstSeenAt: '2026-01-01', notes: 'keep', statusHistory: [{from: 'DISCOVERED' as const, to: 'APPLIED' as const, timestamp: '2026-01-02'}]};
   const merged = mergeDiscoveredJobs([applied], [{...a, description: 'better JD'}]);
   assert.equal(merged.newJobs.length, 0); assert.equal(merged.jobs[0].id, 'existing');
   assert.equal(merged.jobs[0].applicationStatus, 'APPLIED'); assert.equal(merged.jobs[0].firstSeenAt, '2026-01-01');
   assert.deepEqual(merged.jobs[0].statusHistory, applied.statusHistory); assert.equal(merged.jobs[0].notes, 'keep');
+  assert.equal(mergeDiscoveredJobs([{...applied,company:''}], [{...a,company:'Verified Company'}]).jobs[0].company, 'Verified Company');
+  assert.equal(mergeDiscoveredJobs([applied], [{...a,company:'Weaker Company'}]).jobs[0].company, fixture.company);
   assert.equal(merged.jobs[0].description, 'better JD');
   const latest = {...applied, applicationStatus: 'REJECTED' as const, notes: 'edited during discovery'};
   const lateResult = mergeDiscoveredJobs([latest], merged.refreshedJobs);
   assert.equal(lateResult.jobs[0].applicationStatus, 'REJECTED');
   assert.equal(lateResult.jobs[0].notes, 'edited during discovery');
-  assert.equal(mergeDiscoveredJobs([], [a, {...a, id: 'second', discoveryUrl: fixture.canonicalUrl + '?utm_source=x'}]).newJobs.length, 1);
+  assert.equal(mergeDiscoveredJobs([], [a, {...a, id: 'second', discoveryUrl: fixture.url + '?utm_source=x'}]).newJobs.length, 1);
   assert.equal(sameJob(a, {...a, atsJobId: 'different', canonicalUrl: 'https://jobs.ashbyhq.com/synthetic/different'}), false);
+  const companyAlias = 'https://careers.example.org/job';
+  const manualAlias = {...a, id: 'manual', atsProvider: 'company-careers' as const, atsBoard: undefined, atsJobId: undefined, canonicalUrl: companyAlias, discoveryUrl: companyAlias, discoveryAliases: [companyAlias]};
+  const verifiedAlias = {...a, canonicalUrl: fixture.url, discoveryUrl: companyAlias, discoveryAliases: [companyAlias, fixture.url]};
+  assert.equal(sameJob(manualAlias, verifiedAlias), true);
+  const aliasMerge = mergeDiscoveredJobs([manualAlias], [verifiedAlias]);
+  assert.equal(aliasMerge.newJobs.length, 0); assert.equal(aliasMerge.refreshedJobs[0].id, 'manual');
+  assert.deepEqual(mergeDiscoveredJobs([], aliasMerge.refreshedJobs).newJobs.map(job => job.id), ['manual'], 'server refresh retains the existing ID so the client can discard it after an in-flight delete');
   assert.equal(normalizedJobUrl('https://boards.greenhouse.io/synthetic/jobs/123/?utm_source=x#app'), normalizedJobUrl('https://job-boards.greenhouse.io/synthetic/jobs/123'));
   assert.equal(sameJob({...a, atsJobId: undefined}, {...a, atsJobId: undefined, canonicalUrl: a.canonicalUrl + '?utm_source=x'}), true);
   for (const status of ['DISCOVERED','SHORTLISTED','TAILORED','APPLIED','RECRUITER_SCREEN','HIRING_MANAGER','TECHNICAL','FINAL_ONSITE','OFFER','REJECTED','WITHDRAWN','ARCHIVED']) {
@@ -121,14 +285,14 @@ test('identity hierarchy and history-safe canonical refresh', async () => {
 });
 test('company and redirect aliases require authoritative exact verification', async () => {
   const alias = 'https://careers.example.org/job';
-  const authoritative = {status: 'LISTED' as const, isListed: true, lastVerifiedAt: '2026-09-12', canonicalUrl: fixture.canonicalUrl, rawDetails: {atsProvider: 'ashby', atsBoard: 'synthetic', atsJobId: 'id', title: 'Actual title', rawContent: 'Actual JD'}};
-  const verify = async (url: string) => {assert.equal(url, fixture.canonicalUrl); return authoritative;};
-  const redirected = await verifyGenericPage(alias, async () => ({status: 200, text: '', url: fixture.canonicalUrl}), verify);
+  const authoritative = {status: 'LISTED' as const, isListed: true, lastVerifiedAt: '2026-09-12', canonicalUrl: fixture.url, rawDetails: {atsProvider: 'ashby', atsBoard: 'synthetic', atsJobId: 'id', title: 'Actual title', rawContent: 'Actual JD'}};
+  const verify = async (url: string) => {assert.equal(url, fixture.url); return authoritative;};
+  const redirected = await verifyGenericPage(alias, async () => ({status: 200, text: '', url: fixture.url}), verify);
   assert.equal(redirected.status, 'LISTED');
-  const linked = await verifyGenericPage(alias, async () => ({status: 200, text: `<link href="${fixture.canonicalUrl}" rel="canonical">`, url: alias}), verify);
+  const linked = await verifyGenericPage(alias, async () => ({status: 200, text: `<link href="${fixture.url}" rel="canonical">`, url: alias}), verify);
   assert.equal(linked.status, 'LISTED');
   const verifyAlias = async () => linked;
-  const jobs = await buildDiscoveredJobs([fixture, {...fixture, canonicalUrl: alias}], [], [], verifyAlias);
+  const jobs = await buildDiscoveredJobs([fixture, {...fixture, url: alias}], verifyAlias);
   assert.equal(jobs.length, 1); assert.equal(jobs[0].atsProvider, 'ashby');
   assert.ok(jobs[0].discoveryAliases?.includes(alias));
   assert.equal((await verifyGenericPage(alias, async () => {throw new Error('failure');})).status, 'UNKNOWN');
