@@ -24,3 +24,11 @@ export type Requirement = z.infer<typeof requirementSchema>;
 export type AssessmentMetadata = z.infer<typeof metadataSchema>;
 export type Extraction = z.infer<typeof extractionSchema>;
 export type SemanticMatches = z.infer<typeof semanticMatchesSchema>;
+
+export const extractionReviewSchema = z.object({
+  status: z.enum(['NOT_FLAGGED', 'NEEDS_REVIEW']),
+  potentialOmissions: z.array(z.object({ excerpt: z.string(), start: z.number().int().min(0), end: z.number().int().min(1),
+    reason: z.literal('EXPLICIT_DURATION_NOT_REPRESENTED') }).strict()),
+  limitations: z.string(),
+}).strict();
+export type ExtractionReview = z.infer<typeof extractionReviewSchema>;

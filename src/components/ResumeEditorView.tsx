@@ -192,22 +192,23 @@ export const ResumeEditorView: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
       {/* Top Controls Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-xs">
-        <div className="flex items-center space-x-3">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-xs">
+        <div className="flex min-w-0 w-full xl:w-auto xl:flex-1 flex-wrap items-center gap-3">
           <button
             onClick={() => setCurrentView('job-detail')}
-            className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+            className="shrink-0 p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
             title="Back to Job Analysis"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
 
           {/* Job Selector Dropdown */}
-          <div className="relative">
+          <div className="relative min-w-0 flex-1 basis-48">
             <select
+              aria-label="Resume job"
               value={activeJob.id}
               onChange={(e) => setActiveJobId(e.target.value)}
-              className="appearance-none pl-3 pr-8 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="w-full min-w-0 max-w-full truncate appearance-none pl-3 pr-8 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
             >
               {jobs.map((j) => (
                 <option key={j.id} value={j.id}>
@@ -219,7 +220,7 @@ export const ResumeEditorView: React.FC = () => {
           </div>
 
           {/* Mode Switcher: Tailored Resume vs Tailored Cover Letter */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 text-xs font-medium">
+          <div className="flex max-w-full flex-wrap items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 text-xs font-medium">
             <button
               onClick={() => setActiveTab('resume')}
               className={`px-3 py-1 rounded-md transition-colors cursor-pointer ${
@@ -244,10 +245,10 @@ export const ResumeEditorView: React.FC = () => {
         </div>
 
         {/* Page length & Export Actions */}
-        <div className="flex items-center space-x-3 self-end sm:self-auto">
+        <div className="flex min-w-0 w-full xl:w-auto flex-wrap items-center justify-end gap-3 self-end sm:self-auto">
           {activeTab === 'resume' && (
             <div
-              className={`text-[11px] px-2.5 py-1 rounded-full font-medium flex items-center space-x-1.5 ${
+              className={`min-w-0 max-w-full text-[11px] px-2.5 py-1 rounded-full font-medium flex items-center space-x-1.5 ${
                 overflowRisk === 'Low'
                   ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                   : overflowRisk === 'Moderate'
@@ -256,7 +257,7 @@ export const ResumeEditorView: React.FC = () => {
               }`}
               title={`${estimatedLines} estimated rendered lines.`}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+              <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-current" />
               <span>Page fit estimate: {overflowRisk} risk; check print preview</span>
             </div>
           )}
@@ -264,7 +265,7 @@ export const ResumeEditorView: React.FC = () => {
           <button
             disabled={!canExportFinal(resume, activeJob.assessmentStatus)}
             onClick={() => setIsExportOpen(true)}
-            className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+            className="shrink-0 p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
             title="Print / Save as PDF"
           >
             <Printer className="w-4 h-4" />
@@ -272,7 +273,7 @@ export const ResumeEditorView: React.FC = () => {
 
           <button
             onClick={() => setIsExportOpen(true)}
-            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium flex items-center space-x-1 shadow-xs cursor-pointer"
+            className="shrink-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium flex items-center space-x-1 shadow-xs cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Options</span>
@@ -290,7 +291,7 @@ export const ResumeEditorView: React.FC = () => {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT PANE: Editor & Tailoring Controls (5 cols) */}
-        <div className="lg:col-span-5 space-y-4 overflow-y-auto max-h-[calc(100vh-140px)] pr-1">
+        <div className="min-w-0 lg:col-span-5 space-y-4 overflow-y-auto max-h-[calc(100vh-140px)] pr-1">
           {/* Evaluation Panel */}
           {evaluation && (
             <EvaluationPanel
@@ -508,7 +509,7 @@ export const ResumeEditorView: React.FC = () => {
         </div>
 
         {/* RIGHT PANE: Realistic Paper Preview (7 cols) */}
-        <div className="lg:col-span-7 bg-slate-100 dark:bg-slate-950 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto">
+        <div className="min-w-0 lg:col-span-7 bg-slate-100 dark:bg-slate-950 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto">
           {activeTab === 'resume' ? (
             <ResumePaper
               resume={resume}

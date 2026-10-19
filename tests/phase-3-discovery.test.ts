@@ -10,7 +10,8 @@ import { mergeDiscoveredJobs, sameJob, normalizedJobUrl } from '../src/utils/job
 import { safeFetchText, validatePublicUrl, blockedAddress } from '../server/safeFetch';
 import { jobSchema } from '../server/db/workspaceValidation';
 
-const fixture = {url: 'https://jobs.ashbyhq.com/synthetic/id', canonicalUrl: 'https://jobs.ashbyhq.com/synthetic/id', title: 'Engineer', company: 'Synthetic Company', description: 'Board summary', source: 'public-board' as const};
+const fixture = {url: 'https://jobs.ashbyhq.com/synthetic/id', canonicalUrl: 'https://jobs.ashbyhq.com/synthetic/id', title: 'Engineer', company: 'Synthetic Company', description: 'Build React and TypeScript web interfaces.', source: 'public-board' as const};
+const freshVerification = {status:'LISTED' as const,isListed:true,lastVerifiedAt:'2026-10-14T12:00:00.000Z',rawDetails:{publishedAt:'2026-10-14T00:00:00.000Z'}};
 const json = (data: any, status = 200) => new Response(JSON.stringify(data), {status, headers: {'content-type': 'application/json'}});
 test('exact provider contracts and dates', async () => {
   const original = globalThis.fetch;
@@ -95,11 +96,16 @@ test('keyless public board registry, provider endpoints and partial failures are
   const ashby = parseDiscoverySource('https://jobs.ashbyhq.com/synthetic', 'Synthetic Company');
   const lever = parseDiscoverySource('lever-eu:synthetic', 'Synthetic EU');
   const ashbyLeads = await scanPublicBoard(ashby, (async () => json({jobs:[{jobUrl:fixture.url,title:'Frontend Engineer',location:'Remote',isRemote:true}]})) as typeof fetch);
-  const greenhouseLeads = await scanPublicBoard(configured, (async () => json({jobs:[{absolute_url:'https://job-boards.greenhouse.io/synthetic/jobs/123',title:'Product Engineer',location:{name:'Washington, DC'}}]})) as typeof fetch);
+  const greenhouseLeads = await scanPublicBoard(configured, (async () => json({jobs:[{id:123,absolute_url:'https://job-boards.greenhouse.io/synthetic/jobs/123',title:'Product Engineer',location:{name:'Washington, DC'}}]})) as typeof fetch);
   const leverLeads = await scanPublicBoard(lever, (async () => json([{hostedUrl:'https://jobs.eu.lever.co/synthetic/id',text:'UI Engineer',workplaceType:'remote',categories:{commitment:'full-time'}}])) as typeof fetch);
   assert.deepEqual([ashbyLeads.length, greenhouseLeads.length, leverLeads.length], [1,1,1]);
-  assert.deepEqual(await scanPublicBoard(configured, (async () => json({jobs:[{absolute_url:'https://evil.example/fake',title:'Forged Engineer'}]})) as typeof fetch), [], 'foreign hosts in board data do not inherit LISTED authority');
-  assert.deepEqual(await scanPublicBoard(configured, (async () => json({jobs:[{absolute_url:'https://job-boards.greenhouse.io/other-board/jobs/123',title:'Cross-board Engineer'}]})) as typeof fetch), [], 'a different board cannot inherit the configured board identity');
+  const customGreenhouse = await scanPublicBoard(configured, (async () => json({jobs:[{id:456,absolute_url:'https://careers.synthetic.example/jobs/456',title:'Frontend Engineer'}]})) as typeof fetch);
+  assert.equal(customGreenhouse.length, 1, 'the configured Greenhouse feed remains authoritative when it returns an employer-hosted URL');
+  assert.equal((customGreenhouse[0].verification?.rawDetails as any).atsJobId, '456');
+  assert.equal(customGreenhouse[0].verification?.canonicalUrl, 'https://careers.synthetic.example/jobs/456');
+  assert.deepEqual(await scanPublicBoard(configured, (async () => json({jobs:[{id:123,absolute_url:'https://job-boards.greenhouse.io/other-board/jobs/123',title:'Cross-board Engineer'}]})) as typeof fetch), [], 'a different Greenhouse board cannot inherit the configured board identity');
+  assert.deepEqual(await scanPublicBoard(configured, (async () => json({jobs:[{id:123,absolute_url:'https://jobs.ashbyhq.com/other-board/123',title:'Cross-provider Engineer'}]})) as typeof fetch), [], 'a different ATS provider cannot inherit the configured Greenhouse identity');
+  assert.deepEqual(await scanPublicBoard(configured, (async () => json({jobs:[{id:123,absolute_url:'http://careers.synthetic.example/jobs/123',title:'Insecure Engineer'}]})) as typeof fetch), [], 'employer-hosted Greenhouse links must use HTTPS');
   const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'remote_only',excludedRolePatterns:['sales'],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
   const outcome = await scanDiscoverySources([ashby, configured], profile, async source => source.provider === 'greenhouse' ? Promise.reject(new Error('down')) : ashbyLeads, async () => ({status:'UNKNOWN',isListed:false,lastVerifiedAt:'2026-09-24'}));
   assert.deepEqual(outcome.sourceResults.map(result => result.status), ['SUCCESS','FAILED']);
@@ -115,7 +121,7 @@ test('board discovery deduplicates before a deterministic fair global cap with t
   const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'any',excludedRolePatterns:[],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
   const leads = (source: string, count: number) => Array.from({length: count}, (_, index) => ({
     url: source === 'first' ? `https://jobs.ashbyhq.com/first/${index}` : source === 'second' ? `https://job-boards.greenhouse.io/second/jobs/${index}` : `https://jobs.lever.co/third/${index}`,
-    title: `Engineer ${index}`, company: source, location: 'Remote', source: 'public-board' as const
+    title: `Engineer ${index}`, company: source, description: 'Build React and TypeScript web interfaces.', location: 'Remote', source: 'public-board' as const, verification: freshVerification
   }));
   const scan = async (source: any) => source === first ? leads('first', 30) : source === second ? [...leads('second', 4), {...leads('first', 1)[0], company: 'duplicate'}] : leads('third', 0);
   const verify = async () => ({status:'UNKNOWN' as const,isListed:false,lastVerifiedAt:'2026-10-01'});
@@ -123,9 +129,9 @@ test('board discovery deduplicates before a deterministic fair global cap with t
   const repeat = await scanDiscoverySources([first, second, third], profile, scan, verify);
   assert.equal(outcome.jobs.length, 24);
   assert.deepEqual(outcome.sourceResults, [
-    {sourceId:first.id,status:'SUCCESS',fetched:30,roleEligible:30,locationEligible:30,selected:20},
-    {sourceId:second.id,status:'SUCCESS',fetched:5,roleEligible:5,locationEligible:5,selected:4},
-    {sourceId:third.id,status:'SUCCESS',fetched:0,roleEligible:0,locationEligible:0,selected:0}
+    {sourceId:first.id,status:'SUCCESS',health:'SUCCESS',fetched:30,roleEligible:30,locationEligible:30,selected:20},
+    {sourceId:second.id,status:'SUCCESS',health:'SUCCESS',fetched:5,roleEligible:5,locationEligible:5,selected:4},
+    {sourceId:third.id,status:'SUCCESS',health:'EMPTY_BOARD',fetched:0,roleEligible:0,locationEligible:0,selected:0}
   ]);
   assert.deepEqual(outcome.sourceResults, repeat.sourceResults, 'same source order and rows yield the same allocation');
   assert.deepEqual(outcome.jobs.map(job => [job.atsProvider, job.atsBoard, job.atsJobId]), repeat.jobs.map(job => [job.atsProvider, job.atsBoard, job.atsJobId]));
@@ -134,8 +140,8 @@ test('board discovery deduplicates before a deterministic fair global cap with t
   assert.deepEqual(underCap.sourceResults.map(result => result.selected), [1,1]);
   const failed = await scanDiscoverySources([first, second], profile, async source => source === first ? leads('first', 1) : Promise.reject(new Error('synthetic')), verify);
   assert.deepEqual(failed.sourceResults, [
-    {sourceId:first.id,status:'SUCCESS',fetched:1,roleEligible:1,locationEligible:1,selected:1},
-    {sourceId:second.id,status:'FAILED',fetched:0,roleEligible:0,locationEligible:0,selected:0}
+    {sourceId:first.id,status:'SUCCESS',health:'SUCCESS',fetched:1,roleEligible:1,locationEligible:1,selected:1},
+    {sourceId:second.id,status:'FAILED',health:'UNKNOWN_FAILURE',fetched:0,roleEligible:0,locationEligible:0,selected:0}
   ]);
 });
 test('supported maximum strong identities use bounded indexed dedupe before fair selection', async () => {
@@ -144,7 +150,7 @@ test('supported maximum strong identities use bounded indexed dedupe before fair
   const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'any',excludedRolePatterns:[],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
   const scan = async (source: any) => Array.from({length: leadsPerSource}, (_, index) => ({
     url: `https://jobs.ashbyhq.com/${source.boardId}/${index}`,
-    title: `Engineer ${index}`, company: source.company, location: 'Remote', source: 'public-board' as const
+    title: `Engineer ${index}`, company: source.company, description: 'Build React and TypeScript web interfaces.', location: 'Remote', source: 'public-board' as const, verification: freshVerification
   }));
   const verify = async () => ({status:'UNKNOWN' as const,isListed:false,lastVerifiedAt:'2026-10-01'});
   const outcome = await scanDiscoverySources(sources, profile, scan, verify);
@@ -161,7 +167,7 @@ test('supported maximum strong identities use bounded indexed dedupe before fair
 test('mass strong duplicates collapse with first-source attribution and bounded lookups', async () => {
   const sources = Array.from({length: 50}, (_, index) => parseDiscoverySource(`ashby:source-${index}`, `Company ${index}`));
   const shared = Array.from({length: 500}, (_, index) => ({
-    url: `https://jobs.ashbyhq.com/shared/${index}`, title: `Engineer ${index}`, company: 'First', location: 'Remote', source: 'public-board' as const
+    url: `https://jobs.ashbyhq.com/shared/${index}`, title: `Engineer ${index}`, company: 'First', description: 'Build React and TypeScript web interfaces.', location: 'Remote', source: 'public-board' as const, verification: freshVerification
   }));
   const profile = {preferredRoleFamilies:[],technologyStrengths:[],remotePreference:'any',excludedRolePatterns:[],companyExclusions:[],excludedEmploymentTypes:[],allowedEmploymentTypes:[]} as any;
   const outcome = await scanDiscoverySources(sources, profile, async () => shared, async () => ({status:'UNKNOWN' as const,isListed:false,lastVerifiedAt:'2026-10-01'}));

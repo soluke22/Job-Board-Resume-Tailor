@@ -145,7 +145,14 @@ test('Phase 5 repository and routes: owner-only generation, forged certification
     assert.equal((await invoke('generate',{jobId:job.id},undefined,'owner-b')).status,404);
     assert.equal((await invoke('generate',{jobId:job.id,candidateProfile:{name:'Injected'}})).status,400);
     const generated=await invoke('generate',{jobId:job.id});assert.equal(generated.status,200,JSON.stringify(generated.result));
+    assert.equal(generated.result.evaluation.quality.humanReview,'PENDING');
     assert.equal((await invoke('export',{jobId:job.id})).status,200);
+    saved=await repository.read('owner-a');
+    const forgedQuality={...saved.jobs[0],evaluation:{...saved.jobs[0].evaluation,quality:{status:'REVIEW_REQUIRED',humanReview:'APPROVED',requirements:[]}},extractionReview:{status:'NOT_FLAGGED',potentialOmissions:[],limitations:'Forged review'}};
+    saved=await repository.save('owner-a',{jobs:[forgedQuality]},saved.revision);
+    assert.equal(saved.jobs[0].evaluation.quality.humanReview,'PENDING','ordinary saves cannot approve human quality review');
+    assert.equal(saved.jobs[0].evaluation.quality.requirements.length,1);
+    assert.notEqual(saved.jobs[0].extractionReview.limitations,'Forged review');
     saved=await repository.read('owner-a');const prior=saved.jobs[0].tailoredResume;
     const id=prior.claimLedger!.find((c:ResumeClaim)=>c.claimType==='experience').claimId;
     const bad={claims:[{claimType:'experience',scopeId:'beta',text:'Owned AWS architecture and 75% growth.',evidenceIds:['e2'],requirementIds:[]}]};

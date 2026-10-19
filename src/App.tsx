@@ -2,6 +2,7 @@ import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navigation } from './components/Navigation';
 import { DashboardView } from './components/DashboardView';
+import { DailyShortlistView } from './components/DailyShortlistView';
 import { DiscoverView } from './views/DiscoverView';
 import { PipelineView } from './views/PipelineView';
 import { ProofPackView } from './views/ProofPackView';
@@ -63,6 +64,7 @@ const AppContent: React.FC = () => {
       {workspaceMode === 'PRIVATE_WORKSPACE' && <div role="status" className="px-6 py-2 text-xs text-slate-500">{syncStatus}</div>}
       <main key={`main-workspace-${workspaceMode}-${workspaceEpoch}`} className="flex-1 pb-16">
         {currentView === 'dashboard' && <DashboardView />}
+        {currentView === 'shortlist' && <DailyShortlistView />}
         {currentView === 'discover' && <DiscoverView />}
         {currentView === 'pipeline' && <PipelineView />}
         {currentView === 'jobs' && <JobsView />}

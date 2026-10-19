@@ -49,7 +49,7 @@ export function createResumeHandler(operation:'plan'|'generate'|'evaluate'|'vali
         }
         resume=inspectResume(resume,w as any,job);
       }
-      const evaluation=evaluationFor(resume!);
+      const evaluation=evaluationFor(resume!,w as any,job);
       if(operation==='evaluate'){res.json({resume,evaluation});return;}
       if(operation==='export' && resume!.readiness!=='READY')throw new ResumeError('Final export requires current validated enabled claims and assessment basis');
       const version={versionId:randomUUID(),timestamp:new Date().toISOString(),note:`Phase 5 ${operation}: ${resume!.readiness}`,resume:structuredClone(resume!)};

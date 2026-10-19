@@ -166,11 +166,11 @@ export const apiService = {
     return res.json();
   },
 
-  async discoverJobs(scope: import('../types').DiscoveryScope): Promise<{ discoveredJobs: any[]; refreshedJobs?: any[]; discoverySources?: any[]; discoveryScope: import('../types').DiscoveryScope; sourceResults?: import('../types').DiscoverySourceResult[]; googleSearches?: {query:string;url:string}[]; discoveryRequestsUsed?: number; queryBudgetUsed: number; freshnessStats: any }> {
+  async discoverJobs(scope: import('../types').DiscoveryScope, windowDays: import('../types').DiscoveryWindowDays = 14): Promise<{ discoveredJobs: any[]; refreshedJobs?: any[]; discoverySources?: any[]; discoveryScope: import('../types').DiscoveryScope; sourceResults?: import('../types').DiscoverySourceResult[]; googleSearches?: {query:string;url:string}[]; discoveryRequestsUsed?: number; queryBudgetUsed: number; freshnessStats: any; searchSession: import('../types').SearchSessionDiagnostic }> {
     const res = await privateFetch('/api/discover-jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scope })
+      body: JSON.stringify({ scope, windowDays })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

@@ -1,17 +1,19 @@
 import { normalizeApplicationJob, transitionRequestSchema } from '../src/types/application.js';
 import { transitionApplication, ApplicationTransitionError } from './applicationLifecycle.js';
 import { inspectArtifact, preserveArtifact } from './artifactProvenance.js';
-import { and, eq, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import { evidenceReviewContent, preserveEvidenceReview } from '../src/utils/evidenceReview.js';
-import type { EvidenceItem } from '../src/types/index.js';
+import type { EvidenceItem, SearchSessionDiagnostic } from '../src/types/index.js';
 import { getDb } from './db/client.js';
 import * as s from './db/schema.js';
-import { discoverySourceSchema, workspaceInput } from './db/workspaceValidation.js';
+import { discoverySourceSchema, searchSessionDiagnosticSchema, workspaceInput } from './db/workspaceValidation.js';
 import { assessmentMetadata, isCurrent, fingerprint } from './assessment.js';
-import { inspectResume, factualClaims } from './resumeProvenance.js';
+import { inspectResume, factualClaims, evaluationFor } from './resumeProvenance.js';
+import { reviewRequirementCompleteness } from './requirementCompleteness.js';
+import { assessmentSource } from './assessment.js';
 import { assertBoundedJson } from './inputBounds.js';
 export { workspaceInput } from './db/workspaceValidation.js';
 
@@ -97,12 +99,19 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
         }
         catch { job.assessmentStatus = 'STALE'; }
       }
+      // Advisory review is recomputed from canonical source, never trusted from saves/imports.
+      delete job.extractionReview;
+      if (job.requirements) {
+        try { job.extractionReview = reviewRequirementCompleteness(assessmentSource(job as any).text, job.requirements); }
+        catch { /* UI must disclose that extraction review is unavailable. */ }
+      }
       return normalizeApplicationJob(job);
     });
     output.auditLog = (await rows(tx, s.auditEvents, ownerId)).map(r => r.data);
     for (const job of output.jobs) if (job.tailoredResume) {
       job.tailoredResume = inspectResume(job.tailoredResume, output as any, job);
       if (job.tailoredResume.readiness !== 'READY') delete job.evaluation;
+      else job.evaluation = evaluationFor(job.tailoredResume, output as any, job);
     }
     for (const job of output.jobs) {
       for (const key of ['proofPack','recruiterOutreach','outreachDrafts','referralContact']) if(job[key])job[key]=inspectArtifact(job[key],output as any,job);
@@ -317,6 +326,20 @@ export function createWorkspaceRepository(database: DatabaseProvider = getDb) {
     if (evidenceReviewHash(evidence) !== request.data.contentHash) throw new WorkspaceConflict('Evidence changed. Review the current evidence before approving.');
     return save(ownerId, { evidence: workspace.evidence }, workspace.revision, false, undefined, undefined, undefined, undefined, evidence.id);
   }
-  return { read, save, approveEvidence, transition, saveArtifact:(ownerId:string,input:unknown,revision:number,jobId:string,key:string)=>save(ownerId,input,revision,false,undefined,undefined,jobId,key), saveAssessment: (ownerId: string, input: unknown, revision: number, jobId:string) => save(ownerId,input,revision,false,jobId), saveResume:(ownerId:string,input:unknown,revision:number,jobId:string)=>save(ownerId,input,revision,false,undefined,jobId), import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
+  async function appendSearchSession(ownerId: string, raw: unknown): Promise<SearchSessionDiagnostic> {
+    if (!ownerId) throw new WorkspaceValidationError('Owner identity required');
+    const parsed = searchSessionDiagnosticSchema.safeParse(raw);
+    if (!parsed.success) throw new WorkspaceValidationError('Invalid search session diagnostic');
+    return database().transaction(async tx => {
+      await tx.insert(s.workspaces).values({ ownerId }).onConflictDoNothing();
+      await upsert(tx, s.searchSessions, ownerId, parsed.data.id, parsed.data);
+      const sessions = await tx.select({ id:s.searchSessions.id }).from(s.searchSessions)
+        .where(eq(s.searchSessions.ownerId, ownerId)).orderBy(desc(s.searchSessions.updatedAt));
+      const expired = sessions.slice(100).map(session => session.id);
+      if (expired.length) await tx.delete(s.searchSessions).where(and(eq(s.searchSessions.ownerId, ownerId), inArray(s.searchSessions.id, expired)));
+      return parsed.data as SearchSessionDiagnostic;
+    });
+  }
+  return { read, save, approveEvidence, transition, appendSearchSession, saveArtifact:(ownerId:string,input:unknown,revision:number,jobId:string,key:string)=>save(ownerId,input,revision,false,undefined,undefined,jobId,key), saveAssessment: (ownerId: string, input: unknown, revision: number, jobId:string) => save(ownerId,input,revision,false,jobId), saveResume:(ownerId:string,input:unknown,revision:number,jobId:string)=>save(ownerId,input,revision,false,undefined,jobId), import: (ownerId: string, input: unknown, revision: number) => save(ownerId, input, revision, true) };
 }
 export const workspaceRepository = createWorkspaceRepository();

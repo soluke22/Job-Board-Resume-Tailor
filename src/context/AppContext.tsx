@@ -25,13 +25,16 @@ import {
   RecruiterOutreach,
   CompanyWatchlistEntry,
   DiscoveryScope,
-  DiscoverySourceResult
+  DiscoverySourceResult,
+  DiscoveryWindowDays,
+  SearchSessionDiagnostic
 } from '../types';
 import { storageService } from '../services/storage';
 import { apiService, setBeforePrivateRequest, invalidatePrivateRequests, signOutPrivateWorkspace, privateSignInFailureNotice, clearPrivateSignInIntent } from '../services/api';
 
 export type AppView =
   | 'dashboard'
+  | 'shortlist'
   | 'discover'
   | 'pipeline'
   | 'jobs'
@@ -202,6 +205,7 @@ interface AppContextType {
   isGenerating: boolean;
   isDiscovering: boolean;
   discoverySourceResults: DiscoverySourceResult[];
+  latestDiscoverySession: SearchSessionDiagnostic | null;
   error: string | null;
   clearError: () => void;
 
@@ -211,7 +215,7 @@ interface AppContextType {
   openResumeEditor: (id: string) => void;
 
   // Discovery & Job Pipeline
-  discoverJobs: (scope: DiscoveryScope) => Promise<void>;
+  discoverJobs: (scope: DiscoveryScope, windowDays?: DiscoveryWindowDays) => Promise<void>;
   verifyAtsStatus: (jobId: string) => Promise<void>;
   addJob: (
     rawDescription: string,
@@ -326,6 +330,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [discoverySourceResults, setDiscoverySourceResults] = useState<DiscoverySourceResult[]>([]);
+  const [latestDiscoverySession, setLatestDiscoverySession] = useState<SearchSessionDiagnostic | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const clearError = () => setError(null);
@@ -353,7 +358,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsAuthModalOpen(true);
       return;
     }
-    if (newMode !== storageService.getWorkspaceMode()) { epoch.current++; invalidatePrivateRequests(); setWorkspaceEpoch(v => v + 1); }
+    if (newMode !== storageService.getWorkspaceMode()) {
+      epoch.current++;
+      invalidatePrivateRequests();
+      setLatestDiscoverySession(null);
+      setIsDiscovering(false);
+      setWorkspaceEpoch(v => v + 1);
+    }
     setWorkspaceModeState(newMode);
     storageService.setWorkspaceMode(newMode);
     reloadDataForMode(newMode);
@@ -383,10 +394,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthModalOpen(false); setIsQuickGrabOpen(false); setIsAtsGuardsOpen(false);
     setWorkspaceEpoch(v => v + 1);
     setSyncStatus('');
+    setLatestDiscoverySession(null);
     setIsAnalyzing(false); setIsGenerating(false); setIsDiscovering(false);
   };
   const adopt = (result: any) => {
     storageService.hydratePrivateWorkspace(result.data);
+    const sessions = Array.isArray(result.data?.searchSessions) ? result.data.searchSessions : [];
+    setLatestDiscoverySession(sessions.reduce((latest: SearchSessionDiagnostic | null, session: SearchSessionDiagnostic) => {
+      const timestamp = Date.parse(session?.searchedAt);
+      if (!Number.isFinite(timestamp)) return latest;
+      return !latest || timestamp > Date.parse(latest.searchedAt) ? session : latest;
+    }, null));
     revision.current = result.revision;
     saved.current = scheduled.current = JSON.stringify(storageService.privateSnapshot());
     reloadDataForMode('PRIVATE_WORKSPACE');
@@ -605,14 +623,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Job Search & Discovery
-  const discoverJobs = async (scope: DiscoveryScope): Promise<void> => {
+  const discoverJobs = async (scope: DiscoveryScope, windowDays: DiscoveryWindowDays = 14): Promise<void> => {
+    const startedEpoch = epoch.current;
     setIsDiscovering(true);
     setError(null);
     setDiscoverySourceResults([]);
     try {
-      const res = await apiService.discoverJobs(scope);
+      const res = await apiService.discoverJobs(scope, windowDays);
+      if (startedEpoch !== epoch.current) return;
       const newDiscovered = res.discoveredJobs || [];
       setDiscoverySourceResults(res.sourceResults || []);
+      setLatestDiscoverySession(res.searchSession || null);
 
       // Read the latest cache after the await: an in-flight search must not undo
       // application edits or resurrect a history record deleted meanwhile.
@@ -622,11 +643,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setJobs(merged.jobs);
       if (merged.newJobs[0]) setActiveJobId(merged.newJobs[0].id);
     } catch (err: any) {
+      if (startedEpoch !== epoch.current) return;
       setDiscoverySourceResults([]);
       console.error('Job discovery failed:');
       setError(err.message || 'Job discovery encountered an error');
     } finally {
-      setIsDiscovering(false);
+      if (startedEpoch === epoch.current) setIsDiscovering(false);
     }
   };
 
@@ -1111,6 +1133,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isGenerating,
         isDiscovering,
         discoverySourceResults,
+        latestDiscoverySession,
         error,
         clearError,
         setActiveJobId,

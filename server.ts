@@ -15,6 +15,7 @@ import { mergeDiscoveredJobs } from './src/utils/jobIdentity.js';
 import { safeFetchText } from './server/safeFetch.js';
 import { createWorkspaceRepository } from './server/workspaceRepository.js';
 import { createStructuredModel } from './server/llmProvider.js';
+import { randomUUID } from 'node:crypto';
 
 
 dotenv.config();
@@ -171,17 +172,22 @@ app.post('/api/verify-ats', async (req: Request, res: Response): Promise<void> =
 // 12. Keyless public-board discovery and manual posting ingestion
 // ==========================================
 type DiscoveryWorkspace = { searchProfile: import('./src/types/index.js').SearchProfile | null; jobs: import('./src/types/index.js').JobRecord[]; companyWatchlist?: import('./src/types/index.js').CompanyWatchlistEntry[] };
+const defaultDiscoveryRepository = createWorkspaceRepository();
+const defaultReadDiscoveryWorkspace = async (ownerId: string): Promise<DiscoveryWorkspace> => {
+  const workspace = await defaultDiscoveryRepository.read(ownerId);
+  return { searchProfile: workspace.searchProfile, jobs: workspace.jobs, companyWatchlist: workspace.companyWatchlist };
+};
+const defaultRecordDiscoverySession = (ownerId: string, session: import('./src/types/index.js').SearchSessionDiagnostic) => defaultDiscoveryRepository.appendSearchSession(ownerId, session);
 export function createDiscoveryHandler(
   reserve = reserveProviderCall,
-  readWorkspace: (ownerId: string) => Promise<DiscoveryWorkspace> = async ownerId => {
-    const workspace = await createWorkspaceRepository().read(ownerId);
-    return { searchProfile: workspace.searchProfile, jobs: workspace.jobs, companyWatchlist: workspace.companyWatchlist };
-  },
-  scan: typeof scanPublicBoard = scanPublicBoard
+  readWorkspace: (ownerId: string) => Promise<DiscoveryWorkspace> = defaultReadDiscoveryWorkspace,
+  scan: typeof scanPublicBoard = scanPublicBoard,
+  recordSession: (ownerId:string, session:import('./src/types/index.js').SearchSessionDiagnostic)=>Promise<unknown> = readWorkspace === defaultReadDiscoveryWorkspace ? defaultRecordDiscoverySession : async()=>undefined
 ): RequestHandler {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      if (Object.keys(req.body).some(key => key !== 'scope') || !['WATCHLIST', 'ALL_ENABLED'].includes(req.body.scope)) {
+      const requestedWindow = req.body.windowDays ?? 14;
+      if (Object.keys(req.body).some(key => !['scope','windowDays'].includes(key)) || !['WATCHLIST', 'ALL_ENABLED'].includes(req.body.scope) || ![1,2,7,14].includes(requestedWindow)) {
         res.status(400).json({ error: 'Board discovery requires an explicit supported scope.' }); return;
       }
 
@@ -193,19 +199,32 @@ export function createDiscoveryHandler(
       try { queries = buildDiscoveryQueries(searchProfile, 10); }
       catch (error) { res.status(400).json({error: (error as Error).message}); return; }
       const scope = req.body.scope as import('./src/types/index.js').DiscoveryScope;
+      const windowDays = requestedWindow as import('./src/types/index.js').DiscoveryWindowDays;
       const { sources, constraints } = sourcesForDiscoveryScope(searchProfile, existingJobs, workspace.companyWatchlist, scope);
       for (const source of sources.filter(source => source.enabled)) await reserveExternalProviderCall(req.res!.locals.ownerId, reserve);
-      const outcome = await scanDiscoverySources(sources, searchProfile, scan, undefined, constraints);
+      const outcome = await scanDiscoverySources(sources, searchProfile, scan, undefined, constraints, {windowDays});
       const candidates = outcome.jobs;
       const merged = mergeDiscoveredJobs(Array.isArray(existingJobs) ? existingJobs : [], candidates);
+      const sourceById = new Map(sources.map(source=>[source.id,source]));
+      const returnedNewJobs = merged.newJobs.filter(j => j.verificationStatus !== 'NOT_LISTED');
+      const searchSession: import('./src/types/index.js').SearchSessionDiagnostic = {
+        id:`search-${randomUUID()}`,requestedWindowDays:windowDays,searchedAt:outcome.diagnostics.searchedAt,scope,
+        sources:outcome.sourceResults.map(result=>{const source=sourceById.get(result.sourceId)!;return {sourceId:result.sourceId,provider:source.provider,boardId:source.boardId,status:result.status,health:result.health,fetched:result.fetched,selected:result.selected};}),
+        filters:outcome.diagnostics.filterCounts,
+        totals:{candidatesEncountered:outcome.diagnostics.candidatesEncountered,duplicatesRemoved:outcome.diagnostics.duplicatesRemoved,selectedForVerification:outcome.diagnostics.selectedForVerification,successfullyVerified:outcome.diagnostics.successfullyVerified,newlyDiscovered:returnedNewJobs.length,rediscovered:merged.refreshedJobs.length},
+        providerErrors:outcome.sourceResults.filter(result=>result.status==='FAILED').map(result=>{const source=sourceById.get(result.sourceId)!;return {sourceId:result.sourceId,provider:source.provider,boardId:source.boardId,reason:result.health as Exclude<import('./src/types/index.js').DiscoverySourceHealth,'SUCCESS'|'EMPTY_BOARD'|'ZERO_ELIGIBLE'>};}),
+        unsupportedProviders:outcome.sourceResults.filter(result=>result.health==='UNSUPPORTED_PROVIDER').map(result=>result.sourceId),
+      };
+      await recordSession(req.res!.locals.ownerId,searchSession);
       res.json({
-        discoveredJobs: merged.newJobs.filter(j => j.verificationStatus !== 'NOT_LISTED'),
+        discoveredJobs: returnedNewJobs,
         refreshedJobs: merged.refreshedJobs,
         discoverySources: sources,
         discoveryScope: scope,
         sourceResults: outcome.sourceResults,
         googleSearches: queries.map(query => ({ query, url: googleSearchUrl(query) })),
         discoveryRequestsUsed: outcome.discoveryRequestsUsed, queryBudgetUsed: outcome.queryBudgetUsed, queryBudgetUnit: outcome.queryBudgetUnit,
+        searchSession,
         freshnessStats: {
           newCount: merged.newJobs.filter(j => j.freshnessBand === 'NEW').length,
           recentCount: merged.newJobs.filter(j => j.freshnessBand === 'RECENT').length,

@@ -1,5 +1,432 @@
 # Productionization execution plan
 
+## Daily job shortlist UI checkpoint 1.9 (2026-10-17)
+
+Baseline: dev at cce0b1d364d5e1ec9913b1c579052219fafc4cbf, with 271 passing
+tests, 15 modified tracked files and seven untracked files. Preserve all previous
+work. Scope: one dedicated daily shortlist page in the existing React application,
+Dashboard/navigation entry points, pure selection/presentation helpers, synthetic
+tests and documentation. No backend normalization, eligibility/scoring, authentication,
+registry, persistence schema, deployment or scheduled-work changes.
+
+Use actual publication timestamps: up to ten deduplicated reviewable records in
+the last 24 hours, with separate explicit 1-to-14-day and unknown-date views; never
+fill the daily list with older/unknown jobs. Existing current assessments may order
+the list; stale/unassessed fits may not become scores or claimed eligibility.
+Display normalized compensation components and uncertainty without conversion or
+new salary policy. Reuse acknowledged logOutcome SHORTLISTED/ARCHIVED transitions
+for deliberate pursue/dismiss; never mark APPLIED, analyze, tailor or submit on load.
+Review/analysis navigation uses existing actions. Existing explicit discovery stays
+manual. Scan age reflects latestDiscoverySession.searchedAt, not current page load.
+
+Acceptance: deterministic pure selector boundaries/dedupe/limits, honest compensation
+and assessment/workplace states, accessible responsive dark/light presentation,
+loading/empty/error/stale states, action acknowledgement and workspace remount
+isolation. Use synthetic fixtures only. Node 24.19.0 shortlist/discovery/compensation,
+full tests, typecheck/build/harness/strict new-file privacy/runtime/release and diff
+checks. Inspect generated targets; build replacement limited to existing client/server
+outputs and Vite temporary config, preserving legacy dist files. No install, live ATS,
+external LLM, private account access, persistent migrations, commit/push/deployment.
+Create checkpoint-only before/after rollback evidence and record final results here.
+
+Implementation: added a dedicated `shortlist` route and dashboard/navigation entry.
+The selector uses existing `sameJob`, current assessments, saved verification state,
+and actual timestamps only; it has no discovery, analysis, or persistence side effect
+until a user explicitly chooses the existing acknowledged Pursue/Dismiss action.
+Workspace switches clear the in-memory latest discovery session, and discovery
+completion is epoch-guarded so a previous workspace cannot repopulate shortlist
+metadata after a mode change.
+
+Local result: PASS under Node 24.19.0. Fourteen new synthetic shortlist tests;
+shortlist/discovery/compensation focused run 92/92; shortlist/client/watchlist run
+39/39. Full npm test and final release composition each pass 285/285 with zero
+failures, cancellations or skips outside the sandbox. Typecheck, normal production
+build, harness, strict fresh-client privacy (zero findings), explicit scans of all
+three new files, runtime/config check and built startup smoke (1/1) pass. Existing
+large-client-chunk and dependency annotation warnings remain informational.
+
+The first sandbox full run was 264 passed / 21 failed: localhost EACCES and existing
+PGlite/native-process/synthetic-Git environment failures, plus the client source
+contract expecting error handling before the new epoch guard. That assertion now
+requires the stronger success/error/completion epoch fences and mode-reset wiring;
+no assertion or production eligibility rule was removed or weakened. It passes in
+the focused client run and complete outside-sandbox runs.
+
+Local browser evidence uses disposable synthetic fixtures and the actual React App,
+with application network calls blocked. Verified Dashboard/navigation entry, separate
+daily/older/unknown views, pursue/dismiss acknowledgement and rejection feedback,
+Demo decision persistence across reload, keyboard review/analysis navigation, manual
+discovery entry, and 390px mobile layout without horizontal page overflow. Actual
+AppProvider StrictMode fixture confirms that switching to Demo clears private scan
+metadata/spinner and that an old discovery completion cannot repopulate private jobs
+or change the reset timeframe. Dark-mode helper/hover contrast was corrected after
+visual review. Screenshots, synthetic harnesses, logs and checkpoint-only byte backups
+are outside the repository in the checkpoint-1.9 local artifact directory.
+The desktop navigation now scrolls inside its allocated width rather than widening
+the page. Browser geometry passes at 1280px, 1024px and 390px viewport widths; all
+release gates and the 1/1 built startup smoke pass again after that layout correction.
+
+No live ATS/LLM, real private account, persistent database, configuration, installation,
+Git history, commit or deployment operation was performed. Private authenticated
+browser/provider acceptance and separate light-mode visual acceptance remain external
+or manual gates; current fixtures do not certify deployed behavior. Historical Git
+privacy exposure remains an independent publication blocker. Stop at this checkpoint;
+Checkpoint 1.10 requires separate authorization.
+
+Preservation: dev/HEAD and all index entries are unchanged. Ten checkpoint files
+are intentional (seven existing files plus three additions); the other 184 original
+files, including all seven original untracked files, retain their initial SHA-256
+hashes. Final inventory is 19 modified tracked files and ten untracked files.
+Generated replacement stays within dist/client, dist/server.mjs and Vite temporary
+configuration output; all five legacy dist files are unchanged. A reverse-apply
+dry check passes for the checkpoint-only patch, which preserves earlier dirty work.
+
+## ATS compensation normalization checkpoint 1.8B (2026-10-16)
+
+Baseline: dev at cce0b1d364d5e1ec9913b1c579052219fafc4cbf, with 247 passing
+tests, 15 modified tracked files and five untracked files. Preserve this complete
+uncommitted baseline. Scope: one deterministic server normalizer shared by existing
+Greenhouse/Ashby/Lever discovery and exact adapters; additive optional compensation
+component/status contracts; synthetic tests and pipeline documentation. No live ATS
+requests, new provider, migration, private workspace operation or ranking algorithm.
+
+Inspection: discovery retains provider compensation fields but discards normalized
+compensation; exact verification handles Ashby summary text and Lever flat salary
+ranges only. Greenhouse pay_input_ranges are retained but unused. Existing JSON
+persistence accepts flat min/max/currency/year-hour-month/raw fields, which cannot
+represent multiple geographic bands or non-base components. Display uses raw text.
+Assessment compares annual USD flat maxima to configured preferences/minima; leave
+that policy and every scoring weight unchanged. A USD 100,000 target is a preference,
+not a new default hard minimum or an edit to any owner's saved configuration.
+
+Acceptance: shared provider handling of explicit amounts, currencies, periods,
+base/bonus/equity/total and applicability; structured precedence; conservative
+explicit labelled-text fallback; unavailable versus malformed/ambiguous disclosure;
+raw metadata retained; no currency/hourly conversion or geographic aggregation.
+Legacy flat fields expose only one unambiguous unscoped base range; old records
+remain valid. All requested synthetic format/provider/persistence/preference cases
+must pass. Preserve role/location/employment filters, cap/allocation/date/identity,
+registry/auth/ownership/provenance/lifecycle/provider policy. Validate with explicit
+Node 24.19.0 focused compensation/discovery tests, npm test, typecheck/build/harness,
+strict privacy/runtime/release in the established sanitized synthetic fixture
+environment. Build only authorized generated outputs; no commit/push/deployment.
+
+Local result: PASS. One shared normalizer now populates discovery and exact
+verification compensation consistently. Greenhouse cents/currency/title/blurb,
+Ashby components/tiers and Lever salaryRange/descriptions preserve their raw
+provider metadata. Additive optional JSON status/ranges retain amounts, explicit
+currency/year-hour-month period, base/bonus/equity/total, percentage units and
+applicability labels. Legacy flat comparison fields expose only one valid unscoped
+base range. Missing/ambiguous/malformed disclosures stay distinct; malformed pay
+does not change posting availability. Structured data wins over conflicting text,
+without borrowing missing fields. Explicit labelled canonical-text fallback is
+bounded and handles encoded markup; unrelated numeric prose is never salary data.
+
+Node 24.19.0 compensation tests pass 24/24; combined compensation/discovery tests
+pass 90/90 (existing discovery coverage 66/66). Standalone full suite and final
+release suites pass 271/271, zero failures/skips/cancellations. Typecheck, normal
+build, harness, strict required-build privacy (zero findings), runtime and release
+composition pass. Final compensation guards were retested in the full release
+suite. Client output is 722.75 kB; existing large-chunk/Zod annotation warnings
+remain nonfatal. Runtime verifies three client files totaling 792,199 bytes.
+
+Only compensation module/tests, adapter/discovery wiring, optional type/JSON
+validation and pipeline/plan docs changed. Cap/date semantics, role/location/
+employment eligibility and identity/allocation/registry/persistence pipeline
+sections compare unchanged. Assessment code and scoring/policy are unmodified;
+the 100,000 USD target was tested as a preference without reading/changing owner
+settings. Legacy and extended compensation round-trip in a fresh synthetic PGlite
+fixture; no persistent database migration or private workspace access occurred.
+No live ATS/LLM request, install, commit, push or deployment. Official public
+provider documentation was inspected; no live posting payload was fetched.
+
+Limits: structured fields may be absent; regional/tier labels do not establish which
+band applies to an applicant. Free-text grammar is deliberately bounded; unlabelled,
+unsupported weekly/daily periods, mixed components, ambiguous symbols/currency and
+unrecognized formats remain raw/uncertain rather than inferred or converted.
+No FX conversion, annualization, new salary rejection/ranking, or location inference.
+Final privacy coverage includes the new untracked module/test; preservation and a
+checkpoint-only reverse-patch dry run complete the handoff. Next exact step, only
+with separate endpoint-budget authorization: a bounded read-only live compensation
+regression using existing providers. Historical Git privacy remains an independent
+publication blocker; no history remediation. Stop after reporting this checkpoint.
+
+## Discovery live-defect correction checkpoint 1.8A-R1 (2026-10-16)
+
+Baseline: dev at cce0b1d364d5e1ec9913b1c579052219fafc4cbf, with the complete
+uncommitted 1.8A baseline (240 passing tests; 15 modified tracked files and five
+untracked files). Preserve all existing edits. Scope is limited to FDE business-domain
+precedence, explicit Canadian geography, and authoritative live-script employment
+summaries. No live network request, registry change, qualification scoring, migration,
+compensation work, private workspace operation, commit, push or deployment.
+
+Before correction, role filtering applies seniority/profile exclusions and explicit
+backend/pre-sales responsibilities first, then the business-title blocker (including
+Finance/Legal) before recognizing Forward Deployed Engineer. Location filtering
+recognizes country names but not Toronto/ON/CA and does not interpret named country
+or province metadata. The live script's main scan uses employmentEligibility, while
+its auxiliary eligible/reason summaries still call employmentTypeAllowed.
+
+Acceptance: short synthetic positive/negative FDE responsibility fixtures; ordinary
+finance/legal and primary pre-sales/backend exclusions; Toronto/province/country
+recognition without treating isolated CA or Ontario, California as Canada; explicit
+US alternatives retained; real script diagnostics exercised with synthetic fetch.
+Allocation/date/identity/dedupe/registry and persistence boundaries remain unchanged.
+Validate with explicit Node 24.19.0 focused/full tests, typecheck, normal build of
+authorized generated outputs, harness, strict privacy, runtime and release composition.
+Use sanitized configuration and only disposable synthetic localhost/PGlite/Git fixtures.
+Local result: PASS. FDE Finance/Legal/Compliance domains no longer trigger the
+ordinary business-occupation blocker. Production software responsibilities support
+SOFTWARE_DELIVERY; ambiguous duties return ROLE_SCOPE_UNKNOWN_PASS. Explicit
+business-only duties, primary pre-sales/backend work, seniority and configured role
+families remain enforced. Toronto/ON and named Canadian country/province metadata
+now exclude Canada-only geography; isolated CA/Ontario-CA remain uncertain and
+Ontario, California stays distinct. Explicit US-remote/local alternatives survive.
+Both auxiliary live-script employment checks now call production employmentEligibility.
+
+Seven new synthetic test groups cover the requested positive/negative scenarios,
+including accounting automation versus business-only accounting, country/province
+metadata, negated remote permission, explicit attendance contradictions and the
+actual script run with a mocked synthetic board feed. No real employer descriptions
+or candidate records were added. Node 24.19.0 focused tests pass 66/66; standalone
+full suite and final release suite pass 247/247 with zero failures/skips/cancellations.
+Typecheck, normal build, harness, strict required-build privacy (zero findings),
+runtime and release composition pass in the sanitized synthetic fixture environment.
+Client output remains 722.25 kB; existing chunk-size/Zod annotation warnings are
+nonfatal. No migration outside disposable fixtures or live network operation occurred.
+
+Cap/publication semantics, employment eligibility, identity/dedupe, scan/allocation
+and registry/persistence pipeline sections compare unchanged against this checkpoint's
+dirty baseline. Only discovery, the existing live script, precision tests and the
+pipeline/plan docs are in scope. Final source/artifact preservation and incremental
+rollback checks complete the handoff; no commit, push, deployment or next checkpoint.
+
+Limits: bounded responsibility/geography text patterns do not fully interpret JDs,
+all country formats, encoded HTML, commute/transit or actual candidate qualifications.
+No repeat live ATS audit was authorized or performed in R1. Next exact step: a
+separately authorized Checkpoint 1.8B may proceed as local work after this validated
+correction; no compensation behavior was implemented here. Historical Git privacy
+disposition remains an independent publication blocker, with no history remediation.
+
+## Discovery eligibility precision checkpoint 1.8A (2026-10-16)
+
+Baseline: `dev` at `cce0b1d364d5e1ec9913b1c579052219fafc4cbf`, with the
+verified Checkpoint 1.7 implementation (228/228 tests) and all 15 modified tracked
+files/five untracked files preserved. Scope: named structured employment/workplace
+metadata, explicit internship/student-only exclusions, primary backend/pre-sales
+responsibility exclusions, and mandatory distant attendance. Unknown employment
+and workplace remain unknown; ordinary junior roles, target engineering work and
+potentially local hybrid roles remain available for assessment.
+
+Acceptance: synthetic positive/negative and negation regressions; unchanged cap,
+fairness, unknown-date quota, date windows, ATS identity/dedupe/custom Greenhouse
+URLs, search-session persistence, ownership and provenance contracts. Explicit
+Node 24.19.0 focused/full tests, typecheck/build/harness/strict privacy/runtime and
+release composition must pass using the authorized synthetic fixture environment.
+No live ATS/model/workspace access, migration outside disposable tests, registry
+replacement, compensation work, source publication, commit or deployment. Results
+and exact next step will be recorded here; rollback must reverse only this
+checkpoint's incremental patch, preserving the existing uncommitted baseline.
+
+Local result: PASS. Named structured employment/workplace fields now normalize
+consistently in scans and exact adapters without dropping raw metadata. Explicit
+internships and student-only enrollment exclude before allocation; missing and
+conflicting employment remain unknown rather than guessed full-time. Primary
+backend/pre-sales duties precede keyword matches; production customer software,
+frontend-heavy full stack and ordinary junior roles survive. Mandatory distant
+attendance/relocation excludes only explicit evidence; negated/optional attendance
+and unknown workplace stay uncertain. Discover cards label unknown workplace.
+Exclusion functions retain explainable reasons and existing category counters.
+
+Final Node 24.19.0 focused coverage passes 59/59; full suite and repeated release
+suite pass 240/240 with zero failures/skips/cancellations. Typecheck, normal build,
+harness, strict required-build privacy (zero findings), runtime and release
+composition pass in the approved environment with private-service configuration
+removed and only synthetic localhost/PGlite/Git fixtures. Build warnings remain
+non-fatal: 722.25 kB client chunk and dependency annotation warnings. No live ATS,
+model, private workspace, production or registry operation occurred. No SQL
+migration, compensation change, commit, push or deployment. Final documentation
+privacy/harness/diff and incremental rollback checks follow this result entry.
+
+Limits: bounded lexical rules are not complete semantic JD interpretation;
+negated/ambiguous prose may remain uncertain, named metadata coverage is limited,
+and configured local geography does not establish transit/commute feasibility.
+Live selection precision and private profile configuration are not certified by
+synthetic tests. Next exact checkpoint, separately authorized: one bounded,
+read-only ATS eligibility regression without workspace persistence/model calls,
+before compensation normalization or registry expansion. Historical Git privacy
+disposition remains an independent publication blocker; no history remediation
+was performed here. Stop locally with the complete pre-existing dirty baseline.
+
+## ATS registry repair and live regression checkpoint 1.7 (2026-10-14)
+
+Baseline is the complete uncommitted Checkpoint 1 and 1.6 working tree on `dev`;
+preserve that diff and the unrelated untracked QA release record. Scope is limited
+to validating the existing 23-board owner registry, correcting only demonstrated
+board-registration or provider-normalization defects, and running one bounded,
+read-only 14-day scan with no workspace persistence. Do not add a provider, broaden
+the registry, call an LLM, assess a job, generate an artifact, migrate data, deploy,
+commit or push.
+
+Acceptance: official employer pages and public ATS responses establish whether the
+HubSpot, Dropbox, Coinbase and Pinterest registrations are valid, empty or
+unavailable; no replacement board is guessed. A Greenhouse row from the fixed
+configured board endpoint retains its provider/board/job identity when Greenhouse
+returns an employer-hosted `absolute_url`, while cross-board or cross-provider ATS
+URLs remain rejected. The scan reports source health, retrieved and date-coverage
+counts, deterministic filter exclusions, dedupe, eligibility, verification,
+new-versus-known and cap counts without persisting descriptions or jobs. Compare
+live results to Checkpoint 1.5 cautiously and isolate code effects with captured
+fixtures where possible. Run focused regressions and the Node 24 typecheck, build,
+privacy and release gates; update this section with actual results and the next
+exact checkpoint, then stop locally.
+
+Local result (validated 2026-10-14): no board identifier was changed. Official
+careers pages plus direct public feed checks confirm `dropbox` (32 current rows),
+`coinbase` (225) and `pinterest` (155) are valid, populated Greenhouse boards.
+`pinterestjobadvertisements` is a separate six-row board and is not a replacement.
+HubSpot's official careers experience still identifies `hubspotjobs`, while its
+public Greenhouse boards API returns 404; the registration is retained as canonical
+but currently unavailable rather than replaced with a guessed slug. The demonstrated
+defect was adapter normalization: employer-hosted Greenhouse `absolute_url` values
+caused all Dropbox/Coinbase/Pinterest rows to be discarded. The fixed board endpoint
+now supplies the provider/board/requisition identity while retaining the employer
+HTTPS application URL. Cross-board and cross-provider ATS links remain rejected,
+and dedupe now prefers that verified feed identity.
+
+One read-only 14-day run at `2026-10-14T20:00:00Z` scanned the unchanged 23-board
+registry with zero persistence and zero model calls: 22 boards succeeded, HubSpot
+failed HTTP, none was truly empty, and five successful boards had zero eligible
+rows. Feeds returned and the adapter retained 1,605 rows (Ashby 309, Greenhouse
+1,280, Lever 16); every retained row had a canonical publication timestamp. Of
+those, 318 were in-window, 1,277 older and 10 future. Employment filtering removed
+four explicit internships and one disallowed contract; role filtering removed
+1,485 and location filtering 34. Eighty-one passed employment/role/location before
+date filtering, no duplicates were removed, nine fresh jobs were selected and all
+nine were feed-verified/new to the 81-job workspace. There were zero cap exclusions.
+
+The run demonstrates Ashby `FullTime` is no longer mass-rejected, but selection
+quality is not yet acceptable: Greenhouse metadata/title gaps allowed a Coinbase
+internship, Pinterest internship, LaunchDarkly pre-sales role, Coinbase explicitly
+backend-primary role, and distant-market Discord/Pinterest roles through. Correct
+rejections include Staff/Principal/management, PostHog product management,
+Thumbtack AI/ML infrastructure and Grafana backend-heavy full stack. Senior roles
+and US-remote roles remain discoverable. Because live inventory and provider totals
+changed since Checkpoint 1.5, the 1,201-to-1,605 row and 9-to-9 selection comparison
+does not prove a code effect. Controlled same-row regressions do prove Ashby
+`FullTime` normalization and employer-hosted Greenhouse row retention; the cap stayed
+inactive in both live audits.
+
+Node 24.19.0 focused discovery coverage passes 24/24 and the complete release suite
+passes 228/228. Standalone typecheck, production build, privacy scan (zero findings),
+harness/strict privacy/runtime checks within release composition, built startup
+smoke 1/1, and diff whitespace pass. The existing 722.13 kB client chunk warning
+remains. Initial sandboxed build and startup smoke attempts hit Windows realpath and
+loopback restrictions; unchanged reruns outside those restrictions passed. No data
+write, migration, LLM/assessment, resume, deployment, commit or push occurred; the
+unrelated QA record remains untouched. Next exact checkpoint: normalize Greenhouse
+employment/workplace metadata and deterministic internship/early-career, explicit
+backend-primary, pre-sales and distant-onsite blockers before registry expansion or
+compensation gating. Allocation and the 24-job cap do not need investment yet.
+
+## Discovery precision checkpoint 1.6 (2026-10-14)
+
+Baseline is the uncommitted, locally validated Checkpoint 1 discovery-quality
+implementation on `dev`; preserve that complete diff and the unrelated untracked QA
+release record. Scope is limited to canonical provider employment normalization,
+deterministic title/role/seniority/location classification, safe provider/registry
+health diagnostics, and focused synthetic regressions based on the Checkpoint 1.5
+live findings. Raw provider metadata and publication-date provenance remain intact.
+No LLM call, broad source expansion, database migration, workspace/application
+mutation, Vercel action, deployment, push, commit, resume or cover-letter work is
+authorized.
+
+Acceptance: verified Ashby `FullTime` values normalize to the existing internal
+full-time contract before profile filtering; contract, part-time, temporary,
+internship and unknown values stay distinct and unknown never becomes full-time.
+Conservative precedence rejects management and Staff+ titles, infrastructure/cloud/
+compute/network/backend platform work, product-management false matches and clear
+non-US-only employment while retaining explicit frontend, UI, design-system, DX,
+frontend-platform, product-engineering, frontend-heavy full-stack and AI-product-UI
+roles. Senior remains eligible unless an existing explicit profile constraint says
+otherwise. Source diagnostics distinguish HTTP, invalid-response, empty-board,
+unsupported-provider and successful-filtered-zero outcomes without storing provider
+bodies or job descriptions. Canonical dates, dedupe, fair allocation, four-unknown
+quota and 24-job cap do not change. Run focused tests plus the complete Node 24
+validation suite and `git diff --check`; record actual results and stop locally.
+
+Local result (validated 2026-10-14): implemented on top of the preserved Checkpoint
+1 working tree with no migration, provider expansion, model call, workspace/job
+mutation, deployment, commit or push. Exact provider employment fields normalize
+before filtering while their raw values remain in provider metadata; unfamiliar
+values stay unknown. Role precedence now rejects management, Staff/Principal,
+non-engineering false matches, infrastructure/cloud/compute/network/backend lanes,
+backend-heavy full stack and clear non-US-only locations while retaining explicit
+frontend, UI, product, design-system, frontend-platform, DX, frontend-heavy and
+AI-product UI evidence. Senior remains eligible. Diagnostics now distinguish safe
+provider health outcomes, and legacy Checkpoint 1 session JSON hydrates with
+conservative defaults.
+
+Focused discovery/persistence coverage passes 46/46 and the complete Node 24.19.0
+suite passes 227/227. Typecheck, production build, harness integrity, standalone
+privacy scan (zero findings), composed release check (including strict required-build
+privacy and runtime check), and diff whitespace all pass. The existing >500 kB client
+chunk warning remains. Initial sandboxed build/release attempts hit Windows file/
+loopback restrictions, and one initial full-suite invocation inherited machine Node
+25 in npm child processes; unchanged reruns outside that restriction with Node 24
+first in PATH passed. No production/browser/live-ATS claim is inferred. Next exact
+checkpoint: correct or revalidate stale configured board identifiers, then rerun a
+bounded live discovery scan and compare health/filter counts before considering any
+new provider or cap change.
+
+## Discovery quality checkpoint 1 (2026-10-14)
+
+Baseline: tracked `dev` equals `origin/dev` at
+`cce0b1d364d5e1ec9913b1c579052219fafc4cbf`; preserve the unrelated untracked
+QA release record. Scope is limited to canonical-publication discovery windows,
+freshness-first but source-fair allocation under the existing 24-job cap,
+owner-scoped payload-free search-session diagnostics, and the corresponding
+Discover UI and synthetic coverage. Continue to scan only validated Ashby,
+Greenhouse, and Lever public boards. Unknown publication dates remain unknown;
+future and known-older dates cannot consume fresh-window slots. No LLM discovery,
+assessment/scoring changes, Workday scraping, resume/cover-letter work, application
+history changes, Vercel configuration, deployment, remote migration, `main`, or
+Production action is authorized.
+
+Acceptance: the discovery API and UI expose exact 1/2/7/14-day windows with 14
+days default. Canonical provider publication instants are compared against one
+server search instant using inclusive boundaries; `updatedAt` and `firstSeenAt`
+never substitute. Per-source known-date queues are newest-first and allocated
+fairly, with at most four unknown-date selections and 24 total. Existing profile,
+role, location, identity dedupe, history-safe refresh and provider-budget behavior
+remain intact. Each completed scan appends a bounded diagnostic record containing
+only window/timestamp/source identities/counts/statuses and new-versus-rediscovered
+totals, never descriptions, provider bodies, secrets, candidate data or errors.
+Focused boundary/timezone/future/unknown/allocation/dedupe/failure/persistence tests
+and the complete requested validation suite must pass before handoff. Stop after
+local implementation and validation; do not commit or deploy without approval.
+
+Local result (validated 2026-10-14): implemented without a schema migration or
+additional model call. The private discovery contract defaults to 14 days and
+accepts only 1/2/7/14; provider publication instants alone determine eligibility.
+Known fresh rows use newest-first fair rounds, unknown dates receive at most four
+slots, and known-old/future rows receive none under the unchanged 24-job cap.
+The existing owner-scoped search_sessions JSON entity now retains the latest 100
+strict, payload-free diagnostics without advancing the workspace revision, so the
+ordinary client job save remains conflict-free and stored jobs/history are unchanged.
+Discover exposes the selector and latest persisted summary after reload.
+
+Focused discovery/persistence regression coverage passes 43/43. The required
+Node 24.19.0 release composition passes 219/219 with typecheck, build, harness,
+strict required-build privacy zero, and runtime checks; standalone requested
+typecheck/build/harness/privacy commands also pass. An initial release attempt under
+the machine-default Node 25.9.0 correctly failed the two Node-major guards and runtime
+check, then passed unchanged under the repository-required Node 24 runtime. Diff
+whitespace passes. No Vercel action, production data operation, commit, migration,
+assessment/scoring change, Workday adapter, or LLM discovery path was introduced.
+Next checkpoint: evaluate source-registry coverage and provider-specific date
+availability using these diagnostics before expanding providers or changing the cap.
+
 ## Vercel AI Gateway assessment provider (2026-10-05)
 
 Baseline: clean tracked `dev` and `origin/dev` at
@@ -1553,3 +1980,45 @@ migration/rotation/history rewrite. Stop after checkpoint publication.
 
 ## Phase 10 authorized scope (2026-09-13)
 Clean freshly fetched dev/origin/dev 24a5737537d92c7c51b5df2939a3352bcaead082; main 18bde7f451e4e5f39e303f82a0507a30233cd35e; 0 main-side /26 dev-side commits. Verify release delta, dependencies, migrations, deterministic gates and clean-source reproduction; create dev -> main PR and inspect readiness. Acceptance: phase-10-acceptance.md. No merge/main mutation, Phase 11, deployment or remote migration. External gates remain deferred.
+
+## Checkpoint 1.12A local scope (2026-10-19)
+
+Preserve the dirty dev worktree and accepted 1.11A/B. One implementation owner:
+explainable approved-evidence planning; separate advisory resume-quality versus
+unchanged provenance READY; bounded deterministic extraction-omission warnings.
+Acceptance: red/green public-interface synthetic regressions, focused/full tests,
+typecheck, isolated build/release/privacy checks and independent read-only review.
+No external calls, private database writes, evidence promotion, Git mutations or
+deployment. Owner-private evidence review is procedural only; no private content
+belongs in this plan. Actual model-generated resume/PDF acceptance remains later.
+
+Local result: three original defects reproduced red before their implementation;
+12 new contract regressions plus existing suites pass. Final Node 24.19.0 suite:
+312/312, no skips, including existing browser/PDF safeguards. Typecheck, isolated
+production build, harness, strict complete-source/build privacy triage, runtime,
+startup smoke and whitespace checks pass. Independent specification and engineering
+reviews pass after one consolidated correction cycle (exact-statement coverage,
+partial support, preference clauses, payload minimization and runtime plan fields).
+New disclosures render at 1280/1024/390 in light/dark with no document overflow or
+page errors. Build warnings about chunk size/dependency annotations remain.
+READY/export, scoring and whole-statement certification remain unchanged; advisory
+quality always awaits human review, and extraction warnings are explicitly bounded.
+Next exact step: owner-private statement/scope/period review, then separately
+authorized inference and actual tailored-PDF acceptance. No real evidence approval
+or generated real resume is claimed. No commit or external operation authorized.
+
+Exact checkpoint file scope (earlier dirty changes retained):
+- server/resumeProvenance.ts
+- server/resumeRoutes.ts
+- server/assessment.ts
+- server/assessmentRoutes.ts
+- server/requirementCompleteness.ts (new)
+- server/workspaceRepository.ts
+- server/db/workspaceValidation.ts
+- src/types/index.ts
+- src/types/assessment.ts
+- src/components/JobAnalysisView.tsx
+- src/components/EvaluationPanel.tsx
+- tests/resume-quality-contracts.test.ts (new)
+- tests/phase-5-resume.test.ts
+- docs/exec-plans/active/productionization.md

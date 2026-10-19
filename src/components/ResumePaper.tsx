@@ -16,6 +16,16 @@ export const ResumePaper: React.FC<ResumePaperProps> = ({
 }) => {
   const { activeJob } = useApp();
   const { header, professionalSummary, skills, experience, projects, education } = resume;
+  const contacts = [
+    header.location?.trim() ? <span key="location">{header.location}</span> : null,
+    header.email?.trim() ? <a key="email" href={`mailto:${header.email}`} className="hover:underline text-slate-800">{header.email}</a> : null,
+    header.phone?.trim() ? <span key="phone">{header.phone}</span> : null,
+    ...header.links.filter(link => link.url.trim()).map((link, i) => (
+      <a key={`link-${i}`} href={link.url} target="_blank" rel="noreferrer" className="text-slate-800 hover:underline">
+        {link.label?.trim() ? `${link.label}: ` : ''}{link.url.replace(/^https?:\/\//, '')}
+      </a>
+    )),
+  ].filter(Boolean);
 
   return (
     <div
@@ -31,28 +41,16 @@ export const ResumePaper: React.FC<ResumePaperProps> = ({
         <h1 className="text-2xl font-bold tracking-tight text-slate-950 uppercase">
           {header.name}
         </h1>
-        <div className="flex items-center justify-center space-x-2 text-xs text-slate-700 flex-wrap">
-          <span>{header.location}</span>
-          <span>•</span>
-          <a href={`mailto:${header.email}`} className="hover:underline text-slate-800">
-            {header.email}
-          </a>
-          <span>•</span>
-          <span>{header.phone}</span>
-          {header.links.map((link, i) => (
-            <React.Fragment key={i}>
-              <span>•</span>
-              <a
-                href={link.url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-slate-800 hover:underline"
-              >
-                {link.label}: {link.url.replace(/^https?:\/\//, '')}
-              </a>
-            </React.Fragment>
-          ))}
-        </div>
+        {contacts.length > 0 && (
+          <div className="flex items-center justify-center gap-x-2 gap-y-1 text-xs text-slate-700 flex-wrap">
+            {contacts.map((contact, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <span aria-hidden="true">•</span>}
+                {contact}
+              </React.Fragment>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* Professional Summary */}

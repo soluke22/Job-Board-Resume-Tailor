@@ -77,6 +77,11 @@ export const JobAnalysisView: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {activeJob.assessmentStatus==='STALE' && <p className="text-amber-600">Previous assessment is stale. Reassess to see current scores and recommendation.</p>}
+      <section aria-label="Requirement extraction review" className="text-xs p-3 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-200 space-y-1">
+        <p className="font-semibold">Extraction review: {activeJob.extractionReview?.status || 'NOT_EVALUATED'}</p>
+        <p>{activeJob.extractionReview?.limitations || 'Requirement completeness has not been checked; compare the assessment with the target JD.'}</p>
+        {activeJob.extractionReview?.potentialOmissions.map(o => <p key={`${o.start}-${o.end}`}>Potentially omitted requirement: {o.excerpt}. Review before relying on fit or tailoring.</p>)}
+      </section>
       {fit?.recommendation && <div className="text-sm space-y-2"><p><strong>{fit.recommendation}</strong> · {fit.applicationPriority}</p><p>{fit.verdictReason}</p><p>Why it fits: {fit.whyFits?.join('; ') || 'No approved support'}</p><p>Why it does not: {fit.whyNot?.join('; ') || 'No extracted gap'}</p><p>Unknown constraints: {fit.unknownConstraints?.join('; ') || 'None'}</p></div>}
       {/* Back Button & Title Bar */}
       <div className="flex items-center justify-between">
@@ -112,7 +117,7 @@ export const JobAnalysisView: React.FC = () => {
               ) : (
                 <>
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Tailor Resume & Cover Letter</span>
+                  <span>Tailor Resume</span>
                 </>
               )}
             </button>
@@ -473,7 +478,7 @@ export const JobAnalysisView: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
                 <span className="font-semibold text-slate-800 dark:text-slate-200 block mb-1">
-                  Selected Projects & Allocation:
+                  Candidate Project Statements (review final allocation):
                 </span>
                 <ul className="space-y-1">
                   {tailoringPlan.projectSelection.map((p, i) => (
@@ -489,11 +494,18 @@ export const JobAnalysisView: React.FC = () => {
                 <span className="font-semibold text-slate-800 dark:text-slate-200 block mb-1">
                   Experience Bullets Strategy:
                 </span>
-                <p className="text-slate-600 dark:text-slate-400">
-                  {tailoringPlan.decisions?.filter(d=>d.action !== 'omit').length || 0} requirement selections supported by approved evidence.
-                </p>
+                <ol className="space-y-2 text-slate-600 dark:text-slate-400">
+                  {tailoringPlan.experienceBulletsPlan?.map((p,i) => <li key={p.evidenceId}>
+                    <span className="font-semibold">{p.order ?? i+1}. {p.targetSignal}</span>
+                    <p>{p.plannedAngle}</p><p>Evidence: {p.evidenceId}; employment: {p.scopeId || 'Not recorded — regenerate plan'}</p>
+                  </li>)}
+                </ol>
               </div>
             </div>
+            <ul className="space-y-1 text-slate-600 dark:text-slate-400">
+              {tailoringPlan.requirementPriorities?.map(r => <li key={r.requirementId}>{r.importance}: {r.excerpt} — {r.evidenceIds.length ? r.evidenceIds.join(', ') : 'No approved support; withhold claim'}</li>)}
+              {tailoringPlan.omissions?.map(o => <li key={o.evidenceId}>{o.action}: {o.evidenceId} — {o.reason}</li>)}
+            </ul>
           </div>
         </div>
       )}
@@ -529,7 +541,7 @@ export const JobAnalysisView: React.FC = () => {
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>Tailor Immediately</span>
+                  <span>Tailor Resume</span>
                 </>
               )}
             </button>

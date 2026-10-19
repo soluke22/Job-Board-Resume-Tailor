@@ -21,9 +21,10 @@ const profile = (changes: Partial<SearchProfile> = {}): SearchProfile => ({
   ...structuredClone(DEFAULT_SEARCH_PROFILE), preferredRoleFamilies: ['frontend-product', 'ui-platform-design-systems', 'frontend-heavy-fullstack', 'production-support-frontend'],
   remotePreference: 'remote_only', discoverySources: [], ...changes
 });
+const freshVerification = { status: 'LISTED' as const, isListed: true, lastVerifiedAt: '2026-10-14T12:00:00.000Z', rawDetails: { publishedAt: '2026-10-14T00:00:00.000Z' } };
 const lead = (title: string, location = 'Remote - US', changes: Partial<DiscoveryLead> = {}): DiscoveryLead => ({
   url: `https://jobs.ashbyhq.com/synthetic/${encodeURIComponent(title)}-${encodeURIComponent(location)}`,
-  title, company: 'Synthetic Company', location, remoteStatus: /remote/i.test(location) ? 'remote' : 'unknown', source: 'public-board', ...changes
+  title, company: 'Synthetic Company', description: 'Build React and TypeScript web interfaces.', location, remoteStatus: /remote/i.test(location) ? 'remote' : 'unknown', source: 'public-board', verification: freshVerification, ...changes
 });
 const constraint = (changes: Partial<DiscoverySourceConstraint> = {}): DiscoverySourceConstraint => ({
   roleFamilies: ['frontend-product', 'ui-platform-design-systems', 'frontend-heavy-fullstack', 'production-support-frontend'],
@@ -62,27 +63,29 @@ test('positive engineering families survive and unrelated professions fail deter
   for (const title of ['Frontend Engineer', 'Software Engineer, Product', 'UI Engineer', 'Full Stack Engineer', 'Developer Experience Engineer', 'Design Systems Engineer'])
     assert.equal(roleEligibility(lead(title), search, constraint()).eligible, true, title);
   for (const title of ['Account Executive', 'Finance Manager', 'Partnerships Manager', 'Recruiting Coordinator', 'Policy Lead', 'Customer Success Operations Manager', 'Revenue Analyst', 'Machine Learning Research Manager'])
-    assert.deepEqual(roleEligibility(lead(title), search, constraint()), { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' }, title);
+    assert.equal(roleEligibility(lead(title), search, constraint()).eligible, false, title);
 
   const forward = constraint({ roleFamilies: ['forward-deployed-software'] });
   const forwardTitles = ['Forward Deployed Engineer', 'Forward Deployed Software Engineer', 'Software Engineer, Forward Deployed'];
   for (const title of forwardTitles) {
-    assert.deepEqual(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['forward-deployed-software'] }), forward), { eligible: true, family: 'forward-deployed-software' }, `${title} survives when the FDE family is enabled`);
-    assert.deepEqual(roleEligibility(lead(title), search, constraint()), { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' }, `${title} cannot fall through when the FDE family is disabled`);
+    assert.equal(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['forward-deployed-software'] }), forward).eligible, true, `${title} survives when the FDE family is enabled`);
+    assert.equal(roleEligibility(lead(title), search, constraint()).eligible, false, `${title} cannot fall through when the FDE family is disabled`);
   }
   for (const title of ['Forward Deployed Sales Engineer', 'Forward Deployed Data Engineer', 'Forward Deployed Security Engineer', 'Forward Deployed Solutions Engineer'])
-    assert.deepEqual(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['forward-deployed-software'] }), forward), { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' }, `${title} is not a forward-deployed software occupation`);
+    assert.equal(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['forward-deployed-software'] }), forward).eligible, false, `${title} is not a forward-deployed software occupation`);
   assert.equal(roleEligibility(lead('Product Engineer'), profile({ preferredRoleFamilies: ['frontend-product'] }), constraint({ roleFamilies: ['frontend-product'] })).eligible, true);
-  for (const title of ['Software Engineer, Platform', 'Software Engineer, Developer Platform'])
+  for (const title of ['Frontend Platform Engineer', 'UI Platform Engineer'])
     assert.equal(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['ui-platform-design-systems'] }), constraint({ roleFamilies: ['ui-platform-design-systems'] })).eligible, true, `${title} survives with the configured platform family`);
+  for (const title of ['Software Engineer, Platform', 'Software Engineer, Developer Platform'])
+    assert.equal(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['ui-platform-design-systems'] }), constraint({ roleFamilies: ['ui-platform-design-systems'] })).eligible, false, `${title} stays ambiguous without frontend-platform evidence`);
   for (const title of ['Machine Learning Platform Engineer', 'Data Platform Engineer', 'Security Platform Engineer', 'Infrastructure Platform Engineer', 'Mobile Platform Engineer', 'Backend Platform Engineer'])
-    assert.deepEqual(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['ui-platform-design-systems'] }), constraint({ roleFamilies: ['ui-platform-design-systems'] })), { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' }, `${title} cannot be relabeled as the target platform family`);
+    assert.equal(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['ui-platform-design-systems'] }), constraint({ roleFamilies: ['ui-platform-design-systems'] })).eligible, false, `${title} cannot be relabeled as the target platform family`);
   for (const title of ['Sales Platform Engineer', 'Sales Engineer, Platform', 'Customer Success Platform Engineer', 'Revenue Operations Platform Engineer', 'Solutions Engineer, Developer Platform', 'Developer Advocate, Platform'])
-    assert.deepEqual(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['ui-platform-design-systems'] }), constraint({ roleFamilies: ['ui-platform-design-systems'] })), { eligible: false, reason: 'ROLE_FAMILY_MISMATCH' }, `${title} cannot bypass profession safeguards through platform wording`);
+    assert.equal(roleEligibility(lead(title), profile({ preferredRoleFamilies: ['ui-platform-design-systems'] }), constraint({ roleFamilies: ['ui-platform-design-systems'] })).eligible, false, `${title} cannot bypass profession safeguards through platform wording`);
   assert.equal(roleEligibility(lead('Software Engineer, Production'), profile({ preferredRoleFamilies: ['production-support-frontend'] }), constraint({ roleFamilies: ['production-support-frontend'] })).eligible, true);
   assert.equal(roleEligibility(lead('Frontend Engineer'), profile({ preferredRoleFamilies: ['frontend-product'] }), constraint({ roleFamilies: ['forward-deployed-software'] })).eligible, false, 'profile and company lane intent must overlap');
   assert.equal(roleEligibility(lead('Solutions Engineer'), search, constraint()).eligible, false, 'ambiguous customer-facing titles do not pass by title alone');
-  assert.equal(roleEligibility(lead('Staff Engineer'), search, constraint()).eligible, true, 'unqualified engineering seniority titles remain plausible');
+  assert.equal(roleEligibility(lead('Staff Engineer'), search, constraint()).eligible, false, 'staff-level titles are screened before generic engineering evidence');
   assert.equal(roleEligibility(lead('Software Engineer, Payments'), search, constraint()).eligible, true, 'business-domain labels do not erase an explicit software occupation');
   assert.equal(roleEligibility(lead('Solutions Engineer', 'Remote - US', { department: 'Software Engineering' }), profile({ preferredRoleFamilies: ['forward-deployed-software'] }), constraint({ roleFamilies: ['forward-deployed-software'] })).eligible, true, 'structured technical metadata plus an enabled customer-facing family can admit a borderline title');
   assert.equal(roleEligibility(lead('Developer Advocate', 'Remote - US', { department: 'Developer Relations Engineering' }), profile({ preferredRoleFamilies: ['ui-platform-design-systems'], preferredModifiers: ['DEVELOPER_TOOLING'] }), constraint({ roleFamilies: ['ui-platform-design-systems'] })).eligible, true, 'developer-facing work needs both technical metadata and enabled DX intent');
@@ -122,11 +125,11 @@ test('role and location filters run before fair allocation and source results de
   const outcome = await scanDiscoverySources([a, b, c, d, e], profile(), async item => item.id === 'board-a' ? [...irrelevant, ...aEligible] : item.id === 'board-b' ? bEligible : item.id === 'board-c' ? [roleOnly] : item.id === 'board-e' ? [roleMismatch] : [], verify);
   assert.equal(outcome.jobs.length, 7);
   assert.deepEqual(outcome.sourceResults, [
-    { sourceId: 'board-a', status: 'SUCCESS', fetched: 102, roleEligible: 2, locationEligible: 2, selected: 2 },
-    { sourceId: 'board-b', status: 'SUCCESS', fetched: 5, roleEligible: 5, locationEligible: 5, selected: 5 },
-    { sourceId: 'board-c', status: 'SUCCESS', fetched: 1, roleEligible: 1, locationEligible: 0, selected: 0 },
-    { sourceId: 'board-d', status: 'SUCCESS', fetched: 0, roleEligible: 0, locationEligible: 0, selected: 0 },
-    { sourceId: 'board-e', status: 'SUCCESS', fetched: 1, roleEligible: 0, locationEligible: 0, selected: 0 }
+    { sourceId: 'board-a', status: 'SUCCESS', health: 'SUCCESS', fetched: 102, roleEligible: 2, locationEligible: 2, selected: 2 },
+    { sourceId: 'board-b', status: 'SUCCESS', health: 'SUCCESS', fetched: 5, roleEligible: 5, locationEligible: 5, selected: 5 },
+    { sourceId: 'board-c', status: 'SUCCESS', health: 'ZERO_ELIGIBLE', fetched: 1, roleEligible: 1, locationEligible: 0, selected: 0 },
+    { sourceId: 'board-d', status: 'SUCCESS', health: 'EMPTY_BOARD', fetched: 0, roleEligible: 0, locationEligible: 0, selected: 0 },
+    { sourceId: 'board-e', status: 'SUCCESS', health: 'ZERO_ELIGIBLE', fetched: 1, roleEligible: 0, locationEligible: 0, selected: 0 }
   ]);
   assert.deepEqual(outcome.jobs.slice(0, 4).map(job => job.atsBoard), ['board-a', 'board-b', 'board-a', 'board-b'], 'eligible queues retain round-robin order');
 });
@@ -139,8 +142,8 @@ test('cap, deterministic order, selected-zero diagnostics, failure, and priority
   const second = await scanDiscoverySources(sources, profile(), scan, verify);
   assert.equal(first.jobs.length, 24);
   assert.deepEqual(first.jobs.map(job => job.atsBoard), second.jobs.map(job => job.atsBoard));
-  assert.deepEqual(first.sourceResults[24], { sourceId: 'cap-24', status: 'SUCCESS', fetched: 1, roleEligible: 1, locationEligible: 1, selected: 0 });
-  assert.deepEqual(first.sourceResults[25], { sourceId: 'cap-25', status: 'FAILED', fetched: 0, roleEligible: 0, locationEligible: 0, selected: 0 });
+  assert.deepEqual(first.sourceResults[24], { sourceId: 'cap-24', status: 'SUCCESS', health: 'SUCCESS', fetched: 1, roleEligible: 1, locationEligible: 1, selected: 0 });
+  assert.deepEqual(first.sourceResults[25], { sourceId: 'cap-25', status: 'FAILED', health: 'UNKNOWN_FAILURE', fetched: 0, roleEligible: 0, locationEligible: 0, selected: 0 });
 
   const search = profile({ discoverySources: [source('priority')] });
   const low = sourcesForDiscoveryScope(search, [], [watch('low', 'priority', { priority: 'LOW' })], 'WATCHLIST');
